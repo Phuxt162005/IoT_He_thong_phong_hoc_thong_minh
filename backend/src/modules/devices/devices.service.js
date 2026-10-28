@@ -80,10 +80,15 @@ export class DevicesService {
       return result;
     });
   }
-  async events(user, id, { page, page_size }) {
+  async events(user, id, { page, page_size, ...filters }) {
     await requireDeviceScope(this.pool, user, id);
-    const total = (await this.pool.query("SELECT count(*) FROM device_lifecycle_events WHERE device_id=$1", [id])).rows[0].count;
-    const data = (await this.pool.query("SELECT * FROM device_lifecycle_events WHERE device_id=$1 ORDER BY event_id DESC LIMIT $2 OFFSET $3", [id, page_size, (page - 1) * page_size])).rows;
+    const params = [id]; const clauses = ["device_id=$1"];
+    for (const key of ["from_status", "to_status", "actor_type", "actor_id"]) if (filters[key] !== undefined) { params.push(filters[key]); clauses.push(`${key}=$${params.length}`); }
+    if (filters.from) { params.push(filters.from); clauses.push(`created_at >= $${params.length}`); }
+    if (filters.to) { params.push(filters.to); clauses.push(`created_at < $${params.length}`); }
+    const where = `WHERE ${clauses.join(" AND ")}`;
+    const total = (await this.pool.query(`SELECT count(*) FROM device_lifecycle_events ${where}`, params)).rows[0].count;
+    const data = (await this.pool.query(`SELECT * FROM device_lifecycle_events ${where} ORDER BY created_at DESC,event_id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, page_size, (page - 1) * page_size])).rows;
     return { data, meta: { page, page_size, total: Number(total) } };
   }
 }

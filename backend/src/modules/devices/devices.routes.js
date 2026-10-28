@@ -12,6 +12,7 @@ const createSchema = z.object({ device_code: z.string().regex(/^[A-Za-z0-9_-]{1,
 const patchSchema = z.object({ device_name: name.optional(), room_id: idSchema.nullable().optional(), hardware_version: version.optional(), firmware_version: version.optional() }).strict().refine((v) => Object.keys(v).length > 0);
 const listSchema = z.object({ ...pagination, room_id: idSchema.optional(), device_type: deviceType.optional(), lifecycle_status: lifecycleStatus.optional(), connection_status: z.enum(["UNKNOWN", "ONLINE", "OFFLINE"]).optional() }).strict();
 const actionSchema = z.object({ reason: z.string().trim().min(3).max(255), confirmed: z.boolean().optional() }).strict();
+const eventFilters = z.object({ ...pagination, from_status: lifecycleStatus.optional(), to_status: lifecycleStatus.optional(), actor_type: z.enum(["USER", "DEVICE", "SYSTEM"]).optional(), actor_id: idSchema.optional(), from: z.iso.datetime({ offset: true }).optional(), to: z.iso.datetime({ offset: true }).optional() }).strict().refine((v) => !v.from || !v.to || new Date(v.from) < new Date(v.to));
 
 export function createDevicesRoutes(pool, options) {
   const router = Router();
@@ -23,6 +24,6 @@ export function createDevicesRoutes(pool, options) {
   for (const action of ["maintenance", "resume", "clear-fault", "recover", "decommission"]) {
     router.post(`/devices/:id/${action}`, authorize(pool, "devices:write"), async (req, res) => res.json({ success: true, data: await devices.lifecycle(req.user, parse(idSchema, req.params.id), action, parse(actionSchema, req.body), req.requestId) }));
   }
-  router.get("/devices/:id/lifecycle-events", authorize(pool, "devices:read"), async (req, res) => res.json({ success: true, ...await devices.events(req.user, parse(idSchema, req.params.id), parse(z.object(pagination).strict(), req.query)) }));
+  router.get("/devices/:id/lifecycle-events", authorize(pool, "devices:read"), async (req, res) => res.json({ success: true, ...await devices.events(req.user, parse(idSchema, req.params.id), parse(eventFilters, req.query)) }));
   return router;
 }
