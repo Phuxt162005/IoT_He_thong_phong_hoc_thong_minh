@@ -13,6 +13,7 @@ import { MemoryLogSink } from "../../backend/src/modules/monitoring-logging/logg
 import { DevicePresenceService, bindPresence } from "../../backend/src/modules/device-presence/device-presence.service.js";
 import { CommandsService, bindCommands } from "../../backend/src/modules/commands/commands.service.js";
 import { DeviceConfigService, bindDeviceConfig } from "../../backend/src/modules/device-config/device-config.service.js";
+import { AlertsService } from "../../backend/src/modules/alerts/alerts.service.js";
 
 export async function waitFor(predicate) {
   for (let i = 0; i < 80; i++) { if (await predicate()) return; await new Promise((r) => setTimeout(r, 50)); }
@@ -51,10 +52,11 @@ export async function iotFixture(t) {
   const configs = new DeviceConfigService({ pool: db.pool, mqtt: runtime });
   const unbindConfigs = bindDeviceConfig(runtime, configs);
   t.after(unbindConfigs);
+  const alerts = new AlertsService({ pool: db.pool });
   await once(runtime, "ready", { signal: AbortSignal.timeout(5000) });
   const password = "iot-test-password-only";
   await seed(db.pool, { username: "test_admin", password });
-  const http = await testHttp(t, db.pool, { config, credentials, commands, configs });
+  const http = await testHttp(t, db.pool, { config, credentials, commands, configs, alerts });
   const adminUser = (await http.request("/auth/login", { method: "POST", body: { username: "test_admin", password } })).body.data;
   const token = adminUser.access_token;
   const room = (await http.request("/rooms", { method: "POST", token, body: { room_code: "ROOM_302", room_name: "Room" } })).body.data;
@@ -83,6 +85,6 @@ export async function iotFixture(t) {
     if ((await action(device.device_id, "activate")).status !== 200) throw new Error("Device fixture activation failed");
     return { device, client, topic };
   };
-  return { ...db, ...http, config, logger, mqttSink: sink, adminBroker, serviceInput, credentials, commands, configs, runtime, presence, token, room, register, action, connect,
+  return { ...db, ...http, config, logger, mqttSink: sink, adminBroker, serviceInput, credentials, commands, configs, alerts, runtime, presence, token, room, register, action, connect,
     activateSensor: () => activateNode("SENSOR_NODE"), activateControl: () => activateNode("CONTROL_NODE") };
 }

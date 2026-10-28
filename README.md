@@ -170,6 +170,14 @@ Cho phép cấu hình khi PROVISIONED/ACTIVE/FAULT/MAINTENANCE nếu có heartbe
 
 Revoke, rotate hoặc phiên mới hủy cấu hình chờ; phiên mới đặt giá trị đã áp dụng về chưa xác nhận thay vì đoán thiết bị giữ cấu hình cũ. Firmware cần áp dụng snapshot nguyên tử, chống lặp config_id/version và ACK lại khi nhận trùng. Các kiểm thử hiện dùng MQTT client mô phỏng thiết bị, chưa xác nhận cập nhật tham số trên ESP32 thật.
 
+## Cảnh báo (BE-12)
+
+GET `/api/v1/alerts` hỗ trợ lọc room_id/status/severity/alert_type và phân trang; GET `/alerts/:id` xem chi tiết trong phạm vi. Admin/Operator dùng POST `/alerts/:id/acknowledge` và POST `/alerts/:id/resolve` với `{reason:"Đã kiểm tra"}`. Viewer chỉ đọc. Đóng thủ công không tắt giám sát: điều kiện còn tồn tại sẽ sinh cảnh báo mới.
+
+GET/PUT `/rooms/:id/alert-thresholds` đọc/cấu hình ngưỡng theo phòng; chỉ Admin sửa. Body `{thresholds:[{sensor_type:"TEMPERATURE",severity:"WARNING",operator:"GT",threshold_value:30,clear_value:28,is_enabled:true}]}`. Hỗ trợ TEMPERATURE/HUMIDITY và GT/GTE; CRITICAL không thấp hơn WARNING; ngưỡng phục hồi không cao hơn ngưỡng phát sinh. Mặc định nhiệt độ 30/35°C, độ ẩm 80/90%; phòng chưa cấu hình dùng mặc định.
+
+Mỗi thiết bị/loại chỉ có một cảnh báo chưa đóng, ưu tiên CRITICAL. Ba mẫu mới liên tiếp đạt ngưỡng phục hồi sẽ đóng; nếu còn mức WARNING thì tạo cảnh báo WARNING mới để giữ lịch sử CRITICAL. Telemetry trùng/backfill/cũ/clock-skew không đánh giá cảnh báo. Consumer và dấu đã xử lý cùng transaction, tiếp tục sau restart. Offline/FAULT quét mỗi giây, chống lặp và đóng khi hồi phục/thu hồi thiết bị. Mẫu mới chỉ được đánh giá khi Sensor ACTIVE và phòng ACTIVE.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.
