@@ -217,6 +217,12 @@ Sự kiện phát từ PostgreSQL LISTEN/NOTIFY sau commit, không phát dữ li
 
 Đo cục bộ bằng `node --test tests/integration/dashboard-realtime.test.js`: tính từ trước publish MQTT đến frame telemetry WebSocket; các lần chạy hiện tại khoảng 62–65 ms. Đây là phép đo loopback với client Node mô phỏng, chưa đại diện cho Wi-Fi/ESP32 hay tải production.
 
+## Tra cứu nhật ký (BE-15)
+
+GET `/api/v1/audit-logs` chỉ Admin, phân trang; hỗ trợ actor_type/actor_id/action/target_type/target_id/result/request_id/from/to. Khoảng mặc định 7 ngày gần nhất, tối đa 90 ngày mỗi truy vấn, `[from,to)` theo UTC. Ví dụ `?action=COMMAND_CREATE&target_type=COMMAND&request_id=...`. Kết quả giữ actor, đối tượng, kết quả, metadata nghiệp vụ và thời gian để đối chiếu với command/lifecycle.
+
+GET `/devices/:id/lifecycle-events` giữ phạm vi phòng, thêm lọc from_status/to_status/actor_type/actor_id/from/to. Không có API sửa/xóa nhật ký. Quyền database runtime và trigger chặn cả UPDATE/DELETE/TRUNCATE trên audit/lifecycle; ghi audit và nghiệp vụ quan trọng cùng transaction. Metadata chỉ được truyền theo allowlist của từng nghiệp vụ; helper còn che các key password/token/secret/authorization/API key/credential hash lồng nhau và giới hạn độ sâu/kích thước.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.
