@@ -10,6 +10,7 @@ import { createCommandsRoutes } from "./modules/commands/commands.routes.js";
 import { createDeviceConfigRoutes } from "./modules/device-config/device-config.routes.js";
 import { createAlertsRoutes } from "./modules/alerts/alerts.routes.js";
 import { createAutomationRoutes } from "./modules/automation/automation.routes.js";
+import { createDashboardRoutes } from "./modules/dashboard/dashboard.routes.js";
 
 export function createRoutes({ pool, config, credentials, commands, configs, alerts, automation }) {
   const router = Router();
@@ -24,5 +25,6 @@ export function createRoutes({ pool, config, credentials, commands, configs, ale
   router.use(createDeviceConfigRoutes(pool, configs));
   router.use(createAlertsRoutes(pool, alerts));
   router.use(createAutomationRoutes(pool, automation));
+  router.use(createDashboardRoutes(pool, { freshnessSeconds: config.telemetryFreshnessSeconds }));
   return router;
 }

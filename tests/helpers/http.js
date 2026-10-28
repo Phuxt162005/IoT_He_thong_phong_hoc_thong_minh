@@ -13,7 +13,7 @@ export async function testHttp(t, pool, { config = loadConfig({ JWT_SECRET: rand
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
-    config, sink, base,
+    config, sink, base, server,
     async request(path, { method = "GET", body, token, headers = {} } = {}) {
       const response = await fetch(`${base}/api/v1${path}`, {
         method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },

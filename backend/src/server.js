@@ -16,6 +16,7 @@ import { CommandsService, bindCommands } from "./modules/commands/commands.servi
 import { DeviceConfigService, bindDeviceConfig } from "./modules/device-config/device-config.service.js";
 import { AlertsService } from "./modules/alerts/alerts.service.js";
 import { AutomationService } from "./modules/automation/automation.service.js";
+import { attachRealtime } from "./modules/realtime/realtime.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
@@ -42,9 +43,10 @@ try {
   const alertMonitor = startJob("alert-monitor", async () => { await alerts.consumeTelemetry(); await alerts.scanDevices(); }, { intervalMs: 1000, logger });
   const automationMonitor = startJob("automation-monitor", () => automation.tick(), { intervalMs: 1000, logger });
   let cleaning;
-  const cleanup = () => cleaning ??= (async () => { await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop(), configRecovery.stop(), alertMonitor.stop(), automationMonitor.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindConfigs(); unbindTelemetry(); await pool.end(); })();
-  const ready = async () => { await pool.query("SELECT 1"); return mqtt.ready; };
+  const cleanup = () => cleaning ??= (async () => { await realtime.stop(); await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop(), configRecovery.stop(), alertMonitor.stop(), automationMonitor.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindConfigs(); unbindTelemetry(); await pool.end(); })();
+  const ready = async () => { await pool.query("SELECT 1"); return mqtt.ready && realtime.ready(); };
   const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials, commands, configs, alerts, automation }) }));
+  const realtime = attachRealtime({ server, pool, config, logger });
   server.on("error", async () => { logger.error("server.listen_failed"); process.exitCode = 1; await cleanup(); });
   server.listen(config.port, config.host, () => logger.info("server.started", { host: config.host, port: config.port }));
   let stopping = false;
@@ -52,6 +54,7 @@ try {
     if (stopping) return;
     stopping = true;
     logger.info("server.stopping");
+    void realtime.stop().catch(() => logger.error("realtime.stop_failed"));
     const timeout = setTimeout(() => { server.closeAllConnections(); process.exitCode = 1; }, 10000);
     timeout.unref();
     server.close(async () => { await cleanup(); clearTimeout(timeout); logger.info("server.stopped"); });
