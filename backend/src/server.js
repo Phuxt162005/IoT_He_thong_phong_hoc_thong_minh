@@ -5,14 +5,15 @@ import { createApp } from "./app.js";
 import { LoggingService } from "./modules/monitoring-logging/logging.service.js";
 import { ConsoleLogSink } from "./modules/monitoring-logging/logging.sinks.js";
 import { createPool } from "./database/pool.js";
+import { createRoutes } from "./routes.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
-  const config = loadConfig(process.env, { requireDatabase: true });
+  const config = loadConfig(process.env, { requireDatabase: true, requireAuth: true });
   const pool = createPool(config.databaseUrl);
   pool.on("error", () => logger.error("database.pool_error"));
   const ready = async () => { await pool.query("SELECT 1"); return true; };
-  const server = createServer(createApp({ config, logger, ready }));
+  const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config }) }));
   server.on("error", async () => { logger.error("server.listen_failed"); process.exitCode = 1; await pool.end(); });
   server.listen(config.port, config.host, () => logger.info("server.started", { host: config.host, port: config.port }));
   let stopping = false;

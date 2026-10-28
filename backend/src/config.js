@@ -6,9 +6,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
   DATABASE_URL: z.string().url().refine((v) => /^postgres(ql)?:\/\//.test(v)).optional(),
+  JWT_SECRET: z.string().min(32).optional(),
+  JWT_EXPIRES_IN: z.coerce.number().int().min(60).max(86400).default(3600),
 });
 
-export function loadConfig(env = process.env, { requireDatabase = false } = {}) {
+export function loadConfig(env = process.env, { requireDatabase = false, requireAuth = false } = {}) {
   const result = envSchema.safeParse(env);
   if (!result.success) {
     // Only field names are reported; never echo an environment value.
@@ -16,9 +18,10 @@ export function loadConfig(env = process.env, { requireDatabase = false } = {}) 
   }
   const data = result.data;
   if (requireDatabase && !data.DATABASE_URL) throw new Error("Cấu hình không hợp lệ: DATABASE_URL");
+  if (requireAuth && !data.JWT_SECRET) throw new Error("Cấu hình không hợp lệ: JWT_SECRET");
   const corsOrigins = data.CORS_ORIGINS.split(",").map((v) => v.trim()).filter(Boolean);
   if (corsOrigins.some((v) => { try { return new URL(v).origin !== v; } catch { return true; } })) {
     throw new Error("Cấu hình không hợp lệ: CORS_ORIGINS");
   }
-  return Object.freeze({ env: data.NODE_ENV, host: data.HOST, port: data.PORT, corsOrigins, databaseUrl: data.DATABASE_URL });
+  return Object.freeze({ env: data.NODE_ENV, host: data.HOST, port: data.PORT, corsOrigins, databaseUrl: data.DATABASE_URL, jwtSecret: data.JWT_SECRET, jwtExpiresIn: data.JWT_EXPIRES_IN });
 }
