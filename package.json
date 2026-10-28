@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node backend/src/server.js",
+    "dev": "node --watch backend/src/server.js",
     "test:device-shadow": "node --test tests/device-shadow.test.js",
     "test:telemetry-ingestion": "node --test tests/telemetry-ingestion.test.js",
     "test:monitoring-logging": "node --test tests/monitoring-logging.test.js",
@@ -11,5 +13,12 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "zod": "^4.6.7"
   }
 }
