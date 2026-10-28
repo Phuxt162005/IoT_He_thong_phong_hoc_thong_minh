@@ -1,0 +1,37 @@
+name: smartclassroom
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: smartclass_owner
+      POSTGRES_DB: smartclass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
+    ports: ['127.0.0.1:5433:5432']
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/01-app-role.sh:/docker-entrypoint-initdb.d/01-app-role.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U smartclass_owner -d smartclass']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  db-test:
+    image: postgres:17-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_USER: smartclass_owner
+      POSTGRES_DB: smartclass_test
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
+    ports: ['127.0.0.1:5434:5432']
+    tmpfs: [/var/lib/postgresql/data]
+    volumes:
+      - ./postgres/01-app-role.sh:/docker-entrypoint-initdb.d/01-app-role.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U smartclass_owner -d smartclass_test']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  pgdata:
