@@ -40,6 +40,10 @@ export async function migrate(pool, { appRole = "smartclass_app" } = {}) {
       await client.query(`REVOKE ALL ON schema_migrations FROM "${appRole}"`);
       await client.query(`REVOKE ALL ON audit_logs FROM "${appRole}"`);
       await client.query(`GRANT SELECT, INSERT ON audit_logs TO "${appRole}"`);
+      if ((await client.query("SELECT to_regclass('device_lifecycle_events') AS name")).rows[0].name) {
+        await client.query(`REVOKE ALL ON device_lifecycle_events FROM "${appRole}"`);
+        await client.query(`GRANT SELECT, INSERT ON device_lifecycle_events TO "${appRole}"`);
+      }
       await client.query("COMMIT");
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     return applied;
