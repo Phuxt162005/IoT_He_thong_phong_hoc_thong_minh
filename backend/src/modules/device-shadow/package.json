@@ -1,0 +1,12 @@
+{
+  "name": "smart-classroom-backend-modules",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:device-shadow": "node --test tests/device-shadow.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
