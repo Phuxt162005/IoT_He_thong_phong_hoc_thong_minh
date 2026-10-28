@@ -9,8 +9,9 @@ import { createDeviceCredentialsRoutes } from "./modules/device-credentials/devi
 import { createCommandsRoutes } from "./modules/commands/commands.routes.js";
 import { createDeviceConfigRoutes } from "./modules/device-config/device-config.routes.js";
 import { createAlertsRoutes } from "./modules/alerts/alerts.routes.js";
+import { createAutomationRoutes } from "./modules/automation/automation.routes.js";
 
-export function createRoutes({ pool, config, credentials, commands, configs, alerts }) {
+export function createRoutes({ pool, config, credentials, commands, configs, alerts, automation }) {
   const router = Router();
   const auth = new AuthService({ pool, jwtSecret: config.jwtSecret, jwtExpiresIn: config.jwtExpiresIn });
   router.use(createAuthRoutes(auth));
@@ -22,5 +23,6 @@ export function createRoutes({ pool, config, credentials, commands, configs, ale
   router.use(createCommandsRoutes(pool, commands));
   router.use(createDeviceConfigRoutes(pool, configs));
   router.use(createAlertsRoutes(pool, alerts));
+  router.use(createAutomationRoutes(pool, automation));
   return router;
 }

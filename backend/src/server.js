@@ -15,6 +15,7 @@ import { startJob } from "./common/scheduler.js";
 import { CommandsService, bindCommands } from "./modules/commands/commands.service.js";
 import { DeviceConfigService, bindDeviceConfig } from "./modules/device-config/device-config.service.js";
 import { AlertsService } from "./modules/alerts/alerts.service.js";
+import { AutomationService } from "./modules/automation/automation.service.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
@@ -31,6 +32,7 @@ try {
   const configs = new DeviceConfigService({ pool, mqtt, timeoutSeconds: config.configTimeoutSeconds, heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds });
   const unbindConfigs = bindDeviceConfig(mqtt, configs);
   const alerts = new AlertsService({ pool, freshnessSeconds: config.telemetryFreshnessSeconds });
+  const automation = new AutomationService({ pool, commands, freshnessSeconds: config.telemetryFreshnessSeconds, heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds });
   const telemetry = new TelemetryPipeline({ pool, mqtt, logger, freshnessSeconds: config.telemetryFreshnessSeconds });
   const unbindTelemetry = bindTelemetry(mqtt, telemetry);
   const reconcile = startJob("broker-reconcile", () => credentials.processPending(), { intervalMs: 2000, logger });
@@ -38,10 +40,11 @@ try {
   const commandRecovery = startJob("command-recovery", async () => { await commands.expirePending(); await commands.processPending(); }, { intervalMs: 1000, logger });
   const configRecovery = startJob("config-recovery", async () => { await configs.expirePending(); await configs.processPending(); }, { intervalMs: 1000, logger });
   const alertMonitor = startJob("alert-monitor", async () => { await alerts.consumeTelemetry(); await alerts.scanDevices(); }, { intervalMs: 1000, logger });
+  const automationMonitor = startJob("automation-monitor", () => automation.tick(), { intervalMs: 1000, logger });
   let cleaning;
-  const cleanup = () => cleaning ??= (async () => { await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop(), configRecovery.stop(), alertMonitor.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindConfigs(); unbindTelemetry(); await pool.end(); })();
+  const cleanup = () => cleaning ??= (async () => { await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop(), configRecovery.stop(), alertMonitor.stop(), automationMonitor.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindConfigs(); unbindTelemetry(); await pool.end(); })();
   const ready = async () => { await pool.query("SELECT 1"); return mqtt.ready; };
-  const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials, commands, configs, alerts }) }));
+  const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials, commands, configs, alerts, automation }) }));
   server.on("error", async () => { logger.error("server.listen_failed"); process.exitCode = 1; await cleanup(); });
   server.listen(config.port, config.host, () => logger.info("server.started", { host: config.host, port: config.port }));
   let stopping = false;

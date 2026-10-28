@@ -101,6 +101,7 @@ export class CommandsService {
       let context;
       try {
         context = await this.assertReady(client, device);
+        if (command.source === "AUTOMATION" && !(await this.automationGuard?.(client, command, device))) throw new AppError("AUTOMATION_CANCELLED", 409, "Điều kiện tự động hóa không còn hợp lệ");
         if (device.session_id !== command.session_id || context.credential.version !== command.credential_version) throw new AppError("DEVICE_SESSION_MISMATCH", 409, "Phiên thiết bị đã thay đổi");
       } catch (error) {
         if (!(error instanceof AppError)) throw error;
