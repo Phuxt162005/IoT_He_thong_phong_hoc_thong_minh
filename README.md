@@ -160,6 +160,16 @@ Bảo trì/thu hồi/FAULT, đổi credential hoặc phiên MQTT mới hủy l�
 
 Logic đọc/so sánh shadow và kiểm tra desired patch tái sử dụng ADV-01; luồng command PostgreSQL thực hiện ghi nguyên tử thay cho nhiều lần ghi riêng trong service in-memory. Kiểm thử dùng MQTT client mô phỏng ACK qua Mosquitto thật, chưa xác nhận relay/ESP32 thật.
 
+## Cấu hình thiết bị từ xa (BE-11)
+
+- POST `/api/v1/devices/:id/configs`: Admin gửi `{settings:{sample_interval_seconds:3,heartbeat_interval_seconds:5}}`; trả cấu hình PENDING/version mới.
+- GET cùng endpoint: mọi vai trò trong phạm vi được xem `data.state` (desired/applied) và `data.history`, có phân trang.
+- sample_interval_seconds: 1–300, chỉ Sensor Node; heartbeat_interval_seconds: 1–60 và không quá một phần ba HEARTBEAT_TIMEOUT_S của backend.
+
+Cho phép cấu hình khi PROVISIONED/ACTIVE/FAULT/MAINTENANCE nếu có heartbeat mới, phòng/credential hoạt động. Cấu hình có timeout CONFIG_TIMEOUT_S (mặc định 10 giây), version, session_id và expires_at; lưu trước publish và phục hồi config chưa gửi sau restart. Backend chỉ đổi applied_settings khi nhận ACK SUCCESS đúng thiết bị/phiên/credential/version; ACK cũ không làm lùi version, ACK FAILED không đổi giá trị đã áp dụng.
+
+Revoke, rotate hoặc phiên mới hủy cấu hình chờ; phiên mới đặt giá trị đã áp dụng về chưa xác nhận thay vì đoán thiết bị giữ cấu hình cũ. Firmware cần áp dụng snapshot nguyên tử, chống lặp config_id/version và ACK lại khi nhận trùng. Các kiểm thử hiện dùng MQTT client mô phỏng thiết bị, chưa xác nhận cập nhật tham số trên ESP32 thật.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.

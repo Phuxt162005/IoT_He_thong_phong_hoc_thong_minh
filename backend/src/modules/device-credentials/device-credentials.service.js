@@ -9,6 +9,7 @@ import { transitionDevice } from "../devices/device-lifecycle.js";
 import { requireDeviceScope } from "../devices/devices.service.js";
 import { recordConnectionChange } from "../../database/events.js";
 import { cancelPendingDeviceCommands } from "../commands/command-state.js";
+import { cancelPendingDeviceConfigs } from "../device-config/device-config.state.js";
 
 const safeOperation = (op) => ({ operation_id: op.operation_id, operation: op.operation, status: op.status, attempts: op.attempts, last_error_code: op.last_error_code, applied_at: op.applied_at });
 
@@ -42,6 +43,7 @@ export class DeviceCredentialsService {
       await client.query("UPDATE devices SET broker_sync_status='PENDING',connection_status='UNKNOWN',last_seen=NULL,last_heartbeat_at=NULL,session_id=NULL WHERE device_id=$1", [id]);
       await recordConnectionChange(client, device, "UNKNOWN", "CREDENTIAL_ISSUE");
       await cancelPendingDeviceCommands(client, id, "CREDENTIAL_CHANGED");
+      await cancelPendingDeviceConfigs(client, id, "CREDENTIAL_CHANGED");
       await writeAudit(client, { actorType: "USER", actorId: actor.user_id, action: "DEVICE_CREDENTIAL_ISSUE", targetType: "DEVICE", targetId: id, requestId, details: { credential_id: credentialId, version, operation } });
       return { username: device.device_code, client_id: device.device_code, room_code: room.room_code, version };
     });

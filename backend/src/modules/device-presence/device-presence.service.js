@@ -4,6 +4,7 @@ import { withTransaction } from "../../database/pool.js";
 import { recordConnectionChange } from "../../database/events.js";
 import { resetReportedForSession } from "../commands/command-state.js";
 import { reportedPatchSchema, shadowVersionSchema } from "../commands/command-schemas.js";
+import { resetConfigForSession } from "../device-config/device-config.state.js";
 
 const code = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/);
 const sessionId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -49,6 +50,7 @@ export class DevicePresenceService {
         await client.query("INSERT INTO device_sessions(device_id,session_id,last_timestamp_ms) VALUES($1,$2,$3)", [device.device_id, data.session_id, data.timestamp]);
         await client.query("UPDATE devices SET last_heartbeat_at=NULL WHERE device_id=$1", [device.device_id]);
         await resetReportedForSession(client, device, data.session_id);
+        await resetConfigForSession(client, device);
       }
       const heartbeatAt = envelope.kind === "heartbeat" ? now : null;
       await client.query("UPDATE device_sessions SET last_msg_id=$1,last_timestamp_ms=$2,last_uptime_seconds=coalesce($3,last_uptime_seconds),last_heartbeat_at=coalesce($4,last_heartbeat_at) WHERE device_id=$5 AND session_id=$6", [data.msg_id ?? null, data.timestamp, data.uptime_seconds ?? null, heartbeatAt, device.device_id, data.session_id]);

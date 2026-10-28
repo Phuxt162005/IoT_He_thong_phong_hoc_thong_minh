@@ -9,6 +9,6 @@
   "command": {"command_id":"a318a5b9-2d74-4bde-b933-f4cb5639db2c","device_id":"CTRL_01","room_id":"ROOM_302","session_id":"connection-1","shadow_version":2,"desired_state":{"fan":"ON"},"timestamp":1793181600000,"expires_at":1793181605000},
   "command_ack": {"command_id":"a318a5b9-2d74-4bde-b933-f4cb5639db2c","device_id":"CTRL_01","room_id":"ROOM_302","session_id":"connection-1","shadow_version":2,"status":"SUCCESS","reported_state":{"fan":"ON"},"timestamp":1793181601000},
   "reported": {"device_id":"CTRL_01","room_id":"ROOM_302","session_id":"connection-1","shadow_version":2,"reported_state":{"light":"OFF","fan":"ON"},"timestamp":1793181601000},
-  "config": {"config_id":"25cf6621-c90c-452c-8f38-9ebbc56cb3e8","device_id":"SENSOR_01","room_id":"ROOM_302","version":1,"settings":{"sample_interval_seconds":5,"heartbeat_interval_seconds":10},"timestamp":1793181600000},
-  "config_ack": {"config_id":"25cf6621-c90c-452c-8f38-9ebbc56cb3e8","device_id":"SENSOR_01","room_id":"ROOM_302","version":1,"status":"SUCCESS","timestamp":1793181601000}
+  "config": {"config_id":"25cf6621-c90c-452c-8f38-9ebbc56cb3e8","device_id":"SENSOR_01","room_id":"ROOM_302","session_id":"connection-1","version":1,"settings":{"sample_interval_seconds":5,"heartbeat_interval_seconds":10},"timestamp":1793181600000,"expires_at":1793181610000},
+  "config_ack": {"config_id":"25cf6621-c90c-452c-8f38-9ebbc56cb3e8","device_id":"SENSOR_01","room_id":"ROOM_302","session_id":"connection-1","version":1,"status":"SUCCESS","timestamp":1793181601000,"applied_settings":{"sample_interval_seconds":5,"heartbeat_interval_seconds":10}}
 }
