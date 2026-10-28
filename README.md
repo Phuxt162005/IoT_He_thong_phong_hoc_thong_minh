@@ -178,6 +178,25 @@ GET/PUT `/rooms/:id/alert-thresholds` đọc/cấu hình ngưỡng theo phòng; 
 
 Mỗi thiết bị/loại chỉ có một cảnh báo chưa đóng, ưu tiên CRITICAL. Ba mẫu mới liên tiếp đạt ngưỡng phục hồi sẽ đóng; nếu còn mức WARNING thì tạo cảnh báo WARNING mới để giữ lịch sử CRITICAL. Telemetry trùng/backfill/cũ/clock-skew không đánh giá cảnh báo. Consumer và dấu đã xử lý cùng transaction, tiếp tục sau restart. Offline/FAULT quét mỗi giây, chống lặp và đóng khi hồi phục/thu hồi thiết bị. Mẫu mới chỉ được đánh giá khi Sensor ACTIVE và phòng ACTIVE.
 
+## Tự động hóa (BE-13)
+
+Admin tạo rule qua POST `/api/v1/rooms/:id/automation-rules`, đọc danh sách phân trang qua GET, sửa/tắt qua PATCH `/automation-rules/:id`. Ví dụ body:
+
+```json
+{
+  "name":"Bật quạt khi phòng nóng và có người",
+  "target_device_id":"2","actuator":"FAN","action":"ON",
+  "condition":{"all":[{"metric":"temperature","operator":"GT","value":30},{"metric":"occupancy","operator":"EQ","value":true}]},
+  "hold_seconds":5,"cooldown_seconds":30,"priority":10,"is_enabled":true
+}
+```
+
+Điều kiện hỗ trợ all/any, tối đa 20 nút/độ sâu 4; metric temperature/humidity/lux dùng GT/GTE/LT/LTE/EQ/NE, occupancy dùng EQ/NE boolean. Không có eval hoặc mã tùy ý. Rule có target Control Node trong cùng phòng; actuator LIGHT/FAN, action ON/OFF. Hold 0–300 giây, cooldown 1–3600 giây. Priority số nhỏ ưu tiên cao; trùng priority chọn rule_id nhỏ. Rule thắng giữ ưu tiên cả trong cooldown để tránh hai rule đối nghịch bật/tắt liên tục.
+
+Engine mỗi giây dùng mẫu latest đủ điều kiện mới nhất trong phòng từ Sensor ACTIVE/ONLINE có heartbeat mới; không dùng backfill, clock-skew hoặc mẫu quá TELEMETRY_FRESHNESS_S. Khi nhiều Sensor cùng phòng, chọn mẫu recorded_at mới nhất rồi data_id. Hold/cooldown và ID mẫu đã kích hoạt lưu PostgreSQL; ngừng đánh giá quá cửa sổ freshness làm hold bắt đầu lại. Cùng mẫu không tạo lệnh lần hai, lệnh đang chờ và trạng thái đã đồng bộ không tạo lệnh thừa. Lệnh tự động đi qua cùng outbox/ACK/timeout/audit với lệnh thủ công và kiểm tra lại rule/dữ liệu trước publish.
+
+Admin/Operator dùng PUT `/devices/:id/control-mode` với `{control_mode:"MANUAL",reason:"Vận hành thủ công"}` hoặc AUTO trong phạm vi. MANUAL dừng và hủy lệnh tự động đang chờ. Lệnh thủ công ưu tiên trong MANUAL_OVERRIDE_S kể cả khi chế độ AUTO; chuyển AUTO rõ ràng xóa thời gian override. Viewer chỉ đọc rule.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.

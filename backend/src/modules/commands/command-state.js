@@ -14,8 +14,8 @@ export async function finishCommand(client, command, status, errorCode, { ackPay
   return updated;
 }
 
-export async function cancelPendingDeviceCommands(client, deviceId, errorCode) {
-  const pending = (await client.query("SELECT * FROM commands WHERE device_id=$1 AND status='PENDING' ORDER BY created_at FOR UPDATE", [deviceId])).rows;
+export async function cancelPendingDeviceCommands(client, deviceId, errorCode, source = null) {
+  const pending = (await client.query("SELECT * FROM commands WHERE device_id=$1 AND status='PENDING' AND ($2::text IS NULL OR source=$2) ORDER BY created_at FOR UPDATE", [deviceId, source])).rows;
   for (const command of pending) {
     const expired = command.timeout_at <= new Date();
     await finishCommand(client, command, expired ? "TIMEOUT" : "FAILED", expired ? "ACK_TIMEOUT" : errorCode);
