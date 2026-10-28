@@ -11,8 +11,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-04 | Đã push và tích hợp | [PR #5](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/5), head `727683a`, merge `16dae03`; sau tích hợp ADV-04 có 38 unit và 14 integration test đạt cục bộ/CI. |
 | BE-05 | Đã push và tích hợp | [PR #6](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/6), commit `0dfcfac`, merge `af5ea7d`; 38 unit và 18 integration test đạt cục bộ/CI. |
 | BE-06 | Đã push và tích hợp | [PR #7](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/7), commit `0c402ce`, merge `6a09eb3`; 38 unit và 23 integration test đạt cục bộ/CI. Provision/activate/revoke được nối với broker thật ở BE-07. |
-| BE-07 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 28 integration test đạt, có Mosquitto 2.1.2 thật: credential/ACL/client ID, heartbeat trước activate, rotation/revoke ngắt phiên và chặn reconnect; outbox mã hóa phục hồi qua restart, audit rollback trước broker mutation. Runtime readiness và smoke app+DB+MQTT đạt. |
-| BE-08–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-07 | Đã push và tích hợp | [PR #8](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/8), commit `188331b`, merge `0547e5b`; 39 unit và 28 integration test PostgreSQL/Mosquitto thật đạt cục bộ/CI. |
+| BE-08 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 35 integration test đạt: MQTT→PostgreSQL→ACK, retry đồng thời, xung đột ID, DB rollback không ACK, legacy/backfill/clock_skew, lỗi cảm biến/FAULT, chặn thiết bị đã thu hồi. Sửa correlationData cho Dynamic Security khi chạy nhiều module đồng thời. |
+| BE-09–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 

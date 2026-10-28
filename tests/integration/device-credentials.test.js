@@ -1,61 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
-import { once } from "node:events";
-import mqtt from "mqtt";
-import { testDatabase } from "../helpers/database.js";
-import { testHttp } from "../helpers/http.js";
-import { seed } from "../../backend/src/database/seed.js";
-import { loadConfig } from "../../backend/src/config.js";
 import { DynamicSecurity } from "../../backend/src/mqtt/dynamic-security.js";
-import { MqttRuntime } from "../../backend/src/mqtt/runtime.js";
 import { DeviceCredentialsService } from "../../backend/src/modules/device-credentials/device-credentials.service.js";
-import { LoggingService } from "../../backend/src/modules/monitoring-logging/logging.service.js";
-import { MemoryLogSink } from "../../backend/src/modules/monitoring-logging/logging.sinks.js";
-
-async function waitFor(predicate) {
-  for (let i = 0; i < 60; i++) { if (await predicate()) return; await new Promise((r) => setTimeout(r, 50)); }
-  throw new Error("Timed out waiting for MQTT state");
-}
-async function fixture(t) {
-  const db = await testDatabase(t);
-  const mqttUrl = process.env.TEST_MQTT_URL;
-  if (!mqttUrl || new URL(mqttUrl).port !== "1885") throw new Error("MQTT integration requires isolated TEST_MQTT_URL on port 1885");
-  const config = loadConfig({ JWT_SECRET: randomBytes(48).toString("hex"), MQTT_URL: mqttUrl, MQTT_PASSWORD: process.env.TEST_MQTT_PASSWORD, MQTT_ADMIN_PASSWORD: process.env.TEST_MQTT_ADMIN_PASSWORD, DEVICE_SECRET_KEY: randomBytes(32).toString("hex") }, { requireBroker: true });
-  const adminBroker = new DynamicSecurity({ url: mqttUrl, password: config.mqttAdminPassword });
-  const serviceInput = { pool: db.pool, admin: adminBroker, secretKey: config.deviceSecretKey, mqttUrl };
-  const credentials = new DeviceCredentialsService(serviceInput);
-  const runtime = new MqttRuntime({ config, pool: db.pool, logger: new LoggingService({ sink: new MemoryLogSink() }) });
-  await once(runtime, "ready", { signal: AbortSignal.timeout(5000) });
-  t.after(() => runtime.stop());
-  const password = "credential-test-password-only";
-  await seed(db.pool, { username: "test_admin", password });
-  const http = await testHttp(t, db.pool, { config, credentials });
-  const adminUser = (await http.request("/auth/login", { method: "POST", body: { username: "test_admin", password } })).body.data;
-  const token = adminUser.access_token;
-  const room = (await http.request("/rooms", { method: "POST", token, body: { room_code: "ROOM_302", room_name: "Room" } })).body.data;
-  const identities = [];
-  const clients = [];
-  t.after(async () => {
-    for (const client of clients) await client.endAsync(true);
-    for (const username of identities) if (await adminBroker.getClient(username)) await adminBroker.request({ command: "deleteClient", username });
-  });
-  const register = async (type = "SENSOR_NODE") => {
-    const device_code = `T_${randomBytes(8).toString("hex")}`;
-    identities.push(device_code);
-    const response = await http.request("/devices", { method: "POST", token, body: { device_code, device_name: type, device_type: type, room_id: room.room_id, firmware_version: "test-1" } });
-    assert.equal(response.status, 201);
-    return response.body.data;
-  };
-  const action = (id, name, extra = {}) => http.request(`/devices/${id}/${name}`, { method: "POST", token, body: { reason: "Integration test", ...extra } });
-  const connect = async (credential, overrides = {}) => {
-    const client = await mqtt.connectAsync(mqttUrl, { username: credential.username, password: credential.password, clientId: credential.client_id, protocolVersion: 5, reconnectPeriod: 0, connectTimeout: 2000, ...overrides });
-    client.on("error", () => {});
-    clients.push(client);
-    return client;
-  };
-  return { ...db, ...http, config, adminBroker, serviceInput, credentials, runtime, token, room, register, action, connect };
-}
+import { iotFixture as fixture, waitFor } from "../helpers/iot.js";
 
 test("real broker provisioning requires authenticated heartbeat before activation and never stores plaintext", async (t) => {
   const f = await fixture(t);
@@ -151,4 +98,14 @@ test("credential audit failure prevents broker mutation and rolls back database 
   assert.equal((await f.pool.query("SELECT * FROM device_credentials WHERE device_id=$1", [device.device_id])).rowCount, 0);
   assert.equal((await f.pool.query("SELECT lifecycle_status FROM devices WHERE device_id=$1", [device.device_id])).rows[0].lifecycle_status, "REGISTERED");
   assert.equal(await f.adminBroker.getClient(device.device_code), null);
+});
+
+test("concurrent Dynamic Security replies stay correlated to their requested identities", async (t) => {
+  const f = await fixture(t);
+  const names = Array.from({ length: 8 }, (_, i) => i % 2 ? `MISSING_${i}` : f.config.mqttUsername);
+  const result = await Promise.all(names.map((name) => f.adminBroker.getClient(name)));
+  for (let i = 0; i < names.length; i++) {
+    if (i % 2) assert.equal(result[i], null);
+    else assert.equal(result[i].username, f.config.mqttUsername);
+  }
 });
