@@ -10,8 +10,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-03 | Đã push và tích hợp | [PR #4](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/4), commit `55d0a81`, merge `ef6a631`; 29 unit và 9 integration test đạt cục bộ/CI; smoke entrypoint thật với database ứng dụng cũng đạt. |
 | BE-04 | Đã push và tích hợp | [PR #5](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/5), head `727683a`, merge `16dae03`; sau tích hợp ADV-04 có 38 unit và 14 integration test đạt cục bộ/CI. |
 | BE-05 | Đã push và tích hợp | [PR #6](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/6), commit `0dfcfac`, merge `af5ea7d`; 38 unit và 18 integration test đạt cục bộ/CI. |
-| BE-06 | Đã kiểm thử phần nội bộ, chờ push/CI | 38 unit và 23 integration test đạt; đăng ký/gán phòng, metadata, maintenance/recovery/decommission, lịch sử append-only, concurrency/rollback. Provision/activate/revoke được nối và kiểm thử broker ở BE-07. |
-| BE-07–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-06 | Đã push và tích hợp | [PR #7](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/7), commit `0c402ce`, merge `6a09eb3`; 38 unit và 23 integration test đạt cục bộ/CI. Provision/activate/revoke được nối với broker thật ở BE-07. |
+| BE-07 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 28 integration test đạt, có Mosquitto 2.1.2 thật: credential/ACL/client ID, heartbeat trước activate, rotation/revoke ngắt phiên và chặn reconnect; outbox mã hóa phục hồi qua restart, audit rollback trước broker mutation. Runtime readiness và smoke app+DB+MQTT đạt. |
+| BE-08–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 

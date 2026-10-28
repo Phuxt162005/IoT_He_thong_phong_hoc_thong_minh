@@ -36,6 +36,9 @@ jobs:
     env:
       TEST_MIGRATION_DATABASE_URL: postgres://smartclass_owner:ci-test-owner-password@localhost:5432/smartclass_test
       TEST_DATABASE_URL: postgres://smartclass_app:ci-test-app-password@localhost:5432/smartclass_test
+      TEST_MQTT_URL: mqtt://127.0.0.1:1885
+      TEST_MQTT_ADMIN_PASSWORD: ci-test-mqtt-admin-password
+      TEST_MQTT_PASSWORD: ci-test-mqtt-backend-password
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,4 +48,12 @@ jobs:
       - run: npm ci
       - name: Create restricted test role
         run: psql "$TEST_MIGRATION_DATABASE_URL" -c "CREATE ROLE smartclass_app LOGIN PASSWORD 'ci-test-app-password';"
+      - name: Start isolated MQTT broker
+        run: |
+          docker run -d --name smartclass-mqtt-test -p 127.0.0.1:1885:1883 -e MQTT_ADMIN_PASSWORD="$TEST_MQTT_ADMIN_PASSWORD" -v "$GITHUB_WORKSPACE/deployment/mosquitto:/mosquitto/config:ro" --entrypoint /bin/sh eclipse-mosquitto:2 /mosquitto/config/start.sh
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if docker exec smartclass-mqtt-test nc -z 127.0.0.1 1883; then break; fi
+            sleep 1
+          done
+          npm run mqtt:bootstrap:test
       - run: npm run test:integration

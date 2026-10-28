@@ -5,8 +5,9 @@ import { apiRateLimit } from "./common/authorization.js";
 import { createUsersRoutes } from "./modules/users/users.routes.js";
 import { createRoomsRoutes } from "./modules/rooms/rooms.routes.js";
 import { createDevicesRoutes } from "./modules/devices/devices.routes.js";
+import { createDeviceCredentialsRoutes } from "./modules/device-credentials/device-credentials.routes.js";
 
-export function createRoutes({ pool, config }) {
+export function createRoutes({ pool, config, credentials }) {
   const router = Router();
   const auth = new AuthService({ pool, jwtSecret: config.jwtSecret, jwtExpiresIn: config.jwtExpiresIn });
   router.use(createAuthRoutes(auth));
@@ -14,5 +15,6 @@ export function createRoutes({ pool, config }) {
   router.use(createUsersRoutes(pool));
   router.use(createRoomsRoutes(pool));
   router.use(createDevicesRoutes(pool));
+  router.use(createDeviceCredentialsRoutes(pool, credentials));
   return router;
 }
