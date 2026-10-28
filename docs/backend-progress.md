@@ -20,7 +20,7 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-13 | Đã push và tích hợp | [PR #14](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/14), commit `ab4c437`, merge `5cf484d`; 39 unit và 66 integration test đạt cục bộ/CI. |
 | BE-14 | Đã push và tích hợp | [PR #15](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/15), commit `d631fe9`, merge `67e411b`; 39 unit và 72 integration test đạt cục bộ/CI; entrypoint smoke đạt. Loopback MQTT→WS khoảng 62–65 ms. |
 | BE-15 | Đã push và tích hợp | [PR #16](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/16), commit `ed2cabd`, merge `996e148`; 39 unit và 76 integration test đạt cục bộ/CI. |
-| BE-16 | Backend đã kiểm thử cục bộ, chờ push/CI | 40 unit và 79 integration test đạt; Docker app healthy, luồng thiết bị mô phỏng, backup/restore có dữ liệu, checksum/quyền/trigger, graceful restart; OpenAPI phủ 53 operations. Chưa nghiệm thu ESP32/frontend/TLS production, chưa tạo tag toàn hệ thống. |
+| BE-16 | Đã push và tích hợp phần backend | [PR #17](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/17), commit `1764052`, merge `395e016`; 40 unit và 79 integration test đạt cục bộ, clone sạch và CI; job Docker build/demo/backup/restore/graceful restart đạt. OpenAPI phủ 53 operations. Chờ nghiệm thu ESP32/frontend/TLS production; chưa tạo tag toàn hệ thống. |
 
 ## Ghi chú triển khai
 
@@ -28,3 +28,4 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 - Docker Desktop đã chạy; hai container PostgreSQL 17 cho ứng dụng và test đã healthy, chỉ mở cổng loopback. `.env`/`.env.test` chứa secret ngẫu nhiên cục bộ và được loại khỏi Git.
 - Trong BE-04, origin/main có ADV-04 mới (`9ee8666`) làm mất script start/dev/database/integration trong package.json. Đã merge phần AI của nhóm và khôi phục đầy đủ script backend, giữ test:anomaly-detection; kiểm tra lại trước khi tích hợp BE-04.
 - BE-16: các phòng `CHECK_*` trong database ứng dụng là bằng chứng demo Node MQTT mô phỏng; thiết bị đã revoke/decommission và phòng INACTIVE, giữ lịch sử. Backup nằm trong deployment/backups bị Git bỏ qua. Xem [vận hành](backend-operations.md) và [báo cáo kiểm chứng](backend-verification.md).
+- 29/10/2026: BE-00–16 đã có mã backend, kiểm thử và PR tích hợp riêng theo thứ tự. Bản clone mới từ GitHub chạy `npm ci`, 40 unit và 79 integration test đạt. CI BE-16 chạy stack Docker mới với secret sinh ngẫu nhiên, demo MQTT và restore/restart đạt. Phần nghiệm thu phần cứng/frontend được giữ là việc ngoài môi trường, không đánh dấu đã kiểm chứng.

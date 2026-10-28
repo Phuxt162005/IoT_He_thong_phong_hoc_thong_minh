@@ -75,6 +75,8 @@ test("history ranges and CSV are bounded and escaped, with authorization on ever
   assert.equal(csv.status, 200); assert.match(csv.headers.get("content-type"), /text\/csv/);
   assert.match(await csv.text(), /temperature,humidity,lux,occupancy/);
   assert.equal(csvCell('=HYPERLINK("evil")'), '"\'=HYPERLINK(""evil"")"');
+  assert.equal(csvCell(-5), '"-5"');
+  assert.equal(csvCell("-5+1"), '"\'-5+1"');
   await f.owner.query(`INSERT INTO sensor_data(device_id,room_id,msg_id,recorded_at,received_at,temperature,humidity,lux,payload_hash)
     SELECT $1,$2,'BULK_' || x,now(),now(),25,50,100,repeat('0',64) FROM generate_series(1,5001) x`, [f.sensor.device.device_id, f.room.room_id]);
   assert.equal((await f.request(`${path}/export`, { token: f.token })).status, 413);
