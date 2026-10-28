@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+!.env.test.example
+*.log
+coverage/
+.local/
+deployment/runtime/
+deployment/backups/
+*.key
+*.pem
+*.p12
+__pycache__/
