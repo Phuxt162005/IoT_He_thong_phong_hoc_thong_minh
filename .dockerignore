@@ -1,0 +1,9 @@
+**
+!package.json
+!package-lock.json
+!backend/
+!backend/**
+!database/
+!database/**
+!deployment/
+!deployment/Dockerfile

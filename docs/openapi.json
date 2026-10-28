@@ -1,0 +1,3823 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Smart Classroom Backend",
+    "version": "1.0.0-backend",
+    "description": "Backend HTTP contract. Authenticated requests are limited to 100/minute/user. Roles and room membership are checked server-side. For MQTT and WebSocket first-frame authentication see backend-contracts.md and README.md. Hardware acceptance is pending."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Docker/Node; production uses HTTPS."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Process liveness",
+        "description": "",
+        "operationId": "get__health",
+        "tags": [
+          "Health"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Expected schema, database, MQTT subscriptions and realtime listener readiness",
+        "description": "",
+        "operationId": "get__ready",
+        "tags": [
+          "Health"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Login; 5 failed attempts per username/IP in 15 minutes",
+        "description": "",
+        "operationId": "post__api_v1_auth_login",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "summary": "Current user",
+        "description": "",
+        "operationId": "get__api_v1_auth_me",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "Invalidate all user tokens",
+        "description": "",
+        "operationId": "post__api_v1_auth_logout",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "summary": "Change password and invalidate all tokens",
+        "description": "",
+        "operationId": "post__api_v1_auth_change_password",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "summary": "Admin lists users",
+        "description": "",
+        "operationId": "get__api_v1_users",
+        "tags": [
+          "users"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ADMIN",
+                "OPERATOR",
+                "VIEWER"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin creates user",
+        "description": "",
+        "operationId": "post__api_v1_users",
+        "tags": [
+          "users"
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "summary": "Admin reads user",
+        "description": "",
+        "operationId": "get__api_v1_users__id_",
+        "tags": [
+          "users"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Admin changes user, preserving the last active Admin",
+        "description": "",
+        "operationId": "patch__api_v1_users__id_",
+        "tags": [
+          "users"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms": {
+      "get": {
+        "summary": "Scoped rooms",
+        "description": "",
+        "operationId": "get__api_v1_rooms",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin creates room",
+        "description": "",
+        "operationId": "post__api_v1_rooms",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}": {
+      "get": {
+        "summary": "Scoped room detail",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id_",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Admin updates room",
+        "description": "",
+        "operationId": "patch__api_v1_rooms__id_",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomPatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/users": {
+      "get": {
+        "summary": "Admin reads room membership",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__users",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Admin replaces membership; changed scope invalidates tokens",
+        "description": "",
+        "operationId": "put__api_v1_rooms__id__users",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomMembers"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "summary": "Scoped device list",
+        "description": "",
+        "operationId": "get__api_v1_devices",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "room_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SENSOR_NODE",
+                "CONTROL_NODE"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "lifecycle_status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REGISTERED",
+                "PROVISIONED",
+                "ACTIVE",
+                "FAULT",
+                "MAINTENANCE",
+                "REVOKED",
+                "DECOMMISSIONED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "connection_status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UNKNOWN",
+                "ONLINE",
+                "OFFLINE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin registers device",
+        "description": "",
+        "operationId": "post__api_v1_devices",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "get": {
+        "summary": "Scoped device detail",
+        "description": "",
+        "operationId": "get__api_v1_devices__id_",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Admin updates metadata; reassignment only while REGISTERED",
+        "description": "",
+        "operationId": "patch__api_v1_devices__id_",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevicePatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/maintenance": {
+      "post": {
+        "summary": "Admin maintenance",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__maintenance",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/resume": {
+      "post": {
+        "summary": "Admin resume",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__resume",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/clear-fault": {
+      "post": {
+        "summary": "Admin clear-fault",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__clear_fault",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/recover": {
+      "post": {
+        "summary": "Admin recover",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__recover",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/decommission": {
+      "post": {
+        "summary": "Admin decommission",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__decommission",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/provision": {
+      "post": {
+        "summary": "Admin provision",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__provision",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/rotate-credentials": {
+      "post": {
+        "summary": "Admin rotate-credentials",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__rotate_credentials",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/revoke": {
+      "post": {
+        "summary": "Admin revoke",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__revoke",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/activate": {
+      "post": {
+        "summary": "Admin activate",
+        "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
+        "operationId": "post__api_v1_devices__id__activate",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/broker-status": {
+      "get": {
+        "summary": "Scoped broker synchronization status; no secret",
+        "description": "",
+        "operationId": "get__api_v1_devices__id__broker_status",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/lifecycle-events": {
+      "get": {
+        "summary": "Scoped immutable lifecycle history",
+        "description": "",
+        "operationId": "get__api_v1_devices__id__lifecycle_events",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "from_status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REGISTERED",
+                "PROVISIONED",
+                "ACTIVE",
+                "FAULT",
+                "MAINTENANCE",
+                "REVOKED",
+                "DECOMMISSIONED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REGISTERED",
+                "PROVISIONED",
+                "ACTIVE",
+                "FAULT",
+                "MAINTENANCE",
+                "REVOKED",
+                "DECOMMISSIONED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USER",
+                "DEVICE",
+                "SYSTEM"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/commands": {
+      "get": {
+        "summary": "Scoped command history",
+        "description": "",
+        "operationId": "get__api_v1_devices__id__commands",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin/Operator creates manual command",
+        "description": "",
+        "operationId": "post__api_v1_devices__id__commands",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "description": "60-second cache per user/device. Same key with different content gives 409; cached response 200."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/shadow": {
+      "get": {
+        "summary": "Scoped desired/reported state and differences",
+        "description": "",
+        "operationId": "get__api_v1_devices__id__shadow",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/configs": {
+      "get": {
+        "summary": "Scoped desired/applied configuration and history",
+        "description": "",
+        "operationId": "get__api_v1_devices__id__configs",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin requests versioned configuration",
+        "description": "",
+        "operationId": "post__api_v1_devices__id__configs",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts": {
+      "get": {
+        "summary": "Scoped alert history",
+        "description": "",
+        "operationId": "get__api_v1_alerts",
+        "tags": [
+          "alerts"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "room_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "ACKNOWLEDGED",
+                "RESOLVED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "WARNING",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "alert_type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TEMP_HIGH",
+                "HUMIDITY_HIGH",
+                "DEVICE_OFFLINE",
+                "DEVICE_FAULT"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}": {
+      "get": {
+        "summary": "Scoped alert detail",
+        "description": "",
+        "operationId": "get__api_v1_alerts__id_",
+        "tags": [
+          "alerts"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/acknowledge": {
+      "post": {
+        "summary": "Admin/Operator acknowledges alert",
+        "description": "",
+        "operationId": "post__api_v1_alerts__id__acknowledge",
+        "tags": [
+          "alerts"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/resolve": {
+      "post": {
+        "summary": "Admin/Operator resolves alert",
+        "description": "",
+        "operationId": "post__api_v1_alerts__id__resolve",
+        "tags": [
+          "alerts"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertResolve"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/alert-thresholds": {
+      "get": {
+        "summary": "Scoped effective thresholds",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__alert_thresholds",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Admin overrides room thresholds",
+        "description": "",
+        "operationId": "put__api_v1_rooms__id__alert_thresholds",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Thresholds"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/automation-rules": {
+      "get": {
+        "summary": "Scoped automation rules",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__automation_rules",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin creates rule; lower priority number wins",
+        "description": "",
+        "operationId": "post__api_v1_rooms__id__automation_rules",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/automation-rules/{id}": {
+      "patch": {
+        "summary": "Admin updates/disables rule",
+        "description": "",
+        "operationId": "patch__api_v1_automation_rules__id_",
+        "tags": [
+          "automation-rules"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulePatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/control-mode": {
+      "put": {
+        "summary": "Admin/Operator changes AUTO/MANUAL mode",
+        "description": "",
+        "operationId": "put__api_v1_devices__id__control_mode",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlMode"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "summary": "Scoped dashboard",
+        "description": "",
+        "operationId": "get__api_v1_dashboard",
+        "tags": [
+          "dashboard"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "room_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/telemetry": {
+      "get": {
+        "summary": "Scoped measured-time history; default 24h, maximum 31 days",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__telemetry",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "device_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/telemetry": {
+      "get": {
+        "summary": "Scoped measured-time history; default 24h, maximum 31 days",
+        "description": "",
+        "operationId": "get__api_v1_devices__id__telemetry",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "device_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/telemetry/latest": {
+      "get": {
+        "summary": "Scoped latest sample per Sensor, with stale flag",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__telemetry_latest",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/telemetry/stats": {
+      "get": {
+        "summary": "UTC hourly/daily statistics, excluding clock-skew; maximum 31 days",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__telemetry_stats",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "day"
+              ],
+              "default": "hour"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{id}/telemetry/export": {
+      "get": {
+        "summary": "Scoped CSV, maximum 5000 samples and 31 days",
+        "description": "",
+        "operationId": "get__api_v1_rooms__id__telemetry_export",
+        "tags": [
+          "rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "device_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV attachment, up to 5000 rows.",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit-logs": {
+      "get": {
+        "summary": "Admin searches append-only audit; default 7 days, maximum 90 days",
+        "description": "",
+        "operationId": "get__api_v1_audit_logs",
+        "tags": [
+          "audit-logs"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "actor_type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USER",
+                "DEVICE",
+                "SYSTEM"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_type",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "result",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUCCESS",
+                "FAILURE",
+                "DENIED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "request_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Id": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]{0,18}$",
+        "description": "PostgreSQL BIGINT ID, serialized as a string."
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "success",
+          "error",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "Result": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "const": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "description": "Lists: page, page_size, total; time queries also return from/to."
+          }
+        }
+      },
+      "Login": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordChange": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "additionalProperties": false
+      },
+      "UserCreate": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]{3,64}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "display_name",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "UserPatch": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "RoomCreate": {
+        "type": "object",
+        "properties": {
+          "room_code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,40}$"
+          },
+          "room_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "room_code",
+          "room_name"
+        ],
+        "additionalProperties": false
+      },
+      "RoomPatch": {
+        "type": "object",
+        "properties": {
+          "room_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "RoomMembers": {
+        "type": "object",
+        "properties": {
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            },
+            "maxItems": 500,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceCreate": {
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,40}$"
+          },
+          "device_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "device_type": {
+            "type": "string",
+            "enum": [
+              "SENSOR_NODE",
+              "CONTROL_NODE"
+            ]
+          },
+          "room_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "PostgreSQL BIGINT ID, serialized as a string."
+          },
+          "hardware_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "firmware_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "device_code",
+          "device_name",
+          "device_type"
+        ],
+        "additionalProperties": false
+      },
+      "DevicePatch": {
+        "type": "object",
+        "properties": {
+          "device_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "room_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "PostgreSQL BIGINT ID, serialized as a string."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hardware_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "firmware_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "DesiredState": {
+        "type": "object",
+        "properties": {
+          "light": {
+            "type": "string",
+            "enum": [
+              "ON",
+              "OFF"
+            ]
+          },
+          "fan": {
+            "type": "string",
+            "enum": [
+              "ON",
+              "OFF"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "CommandCreate": {
+        "type": "object",
+        "properties": {
+          "desired_state": {
+            "$ref": "#/components/schemas/DesiredState"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "desired_state"
+        ],
+        "additionalProperties": false
+      },
+      "ConfigCreate": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "sample_interval_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300
+              },
+              "heartbeat_interval_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60
+              }
+            },
+            "required": [],
+            "additionalProperties": false,
+            "minProperties": 1,
+            "description": "Sample interval is Sensor-only. Heartbeat interval must be <= HEARTBEAT_TIMEOUT_S / 3."
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "AlertResolve": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "Thresholds": {
+        "type": "object",
+        "properties": {
+          "thresholds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "sensor_type": {
+                  "type": "string",
+                  "enum": [
+                    "TEMPERATURE",
+                    "HUMIDITY"
+                  ]
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "WARNING",
+                    "CRITICAL"
+                  ]
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "GT",
+                    "GTE"
+                  ]
+                },
+                "threshold_value": {
+                  "type": "number"
+                },
+                "clear_value": {
+                  "type": "number"
+                },
+                "is_enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "sensor_type",
+                "severity",
+                "operator",
+                "threshold_value",
+                "clear_value",
+                "is_enabled"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Unique sensor/severity pairs; critical >= warning and clear <= threshold. Temperature -10..60°C; humidity 0..100%."
+          }
+        },
+        "required": [
+          "thresholds"
+        ],
+        "additionalProperties": false
+      },
+      "Condition": {
+        "description": "Bounded interpreter: at most 20 nodes and depth 4; all/any arrays contain 1..10 children. No code evaluation.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "items": {
+                  "$ref": "#/components/schemas/Condition"
+                }
+              }
+            },
+            "required": [
+              "all"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "any": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "items": {
+                  "$ref": "#/components/schemas/Condition"
+                }
+              }
+            },
+            "required": [
+              "any"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "metric": {
+                "type": "string",
+                "enum": [
+                  "temperature",
+                  "humidity",
+                  "lux"
+                ]
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "GT",
+                  "GTE",
+                  "LT",
+                  "LTE",
+                  "EQ",
+                  "NE"
+                ]
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "metric",
+              "operator",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "metric": {
+                "const": "occupancy"
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "EQ",
+                  "NE"
+                ]
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "metric",
+              "operator",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "RuleCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "target_device_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "PostgreSQL BIGINT ID, serialized as a string."
+          },
+          "actuator": {
+            "type": "string",
+            "enum": [
+              "LIGHT",
+              "FAN"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ON",
+              "OFF"
+            ]
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "hold_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "cooldown_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "is_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "target_device_id",
+          "actuator",
+          "action",
+          "condition",
+          "hold_seconds",
+          "cooldown_seconds",
+          "priority",
+          "is_enabled"
+        ],
+        "additionalProperties": false
+      },
+      "RulePatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "target_device_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "PostgreSQL BIGINT ID, serialized as a string."
+          },
+          "actuator": {
+            "type": "string",
+            "enum": [
+              "LIGHT",
+              "FAN"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ON",
+              "OFF"
+            ]
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "hold_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "cooldown_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "is_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "ControlMode": {
+        "type": "object",
+        "properties": {
+          "control_mode": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "MANUAL"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "control_mode",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

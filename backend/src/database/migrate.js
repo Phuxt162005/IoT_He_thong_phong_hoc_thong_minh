@@ -38,6 +38,11 @@ export async function migrate(pool, { appRole = "smartclass_app" } = {}) {
       await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "${schema}" TO "${appRole}"`);
       await client.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA "${schema}" TO "${appRole}"`);
       await client.query(`REVOKE ALL ON schema_migrations FROM "${appRole}"`);
+      if ((await client.query("SELECT to_regclass('backend_schema_state') AS name")).rows[0].name) {
+        await client.query("INSERT INTO backend_schema_state(singleton,version) VALUES(true,$1) ON CONFLICT(singleton) DO UPDATE SET version=EXCLUDED.version,updated_at=now()", [files.at(-1)]);
+        await client.query(`REVOKE ALL ON backend_schema_state FROM "${appRole}"`);
+        await client.query(`GRANT SELECT ON backend_schema_state TO "${appRole}"`);
+      }
       await client.query(`REVOKE ALL ON audit_logs FROM "${appRole}"`);
       await client.query(`GRANT SELECT, INSERT ON audit_logs TO "${appRole}"`);
       if ((await client.query("SELECT to_regclass('device_lifecycle_events') AS name")).rows[0].name) {

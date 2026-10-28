@@ -2,9 +2,20 @@
 
 Backend Node.js theo module cho quản lý người dùng, phòng học, thiết bị và dữ liệu IoT. Xem [kế hoạch](docs/backend-implementation-plan.md), [hợp đồng API/MQTT](docs/backend-contracts.md) và [tiến độ](docs/backend-progress.md).
 
+## Chạy bằng Docker (BE-16)
+
+```powershell
+npm ci
+npm run setup:local
+docker compose --env-file .env -f deployment/compose.yml --profile app up -d --build --wait backend
+npm run smoke
+```
+
+Nếu đã có `.env`/`.env.test`, giữ nguyên và bỏ qua setup. Backend ở http://127.0.0.1:3000, Admin lấy trong `.env`. Xem [hướng dẫn vận hành](docs/backend-operations.md) cho demo mô phỏng, kiểm thử, retention, backup/restore, TLS và tích hợp firmware. [OpenAPI](docs/openapi.json) mô tả đủ 53 HTTP operations. Chưa nghiệm thu ESP32/relay thật và frontend.
+
 ## Chạy cục bộ
 
-Cần Node.js >=20 và Docker Desktop đang chạy; CI kiểm tra Node.js 22 và 24. Từ thư mục gốc:
+Cần Node.js >=20 (khuyến nghị 24) và Docker Desktop đang chạy; CI kiểm tra Node.js 22 và 24. Nếu đang chạy backend Docker, dừng service backend trước khi chạy Node ở cùng cổng/MQTT client ID. Từ thư mục gốc:
 
 ```powershell
 npm ci
@@ -22,8 +33,8 @@ npm start
 Ứng dụng mặc định nghe tại `http://127.0.0.1:3000`. Sửa `.env` để thay host/port/CORS; không commit thông tin bí mật. Có thể dùng `npm run dev` để tự tải lại khi sửa code. Tài khoản ban đầu lấy từ ADMIN_USERNAME/ADMIN_PASSWORD trong `.env`; seed không đặt lại mật khẩu người dùng đã tồn tại. Mặc định chỉ tạo Admin; muốn tạo demo_operator/demo_viewer trong môi trường thử nghiệm, đặt SEED_DEMO_USERS=true và DEMO_PASSWORD riêng.
 
 - `GET /health`: ứng dụng đang hoạt động.
-- `GET /ready`: kiểm tra PostgreSQL và kết nối/subscription MQTT thật, trả 503 khi một dependency không sẵn sàng.
-- Các API nghiệp vụ sẽ xuất hiện theo tiến độ BE, không coi danh mục hợp đồng là danh mục đã triển khai.
+- `GET /ready`: kiểm tra phiên bản migration, PostgreSQL, subscription MQTT và listener realtime; trả 503 khi chưa sẵn sàng.
+- Các API BE-03–15 đã triển khai; bằng chứng kiểm thử và phần nghiệm thu ngoài môi trường nằm trong tiến độ/hướng dẫn vận hành.
 
 ## Kiểm thử
 
@@ -43,7 +54,7 @@ npm run test:monitoring-logging
 - `database/migrations/` chứa SQL có phiên bản, checksum và advisory lock; sửa schema bằng migration mới, không sửa migration đã áp dụng.
 - MIGRATION_DATABASE_URL dùng tài khoản quản lý schema; DATABASE_URL dùng smartclass_app với quyền nghiệp vụ, không có quyền tạo schema hoặc sửa/xóa/truncate audit.
 - Nghiệp vụ quan trọng phải dùng cùng connection/transaction với audit. Trigger chặn chỉnh sửa audit kể cả bằng tài khoản sở hữu qua lệnh DML thông thường.
-- Lược đồ hiện tại gồm roles/users/rooms/user_rooms/devices/audit_logs; các bảng telemetry/command/rule được thêm ở tính năng tương ứng.
+- Lược đồ gồm người dùng/phòng/thiết bị, credential/outbox, telemetry/latest/events, shadow/command/config, alert/threshold, rule/state và audit/lifecycle; runtime chỉ đọc backend_schema_state.
 - `docker compose --env-file .env -f deployment/compose.yml stop` dừng dịch vụ và giữ volume dữ liệu ứng dụng. Không dùng lệnh xóa volume nếu muốn giữ dữ liệu.
 
 ## Xác thực (BE-03)

@@ -17,11 +17,14 @@ import { DeviceConfigService, bindDeviceConfig } from "./modules/device-config/d
 import { AlertsService } from "./modules/alerts/alerts.service.js";
 import { AutomationService } from "./modules/automation/automation.service.js";
 import { attachRealtime } from "./modules/realtime/realtime.js";
+import { expectedSchemaVersion, schemaReady } from "./database/readiness.js";
+import { runRetention } from "./database/retention.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
   const config = loadConfig(process.env, { requireDatabase: true, requireAuth: true, requireBroker: true });
   const pool = createPool(config.databaseUrl);
+  const schemaVersion = await expectedSchemaVersion();
   pool.on("error", () => logger.error("database.pool_error"));
   const mqtt = new MqttRuntime({ config, pool, logger });
   const admin = new DynamicSecurity({ url: config.mqttUrl, username: config.mqttAdminUsername, password: config.mqttAdminPassword });
@@ -42,9 +45,10 @@ try {
   const configRecovery = startJob("config-recovery", async () => { await configs.expirePending(); await configs.processPending(); }, { intervalMs: 1000, logger });
   const alertMonitor = startJob("alert-monitor", async () => { await alerts.consumeTelemetry(); await alerts.scanDevices(); }, { intervalMs: 1000, logger });
   const automationMonitor = startJob("automation-monitor", () => automation.tick(), { intervalMs: 1000, logger });
+  const retention = config.retentionEnabled ? startJob("retention", () => runRetention(pool, { sensorDays: config.sensorRetentionDays, eventDays: config.eventRetentionDays }), { intervalMs: 3600000, logger }) : null;
   let cleaning;
-  const cleanup = () => cleaning ??= (async () => { await realtime.stop(); await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop(), configRecovery.stop(), alertMonitor.stop(), automationMonitor.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindConfigs(); unbindTelemetry(); await pool.end(); })();
-  const ready = async () => { await pool.query("SELECT 1"); return mqtt.ready && realtime.ready(); };
+  const cleanup = () => cleaning ??= (async () => { await realtime.stop(); await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop(), configRecovery.stop(), alertMonitor.stop(), automationMonitor.stop(), retention?.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindConfigs(); unbindTelemetry(); await pool.end(); })();
+  const ready = async () => await schemaReady(pool, schemaVersion) && mqtt.ready && realtime.ready();
   const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials, commands, configs, alerts, automation }) }));
   const realtime = attachRealtime({ server, pool, config, logger });
   server.on("error", async () => { logger.error("server.listen_failed"); process.exitCode = 1; await cleanup(); });
