@@ -11,7 +11,7 @@ const permissions = Object.freeze({
   "commands:read": all, "commands:create": ["ADMIN", "OPERATOR"],
   "configs:read": all, "configs:write": ["ADMIN"],
   "alerts:read": all, "alerts:write": ["ADMIN", "OPERATOR"],
-  "thresholds:write": ["ADMIN"], "rules:read": all, "rules:write": ["ADMIN"],
+  "thresholds:read": all, "thresholds:write": ["ADMIN"], "rules:read": all, "rules:write": ["ADMIN"],
   "audit:read": ["ADMIN"],
 });
 export function can(user, permission) { return permissions[permission]?.includes(user.role) ?? false; }

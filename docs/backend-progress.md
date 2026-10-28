@@ -15,8 +15,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-08 | Đã push và tích hợp | [PR #9](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/9), commit `f1b88cf`, merge `07478f1`; 39 unit và 35 integration test đạt cục bộ/CI. |
 | BE-09 | Đã push và tích hợp | [PR #10](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/10), commit `5314abc`, merge `62606bd`; 39 unit và 40 integration test đạt cục bộ/CI. |
 | BE-10 | Đã push và tích hợp | [PR #11](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/11), commit `6d52134`, merge `986c1c7`; 39 unit và 49 integration test đạt cục bộ/CI. |
-| BE-11 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 54 integration test đạt; config/ACK qua MQTT, desired/applied version, kiểm tra chu kỳ/khả năng node/quyền, ACK sai thứ tự/muộn, timeout/restart, audit rollback và revoke. Chưa xác nhận áp dụng trên ESP32 thật. |
-| BE-12–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-11 | Đã push và tích hợp | [PR #12](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/12), commit `4b61795`, merge `c1601ad`; 39 unit và 54 integration test đạt cục bộ/CI. Chưa xác nhận áp dụng config trên ESP32 thật. |
+| BE-12 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 60 integration test đạt; ngưỡng theo phòng, hysteresis 3 mẫu, nâng/hạ mức cảnh báo, offline/FAULT, scope, audit rollback và durable consumer chống trùng/restart. |
+| BE-13–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 

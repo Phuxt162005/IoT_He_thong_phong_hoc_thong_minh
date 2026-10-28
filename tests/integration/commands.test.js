@@ -97,6 +97,7 @@ test("out-of-order ACKs preserve newer actuator state while independent actuator
   const fan = (await f.create({ fan: "ON" })).body.data.command;
   await f.ack(fan);
   await f.ack(light);
+  await waitFor(async () => (await f.command(fan.command_id)).status === "SUCCESS");
   await waitFor(async () => (await f.command(light.command_id)).status === "SUCCESS");
   assert.deepEqual((await f.shadow()).reported_state, { light: "ON", fan: "ON" });
   assert.equal((await f.shadow()).in_sync, true);
