@@ -197,6 +197,26 @@ Engine mỗi giây dùng mẫu latest đủ điều kiện mới nhất trong ph
 
 Admin/Operator dùng PUT `/devices/:id/control-mode` với `{control_mode:"MANUAL",reason:"Vận hành thủ công"}` hoặc AUTO trong phạm vi. MANUAL dừng và hủy lệnh tự động đang chờ. Lệnh thủ công ưu tiên trong MANUAL_OVERRIDE_S kể cả khi chế độ AUTO; chuyển AUTO rõ ràng xóa thời gian override. Viewer chỉ đọc rule.
 
+## Dashboard, dữ liệu và realtime (BE-14)
+
+Mọi API cần JWT và phạm vi phòng:
+
+| Endpoint GET `/api/v1` | Kết quả |
+| --- | --- |
+| `/dashboard?room_id=...` | Tổng phòng, thiết bị theo lifecycle/kết nối, cảnh báo chưa đóng và tối đa 20 latest. Không truyền room_id thì tổng hợp phạm vi được cấp. |
+| `/rooms/:id/telemetry`, `/devices/:id/telemetry` | Lịch sử recorded_at giảm dần, phân trang; lọc from/to và device_id trong phòng. |
+| `/rooms/:id/telemetry/latest` | Latest từng Sensor, có stale, lifecycle/connection; phân trang. |
+| `/rooms/:id/telemetry/stats` | Bucket hour/day theo UTC; min/max/avg nhiệt độ/độ ẩm/lux, số mẫu có người và số mẫu biết occupancy. Loại mẫu clock-skew khỏi thống kê. |
+| `/rooms/:id/telemetry/export` | CSV tối đa 5000 mẫu, cùng scope/thời gian; vượt giới hạn trả 413 để thu hẹp truy vấn. |
+
+from/to dùng ISO có timezone; khoảng `[from,to)` tối đa 31 ngày, mặc định 24 giờ gần nhất. Thời gian trả UTC, °C/%/lux giữ nguyên đơn vị; occupancy NULL khác false. Lịch sử có cả backfill/clock-skew và cờ tương ứng; latest không dùng clock-skew. CSV escape dấu nháy và tiền tố công thức bảng tính.
+
+WebSocket tại `/ws`: mở kết nối rồi gửi `{"type":"authenticate","token":"<JWT>"}` trong 5 giây. Server trả `authenticated` với `snapshot_required:true`; frontend lấy HTTP snapshot và xử lý các frame `{type,event_id,timestamp,payload}`. Không gửi JWT trong URL. Có telemetry.stored, device.status_changed/lifecycle_changed/mode_changed, command.updated, actuator.state_changed, config.updated, alert.created/updated. Kiểm tra event_id để tránh áp dụng lặp.
+
+Sự kiện phát từ PostgreSQL LISTEN/NOTIFY sau commit, không phát dữ liệu chưa lưu. Stream không replay lịch sử; mỗi reconnect cần snapshot. Mất listener database hoặc quá tải làm đóng socket để frontend đồng bộ lại. Theo [hướng dẫn ws](https://github.com/websockets/ws#how-to-detect-and-close-broken-connections), server dùng ping/pong phát hiện kết nối chết. JWT và scope đọc lại trước broadcast và mỗi 5 giây; logout/khóa/đổi phạm vi làm đóng phiên. Origin phải thuộc CORS_ORIGINS, tối đa 5 kết nối/người dùng, frame 8 KiB, có giới hạn buffer và kết nối chưa xác thực. Production đặt sau HTTPS/WSS.
+
+Đo cục bộ bằng `node --test tests/integration/dashboard-realtime.test.js`: tính từ trước publish MQTT đến frame telemetry WebSocket; các lần chạy hiện tại khoảng 62–65 ms. Đây là phép đo loopback với client Node mô phỏng, chưa đại diện cho Wi-Fi/ESP32 hay tải production.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.

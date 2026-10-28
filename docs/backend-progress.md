@@ -17,8 +17,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-10 | Đã push và tích hợp | [PR #11](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/11), commit `6d52134`, merge `986c1c7`; 39 unit và 49 integration test đạt cục bộ/CI. |
 | BE-11 | Đã push và tích hợp | [PR #12](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/12), commit `4b61795`, merge `c1601ad`; 39 unit và 54 integration test đạt cục bộ/CI. Chưa xác nhận áp dụng config trên ESP32 thật. |
 | BE-12 | Đã push và tích hợp | [PR #13](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/13), commit `17deb28`, merge `0146680`; 39 unit và 60 integration test đạt cục bộ/CI. |
-| BE-13 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 66 integration test đạt; rule theo phòng, điều kiện có giới hạn, priority/hold/cooldown bền vững, manual override và cùng luồng command/ACK; 6 ca tự động hóa có rollback/restart. |
-| BE-14–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-13 | Đã push và tích hợp | [PR #14](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/14), commit `ab4c437`, merge `5cf484d`; 39 unit và 66 integration test đạt cục bộ/CI. |
+| BE-14 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 72 integration test đạt (toàn bộ 71 + ca mất listener bổ sung); entrypoint smoke đạt. Latest/history/stats UTC/CSV/dashboard theo scope; WebSocket thu hồi phiên và NOTIFY sau commit; loopback MQTT→WS khoảng 62–65 ms. |
+| BE-15–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 
