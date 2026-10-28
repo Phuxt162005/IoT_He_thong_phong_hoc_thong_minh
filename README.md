@@ -121,6 +121,19 @@ Broker lỗi trả HTTP 202 với operation.status=PENDING, không báo đã áp
 
 Môi trường đã tồn tại trước BE-07 cần bổ sung MQTT_* và DEVICE_SECRET_KEY theo `.env.example`, TEST_MQTT_* theo `.env.test.example`. TEST_MQTT_ADMIN_PASSWORD trong `.env` phải trùng `.env.test` cho cùng broker test. Volume broker giữ credential qua restart; đổi mật khẩu trong .env không tự thay admin đã lưu trong volume.
 
+## Telemetry và đồng bộ offline (BE-08)
+
+Server subscribe telemetry theo topic trong [hợp đồng](docs/backend-contracts.md), đối chiếu mã thiết bị/phòng và credential đang hoạt động. Chỉ SENSOR_NODE thuộc phòng ACTIVE với lifecycle ACTIVE/FAULT/MAINTENANCE và broker đã đồng bộ được lưu dữ liệu. PROVISIONED/REVOKED/DECOMMISSIONED bị từ chối; FAULT/MAINTENANCE chỉ giám sát, không được dùng để điều khiển tự động.
+
+- Chấp nhận payload chuẩn và legacy của ADV-02. Kiểm tra nhiệt độ [-10,60] °C, độ ẩm [0,100] %, lux [0,65535]; chuẩn cần lux nguyên/occupancy boolean. Legacy giữ lux thập phân, occupancy thiếu lưu NULL.
+- PostgreSQL commit `sensor_data`, `telemetry_latest` và event bền vững trong cùng transaction, sau đó mới gửi ACK STORED. DB lỗi không ACK; retry được lưu lại an toàn khi dịch vụ phục hồi.
+- Chống trùng bằng `(device_id,msg_id)` và hash nội dung: cùng bản tin được ACK lại; cùng ID khác nội dung bị từ chối. Các thiết bị khác nhau có thể dùng cùng msg_id.
+- Bản tin offline giữ nguyên recorded_at quá khứ. Bản tin cũ hơn latest hoặc quá TELEMETRY_FRESHNESS_S (mặc định 30 giây) chỉ phục vụ lịch sử, không kích hoạt điều khiển. Mẫu thiếu timestamp hoặc vượt tương lai >5 phút được gắn clock_skew, dùng received_at cho lịch sử, không đè latest.
+- Năm payload cảm biến không hợp lệ liên tiếp đưa thiết bị ACTIVE vào FAULT; mẫu hợp lệ đặt lại bộ đếm nhưng không tự bỏ trạng thái FAULT. Admin dùng clear-fault sau khi khắc phục.
+- `iot_events` và `iot_event_deliveries` giữ dấu vết cho consumer cảnh báo/tự động hóa ở các mốc sau; duplicate không tạo event mới. API tra cứu/CSV/dashboard được bổ sung ở BE-14.
+
+Dynamic Security request nay dùng correlationData riêng, dựa trên [kiểm thử giao thức của Mosquitto](https://github.com/eclipse-mosquitto/mosquitto/blob/master/test/broker/14-dynsec-disable-client.py), để không nhận nhầm phản hồi khi nhiều thao tác quản trị chạy đồng thời.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.

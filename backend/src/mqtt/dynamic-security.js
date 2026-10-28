@@ -9,10 +9,11 @@ export class DynamicSecurity {
   constructor({ url, username = "admin", password }) { this.url = url; this.username = username; this.password = password; }
   async request(command) {
     let client;
+    const correlationData = randomUUID();
     let deadline;
     const timeout = new Promise((_resolve, reject) => { deadline = setTimeout(() => reject(unavailable()), 5000); });
     const work = async () => {
-      // Isolate every request so late replies cannot be confused after a timeout.
+      // Replies share a broker topic; correlation is required even with separate connections.
       client = mqtt.connect(this.url, { username: this.username, password: this.password, clientId: `dynsec-${randomUUID()}`, reconnectPeriod: 0, connectTimeout: 2500, protocolVersion: 5, queueQoSZero: false });
       client.on("error", () => {});
       await new Promise((resolve, reject) => {
@@ -24,11 +25,14 @@ export class DynamicSecurity {
       const reply = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(unavailable()), 2500);
         const finish = (fn, value) => { clearTimeout(timeout); fn(value); };
-        client.once("message", (_topic, raw) => {
-          try { finish(resolve, JSON.parse(raw.toString()).responses?.[0]); } catch { finish(reject, unavailable()); }
+        client.on("message", (_topic, raw) => {
+          try {
+            const response = JSON.parse(raw.toString()).responses?.find((row) => row.correlationData === correlationData);
+            if (response) finish(resolve, response);
+          } catch { finish(reject, unavailable()); }
         });
         client.once("close", () => finish(reject, unavailable()));
-        client.publish(control, JSON.stringify({ commands: [command] }), { qos: 1, retain: false }, (error) => { if (error) finish(reject, unavailable()); });
+        client.publish(control, JSON.stringify({ commands: [{ ...command, correlationData }] }), { qos: 1, retain: false }, (error) => { if (error) finish(reject, unavailable()); });
       });
       const response = await reply;
       if (!response || response.command !== command.command) throw unavailable();
