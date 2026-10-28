@@ -33,5 +33,36 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  mqtt:
+    image: eclipse-mosquitto:2
+    entrypoint: ['/bin/sh', '/mosquitto/config/start.sh']
+    environment:
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?Set MQTT_ADMIN_PASSWORD}
+    ports: ['127.0.0.1:1884:1883']
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+      - mqttdata:/mosquitto/data
+    healthcheck:
+      test: ['CMD', 'nc', '-z', '127.0.0.1', '1883']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  mqtt-test:
+    image: eclipse-mosquitto:2
+    profiles: [test]
+    entrypoint: ['/bin/sh', '/mosquitto/config/start.sh']
+    environment:
+      MQTT_ADMIN_PASSWORD: ${TEST_MQTT_ADMIN_PASSWORD:?Set TEST_MQTT_ADMIN_PASSWORD}
+    ports: ['127.0.0.1:1885:1883']
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+      - mqtttestdata:/mosquitto/data
+    healthcheck:
+      test: ['CMD', 'nc', '-z', '127.0.0.1', '1883']
+      interval: 3s
+      timeout: 3s
+      retries: 20
 volumes:
   pgdata:
+  mqttdata:
+  mqtttestdata:

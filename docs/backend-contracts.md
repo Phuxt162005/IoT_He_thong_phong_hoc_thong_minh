@@ -14,8 +14,8 @@ Trạng thái: hợp đồng triển khai. Các endpoint dưới đây được 
 | Đồng hồ | Lưu thời điểm đo và nhận riêng, UTC. Timestamp chuẩn phải là số nguyên mili giây không âm; legacy ISO phải parse được hoặc rỗng khi chưa đồng bộ. Sai lệch >5 phút/thiếu timestamp: gắn clock_skew, dùng received_at làm recorded_at, không dùng cho automation. Backfill cũ có timestamp hợp lệ được lưu lịch sử nhưng không đè latest và không điều khiển. | BE-08–09, BE-13 |
 | Kết quả lệnh | API/DB: PENDING → SUCCESS / FAILED / TIMEOUT, trạng thái cuối bất biến. SENT chỉ là thời điểm publish, không chứng minh thực thi. Adapter ánh xạ service cũ ACKNOWLEDGED → SUCCESS, PUBLISH_FAILED → FAILED; không đổi test legacy ngầm. | BE-10 |
 | Trạng thái thực | desired chỉ thể hiện yêu cầu; reported chỉ cập nhật từ thiết bị. Có version/correlation chống ACK/reported cũ ghi đè trạng thái mới. | BE-10 |
-| Broker | Dynamic Security, credential riêng cho thiết bị, ACL theo mã và loại node. Thiết bị không được publish command hoặc subscribe dữ liệu thiết bị khác. Backend đối chiếu phòng trong topic với database. | BE-07 |
-| Khóa thiết bị | Thu hồi credential phải chặn phiên đang kết nối và reconnect; backend cũng chặn ingestion/command. Thất bại thao tác broker không được báo hoàn thành thu hồi. | BE-06–08 |
+| Broker | Dynamic Security, credential riêng cho thiết bị, ACL theo mã và loại node; username và client ID đều bằng device_code, boot ID nằm trong heartbeat.session_id. Thiết bị không được publish command hoặc subscribe dữ liệu thiết bị khác. Backend đối chiếu phòng trong topic với database. | BE-07 |
+| Khóa thiết bị | Thu hồi credential phải chặn phiên đang kết nối và reconnect; backend chặn ingestion/command ngay. Theo mục 9.3.2, DB cập nhật trước; broker lỗi trả 202/PENDING và retry qua outbox, không báo đã đồng bộ. Secret retry mã hóa, xóa sau APPLIED. | BE-06–08 |
 
 ## MQTT
 

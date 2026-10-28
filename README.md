@@ -9,9 +9,11 @@ Cần Node.js >=20 và Docker Desktop đang chạy; CI kiểm tra Node.js 22 và
 ```powershell
 npm ci
 npm run setup:local
-docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test
+docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test mqtt mqtt-test
 npm run db:migrate
 npm run db:seed
+npm run mqtt:bootstrap
+npm run mqtt:bootstrap:test
 npm start
 ```
 
@@ -20,7 +22,7 @@ npm start
 Ứng dụng mặc định nghe tại `http://127.0.0.1:3000`. Sửa `.env` để thay host/port/CORS; không commit thông tin bí mật. Có thể dùng `npm run dev` để tự tải lại khi sửa code. Tài khoản ban đầu lấy từ ADMIN_USERNAME/ADMIN_PASSWORD trong `.env`; seed không đặt lại mật khẩu người dùng đã tồn tại. Mặc định chỉ tạo Admin; muốn tạo demo_operator/demo_viewer trong môi trường thử nghiệm, đặt SEED_DEMO_USERS=true và DEMO_PASSWORD riêng.
 
 - `GET /health`: ứng dụng đang hoạt động.
-- `GET /ready`: kiểm tra truy vấn PostgreSQL thật, trả 503 khi database không sẵn sàng. MQTT được bổ sung ở BE-07.
+- `GET /ready`: kiểm tra PostgreSQL và kết nối/subscription MQTT thật, trả 503 khi một dependency không sẵn sàng.
 - Các API nghiệp vụ sẽ xuất hiện theo tiến độ BE, không coi danh mục hợp đồng là danh mục đã triển khai.
 
 ## Kiểm thử
@@ -33,7 +35,7 @@ npm run test:telemetry-ingestion
 npm run test:monitoring-logging
 ```
 
-`npm test` chạy unit/service/HTTP. Integration test bắt buộc dùng TEST_DATABASE_URL và TEST_MIGRATION_DATABASE_URL trỏ tới database tên kết thúc `_test`; mỗi test chỉ tạo/xóa schema ngẫu nhiên của riêng nó. Không chạy với database ứng dụng. GitHub Actions có PostgreSQL service riêng và tài khoản ứng dụng không phải superuser. Chưa có kiểm thử MQTT/ESP32 cho tới các mốc tương ứng.
+`npm test` chạy unit/service/HTTP. Integration test bắt buộc dùng TEST_DATABASE_URL và TEST_MIGRATION_DATABASE_URL trỏ tới database tên kết thúc `_test`; mỗi test chỉ tạo/xóa schema ngẫu nhiên của riêng nó. MQTT test dùng broker riêng trên localhost:1885, tài khoản thiết bị ngẫu nhiên và dọn sau test. Không chạy với dịch vụ ứng dụng. GitHub Actions có PostgreSQL/Mosquitto riêng. Chưa thay thế kiểm thử ESP32 thật.
 
 ## Database
 
@@ -98,6 +100,26 @@ Chỉ gán Operator/Viewer ACTIVE; Admin luôn có toàn bộ phạm vi nên kh�
 | GET `/api/v1/devices/:id/lifecycle-events` | Lịch sử chỉ ghi thêm, phân trang và kiểm tra scope. |
 
 BE-06 triển khai các chuyển trạng thái nội bộ. API provision/activate/revoke/rotate cần credential và broker thật, được bổ sung ở BE-07; không thể dùng PATCH để bỏ qua quy trình. Thiết bị PROVISIONED/ACTIVE muốn ngừng sử dụng phải revoke trước. Mỗi phòng có tối đa một node chưa thu hồi cho từng loại; mã thiết bị đã ngừng sử dụng không được tái dùng. Bảo trì không đổi trạng thái kết nối thành OFFLINE; vòng đời và kết nối độc lập.
+
+## Broker và credential thiết bị (BE-07)
+
+Mosquitto ứng dụng ở localhost:1884, broker test ở localhost:1885. Cả hai dùng [Dynamic Security](https://mosquitto.org/documentation/dynamic-security/), từ chối anonymous, ACL mặc định deny; vai trò Sensor/Control chỉ được publish/subscribe topic của mã thiết bị. Tài khoản backend và quản trị broker tách riêng. `mqtt:bootstrap` cấu hình role và tài khoản backend; chạy lại sẽ đồng bộ quyền và ngắt phiên backend đang mở trong lúc cập nhật tài khoản.
+
+| Endpoint | Nội dung |
+| --- | --- |
+| POST `/api/v1/devices/:id/provision` | Admin, `{reason,confirmed?}`; REGISTERED/REVOKED → PROVISIONED. Cấp lại REVOKED cần confirmed:true. |
+| POST `/api/v1/devices/:id/activate` | Admin, `{reason}`; chỉ khi credential đã đồng bộ và nhận heartbeat mới qua MQTT. |
+| POST `/api/v1/devices/:id/rotate-credentials` | Admin, `{reason}`; cấp secret mới và ngắt phiên cũ; phải nạp secret mới vào thiết bị. |
+| POST `/api/v1/devices/:id/revoke` | Admin, `{reason,confirmed:true}`; chặn backend ngay, disable broker account và ngắt kết nối. |
+| GET `/api/v1/devices/:id/broker-status` | Theo phạm vi phòng; trạng thái đồng bộ và lịch sử thao tác đã loại bỏ secret. |
+
+Provision/rotate trả credential **một lần** với username và client_id bằng device_code. Thiết bị phải dùng đúng cả username/password/client ID; firmware ví dụ cũ dùng client ID có boot suffix cần điều chỉnh trước khi kết nối. `session_id` của heartbeat mang boot ID riêng. MQTT URL trong phản hồi lấy từ cấu hình; hiện Compose chỉ mở loopback cho phát triển, chưa dành cho ESP32 truy cập từ LAN.
+
+DB lưu hash scrypt, còn secret cần retry được mã hóa AES-256-GCM và gắn với đúng operation. Khi đồng bộ thành công, bản mã bị xóa; không có API lấy lại secret. Nếu làm mất secret trả về, dùng rotate-credentials. DEVICE_SECRET_KEY là 32 byte hex cần giữ cùng cấu hình khôi phục dữ liệu, không đổi khi restart.
+
+Broker lỗi trả HTTP 202 với operation.status=PENDING, không báo đã áp dụng. Hàng đợi trong PostgreSQL được thử lại nền, kể cả sau restart. Trong lúc chờ, backend không cho activate; revoke đã chặn nghiệp vụ nhưng kết nối broker chỉ bị ngắt sau khi sync thành công. Xem broker-status để phân biệt hai trạng thái. Bản ghi outbox bị thao tác mới thay thế không tiếp tục áp dụng secret cũ.
+
+Môi trường đã tồn tại trước BE-07 cần bổ sung MQTT_* và DEVICE_SECRET_KEY theo `.env.example`, TEST_MQTT_* theo `.env.test.example`. TEST_MQTT_ADMIN_PASSWORD trong `.env` phải trùng `.env.test` cho cùng broker test. Volume broker giữ credential qua restart; đổi mật khẩu trong .env không tự thay admin đã lưu trong volume.
 
 ## Cấu trúc
 
