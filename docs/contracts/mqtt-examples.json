@@ -1,0 +1,14 @@
+{
+  "telemetry": {"msg_id":"tel-001","device_id":"SENSOR_01","room_id":"ROOM_302","timestamp":1793181595000,"data":{"temperature":27.5,"humidity":65,"lux":320,"occupancy":true}},
+  "telemetry_ack": {"msg_id":"tel-001","device_id":"SENSOR_01","room_id":"ROOM_302","status":"STORED","duplicate":false,"timestamp":1793181600000},
+  "legacy_telemetry": {"messageType":"telemetry","eventId":"SENSOR_01-BOOT1-1","deviceId":"SENSOR_01","roomCode":"ROOM_302","timestamp":"2026-10-28T09:59:55Z","temperatureC":27.5,"humidityPercent":65,"illuminanceLux":320},
+  "legacy_telemetry_ack": {"messageType":"telemetry_ack","eventId":"SENSOR_01-BOOT1-1","status":"STORED","duplicate":false,"timestamp":"2026-10-28T10:00:00.000Z"},
+  "heartbeat": {"msg_id":"hb-001","device_id":"SENSOR_01","room_id":"ROOM_302","session_id":"boot-1","timestamp":1793181600000,"uptime_seconds":100,"free_heap_bytes":180000,"wifi_rssi_dbm":-58,"firmware_version":"1.0.0"},
+  "status": {"device_id":"CTRL_01","room_id":"ROOM_302","session_id":"boot-1","timestamp":1793181600000,"status":"ONLINE"},
+  "lwt": {"device_id":"CTRL_01","room_id":"ROOM_302","session_id":"boot-1","status":"OFFLINE","reason":"UNEXPECTED_DISCONNECT"},
+  "command": {"command_id":"a318a5b9-2d74-4bde-b933-f4cb5639db2c","device_id":"CTRL_01","room_id":"ROOM_302","shadow_version":2,"desired_state":{"fan":"ON"},"timestamp":1793181600000},
+  "command_ack": {"command_id":"a318a5b9-2d74-4bde-b933-f4cb5639db2c","device_id":"CTRL_01","room_id":"ROOM_302","shadow_version":2,"status":"SUCCESS","reported_state":{"fan":"ON"},"timestamp":1793181601000},
+  "reported": {"device_id":"CTRL_01","room_id":"ROOM_302","shadow_version":2,"reported_state":{"light":"OFF","fan":"ON"},"timestamp":1793181601000},
+  "config": {"config_id":"25cf6621-c90c-452c-8f38-9ebbc56cb3e8","device_id":"SENSOR_01","room_id":"ROOM_302","version":1,"settings":{"sample_interval_seconds":5,"heartbeat_interval_seconds":10},"timestamp":1793181600000},
+  "config_ack": {"config_id":"25cf6621-c90c-452c-8f38-9ebbc56cb3e8","device_id":"SENSOR_01","room_id":"ROOM_302","version":1,"status":"SUCCESS","timestamp":1793181601000}
+}
