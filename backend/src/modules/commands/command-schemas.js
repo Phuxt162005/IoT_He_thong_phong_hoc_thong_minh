@@ -1,0 +1,10 @@
+import { z } from "zod";
+const code = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/);
+export const sessionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+export const shadowVersionSchema = z.number().int().min(0).max(2147483647);
+const patch = (value) => z.object({ light: value.optional(), fan: value.optional() }).strict().refine((v) => Object.keys(v).length > 0);
+export const desiredPatchSchema = patch(z.enum(["ON", "OFF"]));
+export const reportedPatchSchema = patch(z.enum(["ON", "OFF", "UNKNOWN"]));
+const reportFields = { device_id: code, room_id: code, session_id: sessionIdSchema, shadow_version: shadowVersionSchema, timestamp: z.number().int().min(0).max(8640000000000000) };
+export const reportedSchema = z.object({ ...reportFields, reported_state: reportedPatchSchema }).strict();
+export const ackSchema = z.object({ ...reportFields, command_id: z.uuid(), status: z.enum(["SUCCESS", "FAILED"]), reported_state: reportedPatchSchema.optional(), error_code: z.string().regex(/^[A-Z0-9_]{1,40}$/).optional() }).strict().refine((v) => v.status !== "SUCCESS" || v.reported_state !== undefined);

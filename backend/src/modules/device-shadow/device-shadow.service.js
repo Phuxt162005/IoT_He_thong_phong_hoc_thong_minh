@@ -5,7 +5,7 @@ import { buildDeviceCommandTopic } from "./device-shadow.mqtt.js";
 const ALLOWED_STATES = new Set(["ON", "OFF"]);
 const ALLOWED_ACTUATORS = new Set(["light", "fan"]);
 
-function validateStatePatch(patch) {
+export function validateStatePatch(patch) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
     throw new DeviceShadowError(
       "desiredState phải là một object",

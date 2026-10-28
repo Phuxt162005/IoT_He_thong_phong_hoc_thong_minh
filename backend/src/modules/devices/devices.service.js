@@ -35,7 +35,10 @@ export class DevicesService {
       await this.validateRoom(client, input.room_id);
       const device = (await client.query(`INSERT INTO devices(device_code,device_name,device_type,room_id,hardware_version,firmware_version)
         VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [input.device_code, input.device_name, input.device_type, input.room_id ?? null, input.hardware_version ?? null, input.firmware_version ?? null])).rows[0];
-      if (device.device_type === "CONTROL_NODE") await client.query("INSERT INTO actuators(device_id,actuator_type) VALUES($1,'LIGHT'),($1,'FAN')", [device.device_id]);
+      if (device.device_type === "CONTROL_NODE") {
+        await client.query("INSERT INTO actuators(device_id,actuator_type) VALUES($1,'LIGHT'),($1,'FAN')", [device.device_id]);
+        await client.query("INSERT INTO device_shadows(device_id) VALUES($1)", [device.device_id]);
+      }
       await recordLifecycle(client, device, null, "REGISTERED", { actorId: actor.user_id, reason: "Đăng ký thiết bị", requestId, action: "DEVICE_REGISTER" });
       return (await client.query(`${deviceSelect} WHERE d.device_id=$1`, [device.device_id])).rows[0];
     });

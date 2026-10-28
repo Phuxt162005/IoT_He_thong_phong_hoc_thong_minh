@@ -11,6 +11,7 @@ import { DeviceCredentialsService } from "../../backend/src/modules/device-crede
 import { LoggingService } from "../../backend/src/modules/monitoring-logging/logging.service.js";
 import { MemoryLogSink } from "../../backend/src/modules/monitoring-logging/logging.sinks.js";
 import { DevicePresenceService, bindPresence } from "../../backend/src/modules/device-presence/device-presence.service.js";
+import { CommandsService, bindCommands } from "../../backend/src/modules/commands/commands.service.js";
 
 export async function waitFor(predicate) {
   for (let i = 0; i < 80; i++) { if (await predicate()) return; await new Promise((r) => setTimeout(r, 50)); }
@@ -43,10 +44,13 @@ export async function iotFixture(t) {
   const presence = new DevicePresenceService({ pool: db.pool, timeoutSeconds: config.heartbeatTimeoutSeconds });
   const unbindPresence = bindPresence(runtime, presence);
   t.after(unbindPresence);
+  const commands = new CommandsService({ pool: db.pool, mqtt: runtime, logger });
+  const unbindCommands = bindCommands(runtime, commands);
+  t.after(unbindCommands);
   await once(runtime, "ready", { signal: AbortSignal.timeout(5000) });
   const password = "iot-test-password-only";
   await seed(db.pool, { username: "test_admin", password });
-  const http = await testHttp(t, db.pool, { config, credentials });
+  const http = await testHttp(t, db.pool, { config, credentials, commands });
   const adminUser = (await http.request("/auth/login", { method: "POST", body: { username: "test_admin", password } })).body.data;
   const token = adminUser.access_token;
   const room = (await http.request("/rooms", { method: "POST", token, body: { room_code: "ROOM_302", room_name: "Room" } })).body.data;
@@ -64,8 +68,8 @@ export async function iotFixture(t) {
     clients.push(client);
     return client;
   };
-  const activateSensor = async () => {
-    const device = await register();
+  const activateNode = async (type) => {
+    const device = await register(type);
     const provisioned = await action(device.device_id, "provision");
     if (provisioned.status !== 200) throw new Error("Device fixture provisioning failed");
     const client = await connect(provisioned.body.data.credentials);
@@ -75,5 +79,6 @@ export async function iotFixture(t) {
     if ((await action(device.device_id, "activate")).status !== 200) throw new Error("Device fixture activation failed");
     return { device, client, topic };
   };
-  return { ...db, ...http, config, logger, mqttSink: sink, adminBroker, serviceInput, credentials, runtime, presence, token, room, register, action, connect, activateSensor };
+  return { ...db, ...http, config, logger, mqttSink: sink, adminBroker, serviceInput, credentials, commands, runtime, presence, token, room, register, action, connect,
+    activateSensor: () => activateNode("SENSOR_NODE"), activateControl: () => activateNode("CONTROL_NODE") };
 }

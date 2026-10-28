@@ -142,6 +142,24 @@ Mỗi lần MQTT CONNECT phải tạo session_id mới (1–64 ký tự chữ/s�
 
 ONLINE status chỉ cho biết kết nối; activate cần heartbeat mới của chính phiên hiện tại. Phiên mới hoặc rotate credential xóa dấu heartbeat cũ để không kích hoạt bằng dữ liệu phiên trước. Event thay đổi kết nối và audit lưu cùng transaction; chạy lại scanner hoặc restart không tạo event OFFLINE trùng. Scheduler chống chạy chồng lặp và chờ tác vụ đang chạy khi shutdown.
 
+## Command, ACK và Device Shadow (BE-10)
+
+| Endpoint | Nội dung |
+| --- | --- |
+| POST `/api/v1/devices/:id/commands` | Admin/Operator trong phạm vi; `{desired_state:{fan:"ON"},timeout_seconds?:5}`; 202 khi tạo mới, 200 khi dùng cache idempotency. |
+| GET `/api/v1/devices/:id/commands` | Lịch sử lệnh và kết quả, phân trang; mọi vai trò trong phạm vi. |
+| GET `/api/v1/devices/:id/shadow` | desired/reported, differences, in_sync, version và lệnh gần nhất. |
+
+Chỉ Control Node ACTIVE, phòng ACTIVE, credential đồng bộ và heartbeat mới được nhận lệnh. Header Idempotency-Key (1–64 ký tự chữ/số/gạch) giữ cùng lệnh trong 60 giây cho mỗi người/thiết bị; đổi payload với cùng khóa trả 409. Cache vẫn truy cập được khi broker mất kết nối.
+
+Desired state và lệnh PENDING lưu cùng transaction/audit, sau commit mới publish. Published không có nghĩa đã thực thi; reported chỉ đổi từ ACK/snapshot thiết bị. COMMAND_TIMEOUT_S mặc định 5 (cho phép 3–10 giây); job 1 giây xử lý timeout và khôi phục lệnh chưa publish sau restart, kiểm tra lại quyền/phạm vi/phiên trước khi gửi. Lỗi publish trả 503 với command_id đã lưu trong error.details; không tạo lệnh khác tự động để che lỗi.
+
+ACK phải khớp command_id, session_id, shadow_version, thiết bị và credential version. Trạng thái cuối SUCCESS/FAILED/TIMEOUT bất biến; ACK muộn được audit và chỉ cập nhật reported nếu không làm lùi version của actuator. Mỗi đèn/quạt có version riêng, nên phản hồi hai cơ cấu đến khác thứ tự không làm mất trạng thái. Ba ACK FAILED liên tiếp đưa thiết bị vào FAULT.
+
+Bảo trì/thu hồi/FAULT, đổi credential hoặc phiên MQTT mới hủy lệnh đang chờ. Phiên mới đặt reported UNKNOWN, giữ desired; Control Node gửi snapshot thật qua reported hoặc status ONLINE kèm reported_state/shadow_version. Firmware phải kiểm tra session_id/expires_at và nhớ command_id để không thực thi lại bản tin MQTT trùng. MANUAL_OVERRIDE_S mặc định 300 là thời gian ưu tiên lệnh thủ công cho engine BE-13.
+
+Logic đọc/so sánh shadow và kiểm tra desired patch tái sử dụng ADV-01; luồng command PostgreSQL thực hiện ghi nguyên tử thay cho nhiều lần ghi riêng trong service in-memory. Kiểm thử dùng MQTT client mô phỏng ACK qua Mosquitto thật, chưa xác nhận relay/ESP32 thật.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.

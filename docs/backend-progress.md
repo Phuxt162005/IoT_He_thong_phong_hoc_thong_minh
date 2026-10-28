@@ -13,8 +13,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-06 | Đã push và tích hợp | [PR #7](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/7), commit `0c402ce`, merge `6a09eb3`; 38 unit và 23 integration test đạt cục bộ/CI. Provision/activate/revoke được nối với broker thật ở BE-07. |
 | BE-07 | Đã push và tích hợp | [PR #8](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/8), commit `188331b`, merge `0547e5b`; 39 unit và 28 integration test PostgreSQL/Mosquitto thật đạt cục bộ/CI. |
 | BE-08 | Đã push và tích hợp | [PR #9](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/9), commit `f1b88cf`, merge `07478f1`; 39 unit và 35 integration test đạt cục bộ/CI. |
-| BE-09 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 40 integration test đạt; heartbeat/diagnostic, offline scan idempotent qua restart, LWT thật khi ngắt socket, reconnect chống phiên cũ, ONLINE không thay heartbeat để activate, audit rollback. |
-| BE-10–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-09 | Đã push và tích hợp | [PR #10](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/10), commit `5314abc`, merge `62606bd`; 39 unit và 40 integration test đạt cục bộ/CI. |
+| BE-10 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 49 integration test đạt; command MQTT/ACK mô phỏng thiết bị, scope/role, idempotency đồng thời, per-actuator version, timeout/restart/ACK muộn, kiểm tra lại quyền trước publish, lỗi publish/audit và hủy pending khi đổi lifecycle/phiên. Chưa thử relay thật. |
+| BE-11–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 
