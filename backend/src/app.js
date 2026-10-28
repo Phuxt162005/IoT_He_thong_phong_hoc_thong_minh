@@ -40,6 +40,9 @@ export function createApp({ config, logger = new LoggingService({ sink: new Cons
     let message = error instanceof AppError ? error.message : "Lỗi hệ thống";
     if (error.type === "entity.parse.failed") { status = 400; code = "INVALID_JSON"; message = "JSON không hợp lệ"; }
     if (error.type === "entity.too.large") { status = 413; code = "PAYLOAD_TOO_LARGE"; message = "Payload vượt giới hạn"; }
+    if (error.code === "23505") { status = 409; code = "CONFLICT"; message = "Dữ liệu đã tồn tại hoặc đang được sử dụng"; }
+    if (error.code === "23503") { status = 400; code = "INVALID_REFERENCE"; message = "Dữ liệu tham chiếu không hợp lệ"; }
+    if (["ECONNREFUSED", "57P01", "53300", "08006"].includes(error.code)) { status = 503; code = "DATABASE_UNAVAILABLE"; message = "Dịch vụ dữ liệu chưa sẵn sàng"; }
     if (status >= 500) logger.error("http.error", { request_id: req.requestId, code });
     res.status(status).json({ success: false, error: { code, message }, request_id: req.requestId });
   });

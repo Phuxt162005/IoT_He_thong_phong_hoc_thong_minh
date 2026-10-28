@@ -57,6 +57,21 @@ Chạy lại `npm run db:migrate` sau mỗi lần cập nhật mã có migration
 
 Sau 5 lần đăng nhập sai trong 15 phút theo cặp IP/username, server trả 429 cho tới hết cửa sổ. Bộ đếm lưu trong PostgreSQL nên giữ qua restart với cùng JWT_SECRET. Mặc định không tin X-Forwarded-For; khi triển khai qua reverse proxy cần cấu hình trust proxy theo đúng mạng proxy, tránh cho client tự khai IP. Mật khẩu được băm bằng [scrypt của Node.js](https://nodejs.org/api/crypto.html#cryptoscryptpassword-salt-keylen-options-callback); JWT dùng [jose](https://github.com/panva/jose) và chỉ chấp nhận HS256 với issuer/audience cố định. Không lưu token vào URL hoặc log.
 
+## Quản lý người dùng và quyền (BE-04)
+
+Các API dưới đây cần Bearer token của ADMIN. OPERATOR/VIEWER nhận 403; việc từ chối được audit. Không có API xóa người dùng; dùng trạng thái DISABLED để giữ lịch sử.
+
+| Endpoint | Nội dung |
+| --- | --- |
+| GET `/api/v1/users` | Lọc `role`, `status`; phân trang `page`, `page_size` tối đa 100. |
+| POST `/api/v1/users` | JSON `{username,password,display_name,role}`; tạo tài khoản, trả 201; username đã dùng trả 409. |
+| GET `/api/v1/users/:id` | Thông tin an toàn, không có hash mật khẩu/token version. |
+| PATCH `/api/v1/users/:id` | JSON gồm `display_name`, `role`, `status`; không nhận field ngoài danh sách. |
+
+Đổi vai trò hoặc trạng thái tăng token version, vô hiệu ngay JWT cũ; mở khóa không làm phiên cũ sống lại. Server giữ ít nhất một Admin ACTIVE, kể cả hai Admin tự hạ quyền đồng thời. Mọi API đã xác thực giới hạn 100 yêu cầu trong mỗi cửa sổ 60 giây theo tài khoản; bộ đếm nguyên tử trong PostgreSQL. Login có giới hạn riêng nêu ở BE-03.
+
+Ma trận quyền nằm tại `common/authorization.js`; module tiếp theo dùng cùng kiểm tra quyền và `requireRoomScope` để giới hạn phòng. Các thao tác ghi kiểm tra lại quyền/trạng thái người thực hiện bên trong transaction.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.
