@@ -116,3 +116,15 @@ test("từ chối trạng thái component và amount không hợp lệ", async (
     (error) => error.code === "INVALID_AMOUNT",
   );
 });
+
+test("không tăng counter khi log level không hợp lệ", async () => {
+  const { monitoring } = fixture();
+
+  await assert.rejects(
+    () => monitoring.recordEvent("telemetry.received", { level: "TRACE" }),
+    (error) => error.code === "INVALID_LOG_LEVEL",
+  );
+
+  const snapshot = await monitoring.getSnapshot();
+  assert.equal(snapshot.counters["telemetry.received"], undefined);
+});

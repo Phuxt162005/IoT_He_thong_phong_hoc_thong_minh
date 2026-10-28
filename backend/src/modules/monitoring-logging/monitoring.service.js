@@ -41,10 +41,7 @@ export class MonitoringService {
     };
 
     // Repository hiện tại nhận record có timestamp do service cung cấp.
-    await this.repository.setComponent(name, status, {
-      ...details,
-      updatedAt: record.updatedAt,
-    });
+    await this.repository.setComponent(name, status, details, record.updatedAt);
     this.logger.info("Component status updated", record);
     return record;
   }
@@ -90,6 +87,17 @@ export class MonitoringService {
         "amount phải là số nguyên dương",
         "INVALID_AMOUNT",
       );
+    }
+    if (!["DEBUG", "INFO", "WARN", "ERROR"].includes(level)) {
+      throw new MonitoringError("Log level không hợp lệ", "INVALID_LOG_LEVEL");
+    }
+
+    if (typeof message !== "string" || !message.trim()) {
+      throw new MonitoringError("Message không được rỗng", "INVALID_MESSAGE");
+    }
+
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      throw new MonitoringError("Metadata không hợp lệ", "INVALID_METADATA");
     }
 
     const value = await this.repository.incrementCounter(name, amount);
