@@ -6,6 +6,7 @@
   "scripts": {
     "test:device-shadow": "node --test tests/device-shadow.test.js",
     "test:telemetry-ingestion": "node --test tests/telemetry-ingestion.test.js",
+    "test:monitoring-logging": "node --test tests/monitoring-logging.test.js",
     "test": "node --test tests/*.test.js"
   },
   "engines": {
