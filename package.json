@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node backend/src/server.js",
+    "dev": "node --watch backend/src/server.js",
+    "setup:local": "node deployment/scripts/setup-local.mjs",
+    "db:migrate": "node backend/src/database/cli.js migrate",
+    "db:seed": "node backend/src/database/cli.js seed",
+    "test:integration": "node --test tests/integration/*.test.js",
     "test:device-shadow": "node --test tests/device-shadow.test.js",
     "test:telemetry-ingestion": "node --test tests/telemetry-ingestion.test.js",
     "test:monitoring-logging": "node --test tests/monitoring-logging.test.js",
