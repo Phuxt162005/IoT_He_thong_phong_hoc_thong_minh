@@ -9,7 +9,7 @@ export function publicTelemetry(row) {
 }
 export function csvCell(value) {
   let cell = value instanceof Date ? value.toISOString() : value === null || value === undefined ? "" : String(value);
-  if (/^[=+@\-\t\r]/.test(cell)) cell = `'${cell}`;
+  if (typeof value === "string" && /^[=+@\-\t\r]/.test(cell)) cell = `'${cell}`;
   return `"${cell.replaceAll('"', '""')}"`;
 }
 export class DashboardService {
