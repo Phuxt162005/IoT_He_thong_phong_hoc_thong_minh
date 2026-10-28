@@ -2,12 +2,14 @@ import { z } from "zod";
 import { AppError } from "../../common/errors.js";
 import { withTransaction } from "../../database/pool.js";
 import { recordConnectionChange } from "../../database/events.js";
+import { resetReportedForSession } from "../commands/command-state.js";
+import { reportedPatchSchema, shadowVersionSchema } from "../commands/command-schemas.js";
 
 const code = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/);
 const sessionId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const timestamp = z.number().int().min(0).max(8640000000000000);
 const heartbeat = z.object({ msg_id: z.string().min(1).max(64), device_id: code, room_id: code, session_id: sessionId, timestamp, uptime_seconds: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), free_heap_bytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), wifi_rssi_dbm: z.number().int().min(-127).max(0), firmware_version: z.string().min(1).max(64).optional() }).strict();
-const statusMessage = z.object({ device_id: code, room_id: code, session_id: sessionId, timestamp: timestamp.optional(), status: z.enum(["ONLINE", "OFFLINE"]), reason: z.string().min(1).max(64).optional() }).strict().refine((v) => v.status === "OFFLINE" || v.timestamp !== undefined);
+const statusMessage = z.object({ device_id: code, room_id: code, session_id: sessionId, timestamp: timestamp.optional(), status: z.enum(["ONLINE", "OFFLINE"]), reason: z.string().min(1).max(64).optional(), reported_state: reportedPatchSchema.optional(), shadow_version: shadowVersionSchema.optional() }).strict().refine((v) => (v.status === "OFFLINE" || v.timestamp !== undefined) && ((v.reported_state === undefined) === (v.shadow_version === undefined)));
 const allowed = ["PROVISIONED", "ACTIVE", "FAULT", "MAINTENANCE"];
 
 export class DevicePresenceService {
@@ -46,6 +48,7 @@ export class DevicePresenceService {
         await client.query("UPDATE device_sessions SET closed_at=now() WHERE device_id=$1 AND closed_at IS NULL", [device.device_id]);
         await client.query("INSERT INTO device_sessions(device_id,session_id,last_timestamp_ms) VALUES($1,$2,$3)", [device.device_id, data.session_id, data.timestamp]);
         await client.query("UPDATE devices SET last_heartbeat_at=NULL WHERE device_id=$1", [device.device_id]);
+        await resetReportedForSession(client, device, data.session_id);
       }
       const heartbeatAt = envelope.kind === "heartbeat" ? now : null;
       await client.query("UPDATE device_sessions SET last_msg_id=$1,last_timestamp_ms=$2,last_uptime_seconds=coalesce($3,last_uptime_seconds),last_heartbeat_at=coalesce($4,last_heartbeat_at) WHERE device_id=$5 AND session_id=$6", [data.msg_id ?? null, data.timestamp, data.uptime_seconds ?? null, heartbeatAt, device.device_id, data.session_id]);

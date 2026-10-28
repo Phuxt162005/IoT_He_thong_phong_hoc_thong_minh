@@ -15,6 +15,7 @@ Trạng thái: hợp đồng triển khai. Các endpoint dưới đây được 
 | Giá trị legacy | Legacy thiếu occupancy lưu NULL, không suy diễn phòng vắng; lux legacy được giữ phần thập phân theo service cũ. Database lưu số thực có CHECK giới hạn; bản tin chuẩn vẫn yêu cầu lux nguyên và occupancy boolean. | BE-08, BE-13 |
 | Kết quả lệnh | API/DB: PENDING → SUCCESS / FAILED / TIMEOUT, trạng thái cuối bất biến. SENT chỉ là thời điểm publish, không chứng minh thực thi. Adapter ánh xạ service cũ ACKNOWLEDGED → SUCCESS, PUBLISH_FAILED → FAILED; không đổi test legacy ngầm. | BE-10 |
 | Trạng thái thực | desired chỉ thể hiện yêu cầu; reported chỉ cập nhật từ thiết bị. Có version/correlation chống ACK/reported cũ ghi đè trạng thái mới. | BE-10 |
+| ACK/reported BE-10 | Bắt buộc session_id hiện tại; command còn gắn credential version và expires_at. Phiên mới đặt reported về UNKNOWN tới khi có snapshot thật. Version được theo dõi riêng mỗi actuator để ACK quạt/đèn đến khác thứ tự vẫn đúng; timestamp phân biệt các snapshot cùng version. ACK muộn không đổi trạng thái cuối của lệnh, chỉ cập nhật trạng thái thực nếu không ghi đè version mới hơn. | BE-10 |
 | Broker | Dynamic Security, credential riêng cho thiết bị, ACL theo mã và loại node; username và client ID đều bằng device_code. BE-09 yêu cầu session_id mới mỗi lần CONNECT, không chỉ mỗi lần boot, để loại LWT/heartbeat phiên cũ. Thiết bị không được publish command hoặc subscribe dữ liệu thiết bị khác. Backend đối chiếu phòng trong topic với database. | BE-07–09 |
 | Khóa thiết bị | Thu hồi credential phải chặn phiên đang kết nối và reconnect; backend chặn ingestion/command ngay. Theo mục 9.3.2, DB cập nhật trước; broker lỗi trả 202/PENDING và retry qua outbox, không báo đã đồng bộ. Secret retry mã hóa, xóa sau APPLIED. | BE-06–08 |
 
@@ -35,6 +36,8 @@ Topic gốc: `smartclassroom/room/{room_code}/device/{device_code}`. Mã khớp 
 | `/config/ack` | cả hai loại node → backend | 1 | false | config_id, version, status SUCCESS/FAILED, error_code tùy chọn |
 
 Backend dùng client ID ổn định, phiên bền vững và subscribe lại khi cần; không enqueue lệnh điều khiển khi broker không sẵn sàng. Không retain command để tránh thực thi lệnh cũ sau reconnect. QoS MQTT không thay thế ACK nghiệp vụ.
+
+Command/ACK/reported đều có session_id; command thêm expires_at (UTC mili giây). Firmware phải bỏ lệnh sai phiên/hết hạn, chống thực thi lặp command_id nhưng vẫn ACK lại. ACK SUCCESS phải kèm reported_state khớp các actuator được yêu cầu. Reported hỗ trợ ON/OFF/UNKNOWN; desired chỉ ON/OFF. Status ONLINE có thể kèm cặp shadow_version/reported_state để đồng bộ relay sau reconnect; không có snapshot thì trạng thái thực giữ UNKNOWN.
 
 Ví dụ bản tin có thể parse được nằm trong [mqtt-examples.json](contracts/mqtt-examples.json). Hai trạng thái ACK lưu telemetry và ACK thực thi command là hai luồng riêng.
 

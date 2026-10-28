@@ -12,6 +12,7 @@ import { DeviceCredentialsService } from "./modules/device-credentials/device-cr
 import { TelemetryPipeline, bindTelemetry } from "./modules/telemetry-ingestion/telemetry-pipeline.js";
 import { DevicePresenceService, bindPresence } from "./modules/device-presence/device-presence.service.js";
 import { startJob } from "./common/scheduler.js";
+import { CommandsService, bindCommands } from "./modules/commands/commands.service.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
@@ -23,14 +24,17 @@ try {
   const credentials = new DeviceCredentialsService({ pool, admin, secretKey: config.deviceSecretKey, mqttUrl: config.mqttUrl, reservedUsernames: [config.mqttUsername, config.mqttAdminUsername], heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds });
   const presence = new DevicePresenceService({ pool, timeoutSeconds: config.heartbeatTimeoutSeconds });
   const unbindPresence = bindPresence(mqtt, presence);
+  const commands = new CommandsService({ pool, mqtt, logger, timeoutSeconds: config.commandTimeoutSeconds, heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds, manualOverrideSeconds: config.manualOverrideSeconds });
+  const unbindCommands = bindCommands(mqtt, commands);
   const telemetry = new TelemetryPipeline({ pool, mqtt, logger, freshnessSeconds: config.telemetryFreshnessSeconds });
   const unbindTelemetry = bindTelemetry(mqtt, telemetry);
   const reconcile = startJob("broker-reconcile", () => credentials.processPending(), { intervalMs: 2000, logger });
   const offlineScan = startJob("offline-scan", () => presence.scanOffline(), { intervalMs: 5000, logger });
+  const commandRecovery = startJob("command-recovery", async () => { await commands.expirePending(); await commands.processPending(); }, { intervalMs: 1000, logger });
   let cleaning;
-  const cleanup = () => cleaning ??= (async () => { await Promise.all([reconcile.stop(), offlineScan.stop()]); await mqtt.stop(); unbindPresence(); unbindTelemetry(); await pool.end(); })();
+  const cleanup = () => cleaning ??= (async () => { await Promise.all([reconcile.stop(), offlineScan.stop(), commandRecovery.stop()]); await mqtt.stop(); unbindPresence(); unbindCommands(); unbindTelemetry(); await pool.end(); })();
   const ready = async () => { await pool.query("SELECT 1"); return mqtt.ready; };
-  const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials }) }));
+  const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials, commands }) }));
   server.on("error", async () => { logger.error("server.listen_failed"); process.exitCode = 1; await cleanup(); });
   server.listen(config.port, config.host, () => logger.info("server.started", { host: config.host, port: config.port }));
   let stopping = false;
