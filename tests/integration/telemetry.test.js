@@ -26,7 +26,7 @@ test("MQTT telemetry is committed before ACK and concurrent retries store exactl
   await Promise.all(Array.from({ length: 6 }, () => f.publish(value)));
   await waitFor(() => f.acks.length === 6);
   assert.equal((await f.pool.query("SELECT * FROM sensor_data")).rowCount, 1);
-  assert.equal((await f.pool.query("SELECT * FROM iot_events")).rowCount, 1);
+  assert.equal((await f.pool.query("SELECT * FROM iot_events WHERE event_type='telemetry.stored'")).rowCount, 1);
   assert.equal(f.events.length, 1);
   assert.equal(f.events[0].eligible, true);
   assert.equal(f.acks.filter((a) => !a.duplicate).length, 1);
@@ -45,7 +45,7 @@ test("database write failure produces no ACK; retry after recovery succeeds with
   await waitFor(() => f.mqttSink.getEntries().some((e) => e.metadata.code === "23514"));
   assert.equal(f.acks.length, 0);
   assert.equal((await f.pool.query("SELECT * FROM sensor_data")).rowCount, 0);
-  assert.equal((await f.pool.query("SELECT * FROM iot_events")).rowCount, 0);
+  assert.equal((await f.pool.query("SELECT * FROM iot_events WHERE event_type='telemetry.stored'")).rowCount, 0);
   await f.owner.query("ALTER TABLE sensor_data DROP CONSTRAINT test_reject_temperature");
   await f.publish(value);
   await waitFor(() => f.acks.length === 1);

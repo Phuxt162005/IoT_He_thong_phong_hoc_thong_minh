@@ -16,6 +16,7 @@ const envSchema = z.object({
   MQTT_ADMIN_PASSWORD: z.string().min(16).optional(),
   DEVICE_SECRET_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   TELEMETRY_FRESHNESS_S: z.coerce.number().int().min(1).max(300).default(30),
+  HEARTBEAT_TIMEOUT_S: z.coerce.number().int().min(5).max(300).default(30),
 });
 
 export function loadConfig(env = process.env, { requireDatabase = false, requireAuth = false, requireBroker = false } = {}) {
@@ -36,5 +37,5 @@ export function loadConfig(env = process.env, { requireDatabase = false, require
   return Object.freeze({ env: data.NODE_ENV, host: data.HOST, port: data.PORT, corsOrigins, databaseUrl: data.DATABASE_URL, jwtSecret: data.JWT_SECRET, jwtExpiresIn: data.JWT_EXPIRES_IN,
     mqttUrl: data.MQTT_URL, mqttUsername: data.MQTT_USERNAME, mqttPassword: data.MQTT_PASSWORD, mqttClientId: data.MQTT_CLIENT_ID,
     mqttAdminUsername: data.MQTT_ADMIN_USERNAME, mqttAdminPassword: data.MQTT_ADMIN_PASSWORD, deviceSecretKey: data.DEVICE_SECRET_KEY,
-    telemetryFreshnessSeconds: data.TELEMETRY_FRESHNESS_S });
+    telemetryFreshnessSeconds: data.TELEMETRY_FRESHNESS_S, heartbeatTimeoutSeconds: data.HEARTBEAT_TIMEOUT_S });
 }

@@ -14,7 +14,7 @@ export function createRoutes({ pool, config, credentials }) {
   router.use(authenticate(auth), apiRateLimit(pool), (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
   router.use(createUsersRoutes(pool));
   router.use(createRoomsRoutes(pool));
-  router.use(createDevicesRoutes(pool));
+  router.use(createDevicesRoutes(pool, { heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds }));
   router.use(createDeviceCredentialsRoutes(pool, credentials));
   return router;
 }

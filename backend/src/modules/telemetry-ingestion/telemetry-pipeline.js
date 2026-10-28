@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { AppError } from "../../common/errors.js";
 import { withTransaction } from "../../database/pool.js";
 import { writeAudit } from "../../database/audit.js";
+import { recordConnectionChange } from "../../database/events.js";
 import { transitionDevice } from "../devices/device-lifecycle.js";
 import { TelemetryIngestionService } from "./telemetry-ingestion.service.js";
 import { PostgresTelemetryRepository } from "./telemetry-ingestion.repository.pg.js";
@@ -46,6 +47,7 @@ export class TelemetryPipeline {
         const service = new TelemetryIngestionService({ repository, now: () => receivedAt.toISOString() });
         const result = await service.ingest({ ...normalized, timestamp: recordedAt.toISOString() });
         await client.query("UPDATE devices SET connection_status='ONLINE',last_seen=$1,updated_at=$1,fault_counters=jsonb_set(fault_counters,'{sensor_err}','0') WHERE device_id=$2", [receivedAt, device.device_id]);
+        await recordConnectionChange(client, device, "ONLINE", "TELEMETRY");
         return { result, event: repository.createdEvent, receivedAt, legacy: normalized.legacy };
       });
     } catch (error) {

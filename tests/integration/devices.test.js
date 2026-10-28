@@ -60,13 +60,13 @@ test("maintenance and recovery validate lifecycle independently of fresh connect
   const id = (await register()).body.data.device_id;
   assert.equal((await action(id, "maintenance")).status, 409);
   // Represents a device already provisioned/activated by BE-07, not a bypass in the HTTP API.
-  await pool.query("UPDATE devices SET lifecycle_status='ACTIVE',connection_status='ONLINE',last_seen=now() WHERE device_id=$1", [id]);
+  await pool.query("UPDATE devices SET lifecycle_status='ACTIVE',connection_status='ONLINE',last_seen=now(),last_heartbeat_at=now() WHERE device_id=$1", [id]);
   const maintenance = await action(id, "maintenance");
   assert.equal(maintenance.status, 200);
   assert.equal(maintenance.body.data.connection_status, "ONLINE");
-  await pool.query("UPDATE devices SET last_seen=now()-interval '31 seconds' WHERE device_id=$1", [id]);
+  await pool.query("UPDATE devices SET last_seen=now()-interval '31 seconds',last_heartbeat_at=now()-interval '31 seconds' WHERE device_id=$1", [id]);
   assert.equal((await action(id, "resume")).status, 409);
-  await pool.query("UPDATE devices SET last_seen=now() WHERE device_id=$1", [id]);
+  await pool.query("UPDATE devices SET last_seen=now(),last_heartbeat_at=now() WHERE device_id=$1", [id]);
   assert.equal((await action(id, "resume")).body.data.lifecycle_status, "ACTIVE");
   assert.equal((await action(id, "clear-fault")).status, 409);
   await pool.query("UPDATE devices SET lifecycle_status='FAULT',fault_counters='{\"sensor_err\":5}' WHERE device_id=$1", [id]);
@@ -95,7 +95,7 @@ test("device lists, filters, details and lifecycle history respect room scope", 
 test("concurrent lifecycle changes apply once and failed audit rolls back transition", async (t) => {
   const { register, action, pool, owner } = await fixture(t);
   const id = (await register()).body.data.device_id;
-  await pool.query("UPDATE devices SET lifecycle_status='ACTIVE',connection_status='ONLINE',last_seen=now() WHERE device_id=$1", [id]);
+  await pool.query("UPDATE devices SET lifecycle_status='ACTIVE',connection_status='ONLINE',last_seen=now(),last_heartbeat_at=now() WHERE device_id=$1", [id]);
   const results = await Promise.all([action(id, "maintenance"), action(id, "maintenance")]);
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
   assert.equal((await pool.query("SELECT * FROM device_lifecycle_events WHERE to_status='MAINTENANCE'")).rowCount, 1);

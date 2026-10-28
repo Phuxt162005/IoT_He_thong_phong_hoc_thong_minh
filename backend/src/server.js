@@ -10,6 +10,8 @@ import { MqttRuntime } from "./mqtt/runtime.js";
 import { DynamicSecurity } from "./mqtt/dynamic-security.js";
 import { DeviceCredentialsService } from "./modules/device-credentials/device-credentials.service.js";
 import { TelemetryPipeline, bindTelemetry } from "./modules/telemetry-ingestion/telemetry-pipeline.js";
+import { DevicePresenceService, bindPresence } from "./modules/device-presence/device-presence.service.js";
+import { startJob } from "./common/scheduler.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
@@ -18,16 +20,15 @@ try {
   pool.on("error", () => logger.error("database.pool_error"));
   const mqtt = new MqttRuntime({ config, pool, logger });
   const admin = new DynamicSecurity({ url: config.mqttUrl, username: config.mqttAdminUsername, password: config.mqttAdminPassword });
-  const credentials = new DeviceCredentialsService({ pool, admin, secretKey: config.deviceSecretKey, mqttUrl: config.mqttUrl, reservedUsernames: [config.mqttUsername, config.mqttAdminUsername] });
+  const credentials = new DeviceCredentialsService({ pool, admin, secretKey: config.deviceSecretKey, mqttUrl: config.mqttUrl, reservedUsernames: [config.mqttUsername, config.mqttAdminUsername], heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds });
+  const presence = new DevicePresenceService({ pool, timeoutSeconds: config.heartbeatTimeoutSeconds });
+  const unbindPresence = bindPresence(mqtt, presence);
   const telemetry = new TelemetryPipeline({ pool, mqtt, logger, freshnessSeconds: config.telemetryFreshnessSeconds });
   const unbindTelemetry = bindTelemetry(mqtt, telemetry);
-  let pending = null;
-  const reconcile = setInterval(() => {
-    if (pending) return;
-    pending = credentials.processPending().catch((error) => logger.warn("broker.reconcile_failed", { code: error.code ?? "DATABASE_ERROR" })).finally(() => { pending = null; });
-  }, 2000);
-  reconcile.unref();
-  const cleanup = async () => { clearInterval(reconcile); await pending; await mqtt.stop(); unbindTelemetry(); await pool.end(); };
+  const reconcile = startJob("broker-reconcile", () => credentials.processPending(), { intervalMs: 2000, logger });
+  const offlineScan = startJob("offline-scan", () => presence.scanOffline(), { intervalMs: 5000, logger });
+  let cleaning;
+  const cleanup = () => cleaning ??= (async () => { await Promise.all([reconcile.stop(), offlineScan.stop()]); await mqtt.stop(); unbindPresence(); unbindTelemetry(); await pool.end(); })();
   const ready = async () => { await pool.query("SELECT 1"); return mqtt.ready; };
   const server = createServer(createApp({ config, logger, ready, routes: createRoutes({ pool, config, credentials }) }));
   server.on("error", async () => { logger.error("server.listen_failed"); process.exitCode = 1; await cleanup(); });

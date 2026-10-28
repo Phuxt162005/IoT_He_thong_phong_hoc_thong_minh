@@ -7,12 +7,14 @@ import { withTransaction } from "../../database/pool.js";
 import { writeAudit } from "../../database/audit.js";
 import { transitionDevice } from "../devices/device-lifecycle.js";
 import { requireDeviceScope } from "../devices/devices.service.js";
+import { recordConnectionChange } from "../../database/events.js";
 
 const safeOperation = (op) => ({ operation_id: op.operation_id, operation: op.operation, status: op.status, attempts: op.attempts, last_error_code: op.last_error_code, applied_at: op.applied_at });
 
 export class DeviceCredentialsService {
-  constructor({ pool, admin, secretKey, mqttUrl, reservedUsernames = ["admin", "backend_service"] }) {
+  constructor({ pool, admin, secretKey, mqttUrl, reservedUsernames = ["admin", "backend_service"], heartbeatTimeoutSeconds = 30 }) {
     this.pool = pool; this.admin = admin; this.box = new SecretBox(secretKey); this.mqttUrl = mqttUrl; this.reservedUsernames = reservedUsernames;
+    this.heartbeatTimeoutSeconds = heartbeatTimeoutSeconds;
   }
   async issue(actor, id, operation, { reason, confirmed }, requestId) {
     const secret = randomBytes(32).toString("hex");
@@ -36,7 +38,8 @@ export class DeviceCredentialsService {
       const version = Number((await client.query("SELECT coalesce(max(version),0)+1 AS version FROM device_credentials WHERE device_id=$1", [id])).rows[0].version);
       await client.query("INSERT INTO device_credentials(credential_id,device_id,version,mqtt_username,secret_hash,status) VALUES($1,$2,$3,$4,$5,'ACTIVE')", [credentialId, id, version, device.device_code, hash]);
       await client.query("INSERT INTO broker_operations(operation_id,device_id,credential_id,operation,secret_encrypted) VALUES($1,$2,$3,$4,$5)", [operationId, id, credentialId, operation, this.box.seal(secret, `${id}:${operationId}`)]);
-      await client.query("UPDATE devices SET broker_sync_status='PENDING',connection_status='UNKNOWN',last_seen=NULL,session_id=NULL WHERE device_id=$1", [id]);
+      await client.query("UPDATE devices SET broker_sync_status='PENDING',connection_status='UNKNOWN',last_seen=NULL,last_heartbeat_at=NULL,session_id=NULL WHERE device_id=$1", [id]);
+      await recordConnectionChange(client, device, "UNKNOWN", "CREDENTIAL_ISSUE");
       await writeAudit(client, { actorType: "USER", actorId: actor.user_id, action: "DEVICE_CREDENTIAL_ISSUE", targetType: "DEVICE", targetId: id, requestId, details: { credential_id: credentialId, version, operation } });
       return { username: device.device_code, client_id: device.device_code, room_code: room.room_code, version };
     });
@@ -92,7 +95,8 @@ export class DeviceCredentialsService {
       const room = (await client.query("SELECT * FROM rooms WHERE room_id=$1 FOR SHARE", [device.room_id])).rows[0];
       if (!credential || device.broker_sync_status !== "SYNCED") throw new AppError("CREDENTIAL_NOT_READY", 409, "Credential chưa đồng bộ broker");
       if (!room || room.status !== "ACTIVE") throw new AppError("ROOM_INACTIVE", 409, "Phòng chưa hoạt động");
-      if (device.connection_status !== "ONLINE" || !device.last_seen || Date.now() - device.last_seen.getTime() > 30000) throw new AppError("DEVICE_OFFLINE", 409, "Cần heartbeat mới từ thiết bị");
+      const session = (await client.query("SELECT last_heartbeat_at FROM device_sessions WHERE device_id=$1 AND session_id=$2 AND closed_at IS NULL", [id, device.session_id])).rows[0];
+      if (device.connection_status !== "ONLINE" || !session?.last_heartbeat_at || Date.now() - session.last_heartbeat_at.getTime() > this.heartbeatTimeoutSeconds * 1000) throw new AppError("DEVICE_OFFLINE", 409, "Cần heartbeat mới từ phiên thiết bị hiện tại");
       return transitionDevice(client, device, "ACTIVE", { actorId: actor.user_id, reason, requestId, action: "DEVICE_ACTIVATE" });
     });
   }

@@ -13,9 +13,9 @@ const patchSchema = z.object({ device_name: name.optional(), room_id: idSchema.n
 const listSchema = z.object({ ...pagination, room_id: idSchema.optional(), device_type: deviceType.optional(), lifecycle_status: lifecycleStatus.optional(), connection_status: z.enum(["UNKNOWN", "ONLINE", "OFFLINE"]).optional() }).strict();
 const actionSchema = z.object({ reason: z.string().trim().min(3).max(255), confirmed: z.boolean().optional() }).strict();
 
-export function createDevicesRoutes(pool) {
+export function createDevicesRoutes(pool, options) {
   const router = Router();
-  const devices = new DevicesService(pool);
+  const devices = new DevicesService(pool, options);
   router.get("/devices", authorize(pool, "devices:read"), async (req, res) => res.json({ success: true, ...await devices.list(req.user, parse(listSchema, req.query)) }));
   router.get("/devices/:id", authorize(pool, "devices:read"), async (req, res) => res.json({ success: true, data: await devices.get(req.user, parse(idSchema, req.params.id)) }));
   router.post("/devices", authorize(pool, "devices:write"), async (req, res) => res.status(201).json({ success: true, data: await devices.register(req.user, parse(createSchema, req.body), req.requestId) }));
