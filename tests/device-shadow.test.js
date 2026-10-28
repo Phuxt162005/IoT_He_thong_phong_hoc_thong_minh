@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { InMemoryDeviceShadowRepository } from "../src/modules/device-shadow/device-shadow.repository.memory.js";
-import { DeviceShadowService } from "../src/modules/device-shadow/device-shadow.service.js";
-import { buildDeviceCommandTopic } from "../src/modules/device-shadow/device-shadow.mqtt.js";
+import { InMemoryDeviceShadowRepository } from "../backend/src/modules/device-shadow/device-shadow.repository.memory.js";
+import { DeviceShadowService } from "../backend/src/modules/device-shadow/device-shadow.service.js";
+import { buildDeviceCommandTopic } from "../backend/src/modules/device-shadow/device-shadow.mqtt.js";
 
 function createFixture({ failPublish = false } = {}) {
   const repository = new InMemoryDeviceShadowRepository();
