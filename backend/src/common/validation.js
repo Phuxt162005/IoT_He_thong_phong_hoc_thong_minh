@@ -1,7 +1,7 @@
 import { AppError } from "./errors.js";
 import { z } from "zod";
 
-export const idSchema = z.string().regex(/^[1-9]\d{0,18}$/).refine((v) => BigInt(v) <= 9223372036854775807n);
+export const idSchema = z.string().refine((v) => /^[1-9]\d{0,18}$/.test(v) && BigInt(v) <= 9223372036854775807n);
 export const pagination = {
   page: z.coerce.number().int().min(1).max(1000000).default(1),
   page_size: z.coerce.number().int().min(1).max(100).default(20),
