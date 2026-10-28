@@ -149,3 +149,25 @@ test("từ chối topic chứa ký tự không hợp lệ", () => {
     (error) => error.code === "INVALID_TOPIC",
   );
 });
+
+test("không thay đổi dữ liệu khi topic không hợp lệ", async () => {
+  const { repository, service } = createFixture();
+
+  await repository.registerDevice({
+    deviceId: "CTRL_01",
+    roomCode: "ROOM/302",
+  });
+
+  const before = await repository.getShadow("CTRL_01");
+
+  await assert.rejects(
+    () => service.setDesiredState("CTRL_01", { fan: "ON" }),
+    (error) => error.code === "INVALID_TOPIC",
+  );
+
+  const after = await repository.getShadow("CTRL_01");
+  const command = await repository.getLatestCommandForDevice("CTRL_01");
+
+  assert.deepEqual(after, before);
+  assert.equal(command, null);
+});

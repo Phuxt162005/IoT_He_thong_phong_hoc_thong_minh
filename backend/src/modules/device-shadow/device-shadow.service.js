@@ -112,6 +112,7 @@ export class DeviceShadowService {
         "DEVICE_NOT_FOUND",
       );
 
+    const topic = buildDeviceCommandTopic(shadow.roomCode, deviceId);
     const desiredState = { ...shadow.desiredState, ...patch };
     const commandId = randomUUID();
     const createdAt = this.now();
@@ -139,7 +140,6 @@ export class DeviceShadowService {
     await this.repository.saveShadow(updatedShadow);
     await this.repository.saveCommand(command);
 
-    const topic = buildDeviceCommandTopic(shadow.roomCode, deviceId);
     const payload = {
       messageType: "command",
       commandId,
