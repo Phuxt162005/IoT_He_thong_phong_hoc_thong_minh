@@ -2,6 +2,8 @@
 
 Môi trường kiểm chứng cục bộ: Windows/Docker Desktop, Node.js 24, PostgreSQL 17 và Mosquitto Dynamic Security. Dữ liệu MQTT đến từ client Node mô phỏng. Các kết quả dưới đây là kết quả chạy thực tế; chưa đại diện cho phần cứng hoặc production.
 
+BE-16 đã tích hợp qua [PR #17](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/17), merge `395e016`. [CI nhánh](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/actions/runs/40731900813) và [CI Pull Request](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/actions/runs/40731925068) đều đạt cả unit, integration và deployment. Clone sạch nhánh từ GitHub, cài `npm ci` và chạy lại đủ 119 test cũng đạt.
+
 | Phạm vi | Bằng chứng |
 | --- | --- |
 | Unit/service/HTTP/contract | 40/40 test đạt; gồm ADV của nhóm, bootstrap, password, encryption và đối chiếu 53 route OpenAPI. |
