@@ -7,8 +7,9 @@ import { createRoomsRoutes } from "./modules/rooms/rooms.routes.js";
 import { createDevicesRoutes } from "./modules/devices/devices.routes.js";
 import { createDeviceCredentialsRoutes } from "./modules/device-credentials/device-credentials.routes.js";
 import { createCommandsRoutes } from "./modules/commands/commands.routes.js";
+import { createDeviceConfigRoutes } from "./modules/device-config/device-config.routes.js";
 
-export function createRoutes({ pool, config, credentials, commands }) {
+export function createRoutes({ pool, config, credentials, commands, configs }) {
   const router = Router();
   const auth = new AuthService({ pool, jwtSecret: config.jwtSecret, jwtExpiresIn: config.jwtExpiresIn });
   router.use(createAuthRoutes(auth));
@@ -18,5 +19,6 @@ export function createRoutes({ pool, config, credentials, commands }) {
   router.use(createDevicesRoutes(pool, { heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds }));
   router.use(createDeviceCredentialsRoutes(pool, credentials));
   router.use(createCommandsRoutes(pool, commands));
+  router.use(createDeviceConfigRoutes(pool, configs));
   return router;
 }

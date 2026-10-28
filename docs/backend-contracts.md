@@ -39,6 +39,8 @@ Backend dùng client ID ổn định, phiên bền vững và subscribe lại kh
 
 Command/ACK/reported đều có session_id; command thêm expires_at (UTC mili giây). Firmware phải bỏ lệnh sai phiên/hết hạn, chống thực thi lặp command_id nhưng vẫn ACK lại. ACK SUCCESS phải kèm reported_state khớp các actuator được yêu cầu. Reported hỗ trợ ON/OFF/UNKNOWN; desired chỉ ON/OFF. Status ONLINE có thể kèm cặp shadow_version/reported_state để đồng bộ relay sau reconnect; không có snapshot thì trạng thái thực giữ UNKNOWN.
 
+Config/config ACK cũng có session_id; config thêm expires_at và full settings snapshot. Firmware không áp dụng lại config_id/version đã xử lý nhưng gửi ACK lại. Config ACK SUCCESS có thể kèm applied_settings; nếu có phải khớp đầy đủ yêu cầu. Bản ACK đúng version mới được cập nhật applied_settings, không suy diễn từ publish thành công. Phiên MQTT mới làm applied_settings trở về chưa xác nhận cho đến ACK mới.
+
 Ví dụ bản tin có thể parse được nằm trong [mqtt-examples.json](contracts/mqtt-examples.json). Hai trạng thái ACK lưu telemetry và ACK thực thi command là hai luồng riêng.
 
 ## HTTP

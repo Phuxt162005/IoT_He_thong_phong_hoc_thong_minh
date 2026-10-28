@@ -39,6 +39,7 @@ export class DevicesService {
         await client.query("INSERT INTO actuators(device_id,actuator_type) VALUES($1,'LIGHT'),($1,'FAN')", [device.device_id]);
         await client.query("INSERT INTO device_shadows(device_id) VALUES($1)", [device.device_id]);
       }
+      await client.query("INSERT INTO device_settings(device_id,desired_settings) VALUES($1,$2)", [device.device_id, device.device_type === "SENSOR_NODE" ? { sample_interval_seconds: 5, heartbeat_interval_seconds: 10 } : { heartbeat_interval_seconds: 10 }]);
       await recordLifecycle(client, device, null, "REGISTERED", { actorId: actor.user_id, reason: "Đăng ký thiết bị", requestId, action: "DEVICE_REGISTER" });
       return (await client.query(`${deviceSelect} WHERE d.device_id=$1`, [device.device_id])).rows[0];
     });

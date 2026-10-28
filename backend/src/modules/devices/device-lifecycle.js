@@ -2,6 +2,7 @@ import { AppError } from "../../common/errors.js";
 import { writeAudit } from "../../database/audit.js";
 import { recordConnectionChange } from "../../database/events.js";
 import { cancelPendingDeviceCommands } from "../commands/command-state.js";
+import { cancelPendingDeviceConfigs } from "../device-config/device-config.state.js";
 
 export const transitions = Object.freeze({
   REGISTERED: ["PROVISIONED", "DECOMMISSIONED"],
@@ -27,5 +28,6 @@ export async function transitionDevice(client, device, to, context) {
   await recordLifecycle(client, result.rows[0], device.lifecycle_status, to, context);
   await recordConnectionChange(client, { ...device, lifecycle_status: to }, result.rows[0].connection_status, context.action);
   if (["FAULT", "MAINTENANCE", "REVOKED", "DECOMMISSIONED"].includes(to)) await cancelPendingDeviceCommands(client, device.device_id, `DEVICE_${to}`);
+  if (["REVOKED", "DECOMMISSIONED"].includes(to)) await cancelPendingDeviceConfigs(client, device.device_id, `DEVICE_${to}`);
   return result.rows[0];
 }
