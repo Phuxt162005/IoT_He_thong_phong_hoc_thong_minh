@@ -1,5 +1,60 @@
 name: smartclassroom
+x-runtime-env: &runtime-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: 3000
+  DATABASE_URL: postgres://smartclass_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}@db:5432/smartclass
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-3600}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+  MQTT_URL: mqtt://mqtt:1883
+  MQTT_USERNAME: ${MQTT_USERNAME:-backend_service}
+  MQTT_PASSWORD: ${MQTT_PASSWORD:?Set MQTT_PASSWORD}
+  MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-backend-01}
+  MQTT_ADMIN_USERNAME: ${MQTT_ADMIN_USERNAME:-admin}
+  MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?Set MQTT_ADMIN_PASSWORD}
+  DEVICE_SECRET_KEY: ${DEVICE_SECRET_KEY:?Set DEVICE_SECRET_KEY}
+  TELEMETRY_FRESHNESS_S: ${TELEMETRY_FRESHNESS_S:-30}
+  HEARTBEAT_TIMEOUT_S: ${HEARTBEAT_TIMEOUT_S:-30}
+  COMMAND_TIMEOUT_S: ${COMMAND_TIMEOUT_S:-5}
+  MANUAL_OVERRIDE_S: ${MANUAL_OVERRIDE_S:-300}
+  CONFIG_TIMEOUT_S: ${CONFIG_TIMEOUT_S:-10}
+  RETENTION_ENABLED: ${RETENTION_ENABLED:-false}
+  SENSOR_RETENTION_DAYS: ${SENSOR_RETENTION_DAYS:-90}
+  EVENT_RETENTION_DAYS: ${EVENT_RETENTION_DAYS:-7}
 services:
+  backend-init:
+    image: smartclassroom-backend:local
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    profiles: [app]
+    environment:
+      <<: *runtime-env
+      MIGRATION_DATABASE_URL: postgres://smartclass_owner:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/smartclass
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
+    command: ['sh', '-c', 'npm run db:migrate && npm run db:seed && npm run mqtt:bootstrap']
+    depends_on:
+      db: {condition: service_healthy}
+      mqtt: {condition: service_healthy}
+    restart: 'no'
+  backend:
+    image: smartclassroom-backend:local
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    profiles: [app]
+    environment: *runtime-env
+    ports: ['127.0.0.1:${BACKEND_PORT:-3000}:3000']
+    depends_on:
+      backend-init: {condition: service_completed_successfully}
+    restart: unless-stopped
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
   db:
     image: postgres:17-alpine
     environment:
@@ -7,7 +62,7 @@ services:
       POSTGRES_DB: smartclass
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
-    ports: ['127.0.0.1:5433:5432']
+    ports: ['127.0.0.1:${POSTGRES_PORT:-5433}:5432']
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/01-app-role.sh:/docker-entrypoint-initdb.d/01-app-role.sh:ro
@@ -24,7 +79,7 @@ services:
       POSTGRES_DB: smartclass_test
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
-    ports: ['127.0.0.1:5434:5432']
+    ports: ['127.0.0.1:${TEST_POSTGRES_PORT:-5434}:5432']
     tmpfs: [/var/lib/postgresql/data]
     volumes:
       - ./postgres/01-app-role.sh:/docker-entrypoint-initdb.d/01-app-role.sh:ro
@@ -38,7 +93,7 @@ services:
     entrypoint: ['/bin/sh', '/mosquitto/config/start.sh']
     environment:
       MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?Set MQTT_ADMIN_PASSWORD}
-    ports: ['127.0.0.1:1884:1883']
+    ports: ['127.0.0.1:${MQTT_PORT:-1884}:1883']
     volumes:
       - ./mosquitto:/mosquitto/config:ro
       - mqttdata:/mosquitto/data
@@ -53,7 +108,7 @@ services:
     entrypoint: ['/bin/sh', '/mosquitto/config/start.sh']
     environment:
       MQTT_ADMIN_PASSWORD: ${TEST_MQTT_ADMIN_PASSWORD:?Set TEST_MQTT_ADMIN_PASSWORD}
-    ports: ['127.0.0.1:1885:1883']
+    ports: ['127.0.0.1:${TEST_MQTT_PORT:-1885}:1883']
     volumes:
       - ./mosquitto:/mosquitto/config:ro
       - mqtttestdata:/mosquitto/data

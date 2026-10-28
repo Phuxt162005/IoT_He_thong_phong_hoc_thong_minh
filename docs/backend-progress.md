@@ -19,11 +19,12 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-12 | Đã push và tích hợp | [PR #13](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/13), commit `17deb28`, merge `0146680`; 39 unit và 60 integration test đạt cục bộ/CI. |
 | BE-13 | Đã push và tích hợp | [PR #14](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/14), commit `ab4c437`, merge `5cf484d`; 39 unit và 66 integration test đạt cục bộ/CI. |
 | BE-14 | Đã push và tích hợp | [PR #15](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/15), commit `d631fe9`, merge `67e411b`; 39 unit và 72 integration test đạt cục bộ/CI; entrypoint smoke đạt. Loopback MQTT→WS khoảng 62–65 ms. |
-| BE-15 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 76 integration test đạt; API audit chỉ Admin, bộ lọc actor/target/action/result/request/thời gian; lifecycle theo scope; che secret lồng nhau trước khi lưu. |
-| BE-16 | Chưa làm | Đóng gói, kiểm thử đầu cuối và hướng dẫn vận hành. |
+| BE-15 | Đã push và tích hợp | [PR #16](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/16), commit `ed2cabd`, merge `996e148`; 39 unit và 76 integration test đạt cục bộ/CI. |
+| BE-16 | Backend đã kiểm thử cục bộ, chờ push/CI | 40 unit và 79 integration test đạt; Docker app healthy, luồng thiết bị mô phỏng, backup/restore có dữ liệu, checksum/quyền/trigger, graceful restart; OpenAPI phủ 53 operations. Chưa nghiệm thu ESP32/frontend/TLS production, chưa tạo tag toàn hệ thống. |
 
 ## Ghi chú triển khai
 
 - 28/10/2026: bắt đầu BE-00, giữ nguyên các module ADV-01/02/03 của nhóm và hai PDF chưa được theo dõi.
 - Docker Desktop đã chạy; hai container PostgreSQL 17 cho ứng dụng và test đã healthy, chỉ mở cổng loopback. `.env`/`.env.test` chứa secret ngẫu nhiên cục bộ và được loại khỏi Git.
 - Trong BE-04, origin/main có ADV-04 mới (`9ee8666`) làm mất script start/dev/database/integration trong package.json. Đã merge phần AI của nhóm và khôi phục đầy đủ script backend, giữ test:anomaly-detection; kiểm tra lại trước khi tích hợp BE-04.
+- BE-16: các phòng `CHECK_*` trong database ứng dụng là bằng chứng demo Node MQTT mô phỏng; thiết bị đã revoke/decommission và phòng INACTIVE, giữ lịch sử. Backup nằm trong deployment/backups bị Git bỏ qua. Xem [vận hành](backend-operations.md) và [báo cáo kiểm chứng](backend-verification.md).

@@ -57,3 +57,22 @@ jobs:
           done
           npm run mqtt:bootstrap:test
       - run: npm run test:integration
+  deployment:
+    runs-on: ubuntu-latest
+    needs: [unit, integration]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run setup:local
+      - name: Build and start complete backend stack
+        run: docker compose --env-file .env -f deployment/compose.yml --profile app up -d --build --wait backend
+      - name: Simulated device flow, backup/restore and graceful restart
+        run: npm run check:stack
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file .env -f deployment/compose.yml --profile app down

@@ -20,6 +20,9 @@ const envSchema = z.object({
   COMMAND_TIMEOUT_S: z.coerce.number().int().min(3).max(10).default(5),
   MANUAL_OVERRIDE_S: z.coerce.number().int().min(0).max(86400).default(300),
   CONFIG_TIMEOUT_S: z.coerce.number().int().min(3).max(30).default(10),
+  RETENTION_ENABLED: z.enum(["true", "false"]).default("false"),
+  SENSOR_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  EVENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(7),
 });
 
 export function loadConfig(env = process.env, { requireDatabase = false, requireAuth = false, requireBroker = false } = {}) {
@@ -29,6 +32,7 @@ export function loadConfig(env = process.env, { requireDatabase = false, require
     throw new Error(`Cấu hình không hợp lệ: ${result.error.issues.map((i) => i.path.join(".")).join(", ")}`);
   }
   const data = result.data;
+  if (data.EVENT_RETENTION_DAYS > data.SENSOR_RETENTION_DAYS) throw new Error("EVENT_RETENTION_DAYS không được lớn hơn SENSOR_RETENTION_DAYS");
   if (requireDatabase && !data.DATABASE_URL) throw new Error("Cấu hình không hợp lệ: DATABASE_URL");
   if (requireAuth && !data.JWT_SECRET) throw new Error("Cấu hình không hợp lệ: JWT_SECRET");
   if (requireBroker && ["MQTT_URL", "MQTT_PASSWORD", "MQTT_ADMIN_PASSWORD", "DEVICE_SECRET_KEY"].some((key) => !data[key])) throw new Error("Cấu hình không hợp lệ: MQTT/DEVICE_SECRET_KEY");
@@ -42,5 +46,5 @@ export function loadConfig(env = process.env, { requireDatabase = false, require
     mqttAdminUsername: data.MQTT_ADMIN_USERNAME, mqttAdminPassword: data.MQTT_ADMIN_PASSWORD, deviceSecretKey: data.DEVICE_SECRET_KEY,
     telemetryFreshnessSeconds: data.TELEMETRY_FRESHNESS_S, heartbeatTimeoutSeconds: data.HEARTBEAT_TIMEOUT_S,
     commandTimeoutSeconds: data.COMMAND_TIMEOUT_S, manualOverrideSeconds: data.MANUAL_OVERRIDE_S,
-    configTimeoutSeconds: data.CONFIG_TIMEOUT_S });
+    configTimeoutSeconds: data.CONFIG_TIMEOUT_S, retentionEnabled: data.RETENTION_ENABLED === "true", sensorRetentionDays: data.SENSOR_RETENTION_DAYS, eventRetentionDays: data.EVENT_RETENTION_DAYS });
 }
