@@ -43,7 +43,8 @@ export function createApp({ config, logger = new LoggingService({ sink: new Cons
     if (error.code === "23505") { status = 409; code = "CONFLICT"; message = "Dữ liệu đã tồn tại hoặc đang được sử dụng"; }
     if (error.code === "23503") { status = 400; code = "INVALID_REFERENCE"; message = "Dữ liệu tham chiếu không hợp lệ"; }
     if (["ECONNREFUSED", "57P01", "53300", "08006"].includes(error.code)) { status = 503; code = "DATABASE_UNAVAILABLE"; message = "Dịch vụ dữ liệu chưa sẵn sàng"; }
-    if (status >= 500) logger.error("http.error", { request_id: req.requestId, code });
+    if (status >= 500) logger.error("http.error", { request_id: req.requestId, code,
+      cause_code: typeof error.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code) ? error.code : undefined });
     res.status(status).json({ success: false, error: { code, message }, request_id: req.requestId });
   });
   return app;

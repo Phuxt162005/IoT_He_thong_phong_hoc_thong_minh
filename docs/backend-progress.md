@@ -9,8 +9,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-02 | Đã push và tích hợp | [PR #3](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/3), commit `1ccc82a`, merge `e726319`; 29 unit và 4 integration test PostgreSQL thật đạt cả cục bộ/CI. |
 | BE-03 | Đã push và tích hợp | [PR #4](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/4), commit `55d0a81`, merge `ef6a631`; 29 unit và 9 integration test đạt cục bộ/CI; smoke entrypoint thật với database ứng dụng cũng đạt. |
 | BE-04 | Đã push và tích hợp | [PR #5](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/5), head `727683a`, merge `16dae03`; sau tích hợp ADV-04 có 38 unit và 14 integration test đạt cục bộ/CI. |
-| BE-05 | Đã kiểm thử cục bộ, chờ push/CI | 38 unit và 18 integration test đạt: phòng/mã duy nhất, giữ lịch sử INACTIVE, scope danh sách/chi tiết, gán phòng vô hiệu phiên, thay danh sách nguyên tử/idempotent và rollback khi audit lỗi. |
-| BE-06–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-05 | Đã push và tích hợp | [PR #6](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/6), commit `0dfcfac`, merge `af5ea7d`; 38 unit và 18 integration test đạt cục bộ/CI. |
+| BE-06 | Đã kiểm thử phần nội bộ, chờ push/CI | 38 unit và 23 integration test đạt; đăng ký/gán phòng, metadata, maintenance/recovery/decommission, lịch sử append-only, concurrency/rollback. Provision/activate/revoke được nối và kiểm thử broker ở BE-07. |
+| BE-07–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 

@@ -84,6 +84,21 @@ Ma trận quyền nằm tại `common/authorization.js`; module tiếp theo dùn
 
 Chỉ gán Operator/Viewer ACTIVE; Admin luôn có toàn bộ phạm vi nên không cần gán. Gán/bỏ gán phòng tăng token version cho người bị thay đổi phạm vi, yêu cầu đăng nhập lại; gửi lại đúng danh sách hiện có không vô hiệu phiên. Thay đổi và audit nằm cùng transaction. Mã phòng không đổi qua PATCH để giữ ổn định topic thiết bị.
 
+## Thiết bị và vòng đời (BE-06)
+
+| Endpoint | Nội dung |
+| --- | --- |
+| GET `/api/v1/devices` | Scope theo phòng; lọc room_id, device_type, lifecycle_status, connection_status và phân trang. |
+| POST `/api/v1/devices` | Admin đăng ký `{device_code,device_name,device_type,room_id?,hardware_version?,firmware_version?}`. |
+| GET `/api/v1/devices/:id` | Thông tin và actuators; Control Node có LIGHT/FAN, trạng thái thực ban đầu UNKNOWN. |
+| PATCH `/api/v1/devices/:id` | Admin đổi tên/phiên bản; chỉ gán/bỏ gán phòng khi REGISTERED. Không đổi mã, loại node hoặc trạng thái trực tiếp. |
+| POST `/api/v1/devices/:id/maintenance` | ACTIVE/FAULT → MAINTENANCE, body `{reason}`. |
+| POST `/api/v1/devices/:id/resume` hoặc `/clear-fault` | MAINTENANCE/FAULT → ACTIVE; cần ONLINE, heartbeat trong 30 giây và phòng ACTIVE. `/recover` là alias chọn theo trạng thái. |
+| POST `/api/v1/devices/:id/decommission` | Chỉ REGISTERED/REVOKED → DECOMMISSIONED; body `{reason,confirmed:true}`. |
+| GET `/api/v1/devices/:id/lifecycle-events` | Lịch sử chỉ ghi thêm, phân trang và kiểm tra scope. |
+
+BE-06 triển khai các chuyển trạng thái nội bộ. API provision/activate/revoke/rotate cần credential và broker thật, được bổ sung ở BE-07; không thể dùng PATCH để bỏ qua quy trình. Thiết bị PROVISIONED/ACTIVE muốn ngừng sử dụng phải revoke trước. Mỗi phòng có tối đa một node chưa thu hồi cho từng loại; mã thiết bị đã ngừng sử dụng không được tái dùng. Bảo trì không đổi trạng thái kết nối thành OFFLINE; vòng đời và kết nối độc lập.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.

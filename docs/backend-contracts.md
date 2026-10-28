@@ -67,7 +67,8 @@ WebSocket xác thực bằng frame đầu tiên trong thời hạn ngắn, khôn
 ## Trạng thái và trách nhiệm
 
 - User: ACTIVE / DISABLED; room: ACTIVE / INACTIVE; không hard-delete lịch sử.
-- Device lifecycle: REGISTERED → PROVISIONED → ACTIVE; ACTIVE có thể sang FAULT/MAINTENANCE/REVOKED; khôi phục chỉ theo transition được định nghĩa; DECOMMISSIONED là kết thúc. Kích hoạt chỉ khi có room và broker credential hợp lệ.
+- Device lifecycle theo bảng 9.4: REGISTERED → PROVISIONED hoặc DECOMMISSIONED; PROVISIONED → ACTIVE hoặc REVOKED; ACTIVE → FAULT/MAINTENANCE/REVOKED; FAULT → ACTIVE/MAINTENANCE/REVOKED; MAINTENANCE → ACTIVE/REVOKED; REVOKED → PROVISIONED/DECOMMISSIONED; DECOMMISSIONED là kết thúc. Không decommission trực tiếp thiết bị đã provision, phải revoke trước. Khôi phục dùng `/resume` hoặc `/clear-fault`, `/recover` là alias; cần heartbeat mới và phòng hoạt động. Kích hoạt/provision/revoke cần credential và broker ở BE-07.
+- Điều chỉnh ràng buộc DB từ bản thiết kế: DECOMMISSIONED được phép không có room_id khi thiết bị bị ngừng sử dụng ngay từ REGISTERED chưa gán phòng, phù hợp transition C10. Các trạng thái đang vận hành vẫn bắt buộc có phòng.
 - Connection: UNKNOWN / ONLINE / OFFLINE, độc lập lifecycle; heartbeat 10 giây, timeout mặc định 30 giây, quét mỗi 5 giây.
 - Alert: OPEN → ACKNOWLEDGED → RESOLVED; tự phục hồi cũng có thể đóng OPEN. Chỉ một alert chưa resolved mỗi (device,type); ưu tiên CRITICAL; clear sau 3 mẫu mới liên tiếp qua ngưỡng phục hồi.
 - Config: PENDING → SUCCESS / FAILED / TIMEOUT; version tăng, trạng thái cuối bất biến.
