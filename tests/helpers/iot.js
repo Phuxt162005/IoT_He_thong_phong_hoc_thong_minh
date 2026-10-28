@@ -10,6 +10,7 @@ import { MqttRuntime } from "../../backend/src/mqtt/runtime.js";
 import { DeviceCredentialsService } from "../../backend/src/modules/device-credentials/device-credentials.service.js";
 import { LoggingService } from "../../backend/src/modules/monitoring-logging/logging.service.js";
 import { MemoryLogSink } from "../../backend/src/modules/monitoring-logging/logging.sinks.js";
+import { DevicePresenceService, bindPresence } from "../../backend/src/modules/device-presence/device-presence.service.js";
 
 export async function waitFor(predicate) {
   for (let i = 0; i < 80; i++) { if (await predicate()) return; await new Promise((r) => setTimeout(r, 50)); }
@@ -38,7 +39,10 @@ export async function iotFixture(t) {
   const credentials = new DeviceCredentialsService(serviceInput);
   const sink = new MemoryLogSink();
   const logger = new LoggingService({ sink });
-  runtime = new MqttRuntime({ config, pool: db.pool, logger });
+  runtime = new MqttRuntime({ config, pool: db.pool, logger, clean: true });
+  const presence = new DevicePresenceService({ pool: db.pool, timeoutSeconds: config.heartbeatTimeoutSeconds });
+  const unbindPresence = bindPresence(runtime, presence);
+  t.after(unbindPresence);
   await once(runtime, "ready", { signal: AbortSignal.timeout(5000) });
   const password = "iot-test-password-only";
   await seed(db.pool, { username: "test_admin", password });
@@ -71,5 +75,5 @@ export async function iotFixture(t) {
     if ((await action(device.device_id, "activate")).status !== 200) throw new Error("Device fixture activation failed");
     return { device, client, topic };
   };
-  return { ...db, ...http, config, logger, mqttSink: sink, adminBroker, serviceInput, credentials, runtime, token, room, register, action, connect, activateSensor };
+  return { ...db, ...http, config, logger, mqttSink: sink, adminBroker, serviceInput, credentials, runtime, presence, token, room, register, action, connect, activateSensor };
 }

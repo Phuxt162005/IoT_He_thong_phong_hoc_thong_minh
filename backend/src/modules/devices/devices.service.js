@@ -4,14 +4,14 @@ import { withTransaction } from "../../database/pool.js";
 import { writeAudit } from "../../database/audit.js";
 import { recordLifecycle, transitionDevice } from "./device-lifecycle.js";
 
-export const deviceSelect = `SELECT d.device_id,d.device_code,d.device_name,d.device_type,d.room_id,d.lifecycle_status,d.connection_status,d.hardware_version,d.firmware_version,d.last_seen,d.created_at,d.updated_at,r.room_code,r.status AS room_status FROM devices d LEFT JOIN rooms r ON r.room_id=d.room_id`;
+export const deviceSelect = `SELECT d.device_id,d.device_code,d.device_name,d.device_type,d.room_id,d.lifecycle_status,d.connection_status,d.broker_sync_status,d.hardware_version,d.firmware_version,d.last_seen,d.last_heartbeat_at,d.last_rssi_dbm,d.last_free_heap_bytes,d.last_uptime_seconds,d.created_at,d.updated_at,r.room_code,r.status AS room_status FROM devices d LEFT JOIN rooms r ON r.room_id=d.room_id`;
 const scopeSql = "($1::boolean OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.room_id=d.room_id AND ur.user_id=$2))";
 export async function requireDeviceScope(client, user, id) {
   return requireFound((await client.query(`${deviceSelect} WHERE ${scopeSql} AND d.device_id=$3`, [user.role === "ADMIN", user.user_id, id])).rows[0], "Không tìm thấy thiết bị trong phạm vi truy cập");
 }
 
 export class DevicesService {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool, { heartbeatTimeoutSeconds = 30 } = {}) { this.pool = pool; this.heartbeatTimeoutSeconds = heartbeatTimeoutSeconds; }
   async list(user, { page, page_size, room_id, lifecycle_status, device_type, connection_status }) {
     const where = `WHERE ${scopeSql} AND ($3::bigint IS NULL OR d.room_id=$3) AND ($4::text IS NULL OR d.lifecycle_status=$4) AND ($5::text IS NULL OR d.device_type=$5) AND ($6::text IS NULL OR d.connection_status=$6)`;
     const params = [user.role === "ADMIN", user.user_id, room_id ?? null, lifecycle_status ?? null, device_type ?? null, connection_status ?? null];
@@ -62,7 +62,7 @@ export class DevicesService {
       if (["resume", "clear-fault", "recover"].includes(action)) {
         const expected = action === "resume" ? ["MAINTENANCE"] : action === "clear-fault" ? ["FAULT"] : ["FAULT", "MAINTENANCE"];
         if (!expected.includes(device.lifecycle_status)) throw new AppError("INVALID_DEVICE_TRANSITION", 409, "Thiết bị không ở trạng thái cần khôi phục");
-        if (device.connection_status !== "ONLINE" || !device.last_seen || Date.now() - device.last_seen.getTime() > 30000) throw new AppError("DEVICE_OFFLINE", 409, "Cần heartbeat mới để khôi phục thiết bị");
+        if (device.connection_status !== "ONLINE" || !device.last_heartbeat_at || Date.now() - device.last_heartbeat_at.getTime() > this.heartbeatTimeoutSeconds * 1000) throw new AppError("DEVICE_OFFLINE", 409, "Cần heartbeat mới để khôi phục thiết bị");
         await this.validateRoom(client, device.room_id);
         to = "ACTIVE";
       }

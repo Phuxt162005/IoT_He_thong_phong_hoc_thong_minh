@@ -113,7 +113,7 @@ Mosquitto ứng dụng ở localhost:1884, broker test ở localhost:1885. Cả 
 | POST `/api/v1/devices/:id/revoke` | Admin, `{reason,confirmed:true}`; chặn backend ngay, disable broker account và ngắt kết nối. |
 | GET `/api/v1/devices/:id/broker-status` | Theo phạm vi phòng; trạng thái đồng bộ và lịch sử thao tác đã loại bỏ secret. |
 
-Provision/rotate trả credential **một lần** với username và client_id bằng device_code. Thiết bị phải dùng đúng cả username/password/client ID; firmware ví dụ cũ dùng client ID có boot suffix cần điều chỉnh trước khi kết nối. `session_id` của heartbeat mang boot ID riêng. MQTT URL trong phản hồi lấy từ cấu hình; hiện Compose chỉ mở loopback cho phát triển, chưa dành cho ESP32 truy cập từ LAN.
+Provision/rotate trả credential **một lần** với username và client_id bằng device_code. Thiết bị phải dùng đúng cả username/password/client ID; firmware ví dụ cũ dùng client ID có boot suffix cần điều chỉnh trước khi kết nối. `session_id` phải tạo mới mỗi lần CONNECT, dùng chung cho heartbeat/status/LWT của lần kết nối đó. MQTT URL trong phản hồi lấy từ cấu hình; hiện Compose chỉ mở loopback cho phát triển, chưa dành cho ESP32 truy cập từ LAN.
 
 DB lưu hash scrypt, còn secret cần retry được mã hóa AES-256-GCM và gắn với đúng operation. Khi đồng bộ thành công, bản mã bị xóa; không có API lấy lại secret. Nếu làm mất secret trả về, dùng rotate-credentials. DEVICE_SECRET_KEY là 32 byte hex cần giữ cùng cấu hình khôi phục dữ liệu, không đổi khi restart.
 
@@ -133,6 +133,14 @@ Server subscribe telemetry theo topic trong [hợp đồng](docs/backend-contrac
 - `iot_events` và `iot_event_deliveries` giữ dấu vết cho consumer cảnh báo/tự động hóa ở các mốc sau; duplicate không tạo event mới. API tra cứu/CSV/dashboard được bổ sung ở BE-14.
 
 Dynamic Security request nay dùng correlationData riêng, dựa trên [kiểm thử giao thức của Mosquitto](https://github.com/eclipse-mosquitto/mosquitto/blob/master/test/broker/14-dynsec-disable-client.py), để không nhận nhầm phản hồi khi nhiều thao tác quản trị chạy đồng thời.
+
+## Heartbeat, LWT và online/offline (BE-09)
+
+Heartbeat hợp lệ cập nhật last_seen, thời điểm heartbeat, uptime, RSSI, free heap và phiên bản firmware. Hệ thống quét mỗi 5 giây, đánh dấu OFFLINE nếu không có tín hiệu hợp lệ quá HEARTBEAT_TIMEOUT_S (mặc định 30 giây). Trạng thái vòng đời giữ nguyên; kết nối của PROVISIONED/MAINTENANCE cũng được phản ánh nhưng cảnh báo mất kết nối ở BE-12 chỉ áp dụng ACTIVE/FAULT.
+
+Mỗi lần MQTT CONNECT phải tạo session_id mới (1–64 ký tự chữ/số/gạch ngang/gạch dưới) và đưa vào LWT trước khi kết nối. LWT OFFLINE chỉ có hiệu lực với phiên hiện tại; phiên đã đóng và bản tin cũ/uptime lùi không được làm mới trạng thái. Heartbeat/status ONLINE cần timestamp mới trong cửa sổ timeout và không vượt tương lai 5 phút; firmware cần đồng bộ thời gian. Riêng telemetry offline vẫn được nhận vào lịch sử theo BE-08.
+
+ONLINE status chỉ cho biết kết nối; activate cần heartbeat mới của chính phiên hiện tại. Phiên mới hoặc rotate credential xóa dấu heartbeat cũ để không kích hoạt bằng dữ liệu phiên trước. Event thay đổi kết nối và audit lưu cùng transaction; chạy lại scanner hoặc restart không tạo event OFFLINE trùng. Scheduler chống chạy chồng lặp và chờ tác vụ đang chạy khi shutdown.
 
 ## Cấu trúc
 

@@ -12,8 +12,9 @@ Theo [kế hoạch](backend-implementation-plan.md). Chỉ ghi đã push/merge k
 | BE-05 | Đã push và tích hợp | [PR #6](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/6), commit `0dfcfac`, merge `af5ea7d`; 38 unit và 18 integration test đạt cục bộ/CI. |
 | BE-06 | Đã push và tích hợp | [PR #7](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/7), commit `0c402ce`, merge `6a09eb3`; 38 unit và 23 integration test đạt cục bộ/CI. Provision/activate/revoke được nối với broker thật ở BE-07. |
 | BE-07 | Đã push và tích hợp | [PR #8](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/8), commit `188331b`, merge `0547e5b`; 39 unit và 28 integration test PostgreSQL/Mosquitto thật đạt cục bộ/CI. |
-| BE-08 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 35 integration test đạt: MQTT→PostgreSQL→ACK, retry đồng thời, xung đột ID, DB rollback không ACK, legacy/backfill/clock_skew, lỗi cảm biến/FAULT, chặn thiết bị đã thu hồi. Sửa correlationData cho Dynamic Security khi chạy nhiều module đồng thời. |
-| BE-09–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
+| BE-08 | Đã push và tích hợp | [PR #9](https://github.com/Phuxt162005/IoT_He_thong_phong_hoc_thong_minh/pull/9), commit `f1b88cf`, merge `07478f1`; 39 unit và 35 integration test đạt cục bộ/CI. |
+| BE-09 | Đã kiểm thử cục bộ, chờ push/CI | 39 unit và 40 integration test đạt; heartbeat/diagnostic, offline scan idempotent qua restart, LWT thật khi ngắt socket, reconnect chống phiên cũ, ONLINE không thay heartbeat để activate, audit rollback. |
+| BE-10–16 | Chưa làm | Triển khai tuần tự sau khi mốc trước được đẩy và tích hợp. |
 
 ## Ghi chú triển khai
 

@@ -1,5 +1,6 @@
 import { AppError } from "../../common/errors.js";
 import { writeAudit } from "../../database/audit.js";
+import { recordConnectionChange } from "../../database/events.js";
 
 export const transitions = Object.freeze({
   REGISTERED: ["PROVISIONED", "DECOMMISSIONED"],
@@ -23,5 +24,6 @@ export async function transitionDevice(client, device, to, context) {
     updated_at=now() WHERE device_id=$2 AND lifecycle_status=$3 RETURNING *`, [to, device.device_id, device.lifecycle_status]);
   if (!result.rowCount) throw new AppError("DEVICE_STATE_CONFLICT", 409, "Trạng thái thiết bị đã thay đổi");
   await recordLifecycle(client, result.rows[0], device.lifecycle_status, to, context);
+  await recordConnectionChange(client, { ...device, lifecycle_status: to }, result.rows[0].connection_status, context.action);
   return result.rows[0];
 }
