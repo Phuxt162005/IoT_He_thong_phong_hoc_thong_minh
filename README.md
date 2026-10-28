@@ -4,30 +4,45 @@ Backend Node.js theo module cho quản lý người dùng, phòng học, thiết
 
 ## Chạy cục bộ
 
-Cần Node.js >=20; CI kiểm tra Node.js 22 và 24. Từ thư mục gốc:
+Cần Node.js >=20 và Docker Desktop đang chạy; CI kiểm tra Node.js 22 và 24. Từ thư mục gốc:
 
 ```powershell
 npm ci
-Copy-Item .env.example .env
+npm run setup:local
+docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test
+npm run db:migrate
+npm run db:seed
 npm start
 ```
 
-Ứng dụng mặc định nghe tại `http://127.0.0.1:3000`. Sửa `.env` để thay host/port/CORS; không commit thông tin bí mật. Có thể dùng `npm run dev` để tự tải lại khi sửa code.
+`setup:local` tạo `.env` và `.env.test` với mật khẩu ngẫu nhiên, từ chối ghi đè file có sẵn. Nếu đã có cấu hình, đối chiếu `.env.example`/`.env.test.example` và bổ sung thủ công. Không chạy lại setup để thay mật khẩu của volume PostgreSQL đã tồn tại: biến POSTGRES_* chỉ áp dụng khi khởi tạo volume lần đầu.
+
+Ứng dụng mặc định nghe tại `http://127.0.0.1:3000`. Sửa `.env` để thay host/port/CORS; không commit thông tin bí mật. Có thể dùng `npm run dev` để tự tải lại khi sửa code. Tài khoản ban đầu lấy từ ADMIN_USERNAME/ADMIN_PASSWORD trong `.env`; seed không đặt lại mật khẩu người dùng đã tồn tại. Mặc định chỉ tạo Admin; muốn tạo demo_operator/demo_viewer trong môi trường thử nghiệm, đặt SEED_DEMO_USERS=true và DEMO_PASSWORD riêng.
 
 - `GET /health`: ứng dụng đang hoạt động.
-- `GET /ready`: dependency sẵn sàng; BE-01 chưa nối database/broker, các mốc sau bổ sung kiểm tra thực tế.
+- `GET /ready`: kiểm tra truy vấn PostgreSQL thật, trả 503 khi database không sẵn sàng. MQTT được bổ sung ở BE-07.
 - Các API nghiệp vụ sẽ xuất hiện theo tiến độ BE, không coi danh mục hợp đồng là danh mục đã triển khai.
 
 ## Kiểm thử
 
 ```powershell
 npm test
+npm run test:integration
 npm run test:device-shadow
 npm run test:telemetry-ingestion
 npm run test:monitoring-logging
 ```
 
-Test hiện tại gồm service và HTTP bootstrap; chưa thay thế kiểm thử tích hợp PostgreSQL/MQTT/ESP32. GitHub Actions chạy kiểm thử trên mỗi PR và nhánh tính năng.
+`npm test` chạy unit/service/HTTP. Integration test bắt buộc dùng TEST_DATABASE_URL và TEST_MIGRATION_DATABASE_URL trỏ tới database tên kết thúc `_test`; mỗi test chỉ tạo/xóa schema ngẫu nhiên của riêng nó. Không chạy với database ứng dụng. GitHub Actions có PostgreSQL service riêng và tài khoản ứng dụng không phải superuser. Chưa có kiểm thử MQTT/ESP32 cho tới các mốc tương ứng.
+
+## Database
+
+- PostgreSQL ứng dụng ở localhost:5433; instance kiểm thử riêng ở localhost:5434.
+- `database/migrations/` chứa SQL có phiên bản, checksum và advisory lock; sửa schema bằng migration mới, không sửa migration đã áp dụng.
+- MIGRATION_DATABASE_URL dùng tài khoản quản lý schema; DATABASE_URL dùng smartclass_app với quyền nghiệp vụ, không có quyền tạo schema hoặc sửa/xóa/truncate audit.
+- Nghiệp vụ quan trọng phải dùng cùng connection/transaction với audit. Trigger chặn chỉnh sửa audit kể cả bằng tài khoản sở hữu qua lệnh DML thông thường.
+- Lược đồ hiện tại gồm roles/users/rooms/user_rooms/devices/audit_logs; các bảng telemetry/command/rule được thêm ở tính năng tương ứng.
+- `docker compose --env-file .env -f deployment/compose.yml stop` dừng dịch vụ và giữ volume dữ liệu ứng dụng. Không dùng lệnh xóa volume nếu muốn giữ dữ liệu.
 
 ## Cấu trúc
 
