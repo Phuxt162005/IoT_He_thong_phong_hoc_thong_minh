@@ -72,6 +72,18 @@ Các API dưới đây cần Bearer token của ADMIN. OPERATOR/VIEWER nhận 40
 
 Ma trận quyền nằm tại `common/authorization.js`; module tiếp theo dùng cùng kiểm tra quyền và `requireRoomScope` để giới hạn phòng. Các thao tác ghi kiểm tra lại quyền/trạng thái người thực hiện bên trong transaction.
 
+## Phòng học và phạm vi truy cập (BE-05)
+
+| Endpoint | Nội dung |
+| --- | --- |
+| GET `/api/v1/rooms` | Danh sách phòng trong phạm vi, phân trang, lọc status; Admin thấy tất cả. |
+| POST `/api/v1/rooms` | Admin tạo bằng `{room_code,room_name}`; mã ổn định theo hợp đồng MQTT. |
+| GET `/api/v1/rooms/:id` | Thông tin phòng và danh sách thiết bị được gán; ngoài phạm vi trả 404. |
+| PATCH `/api/v1/rooms/:id` | Admin đổi `{room_name,status}`; INACTIVE giữ lịch sử và thiết bị, không hard-delete. |
+| GET/PUT `/api/v1/rooms/:id/users` | Admin đọc/thay toàn bộ thành viên; PUT nhận `{user_ids:["2","3"]}`, tối đa 500 ID duy nhất. |
+
+Chỉ gán Operator/Viewer ACTIVE; Admin luôn có toàn bộ phạm vi nên không cần gán. Gán/bỏ gán phòng tăng token version cho người bị thay đổi phạm vi, yêu cầu đăng nhập lại; gửi lại đúng danh sách hiện có không vô hiệu phiên. Thay đổi và audit nằm cùng transaction. Mã phòng không đổi qua PATCH để giữ ổn định topic thiết bị.
+
 ## Cấu trúc
 
 `backend/src/app.js` tạo Express app không tự mở cổng, `server.js` là entrypoint; `modules/` giữ nghiệp vụ, `common/` giữ lỗi và tiện ích dùng chung. Logger JSON có sẵn từ ADV-03 được tái sử dụng; không ghi request body/header/URL có token vào log. Dữ liệu và credential thật không lưu trong Git.
