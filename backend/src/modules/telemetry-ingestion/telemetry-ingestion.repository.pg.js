@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AppError } from "../../common/errors.js";
 
-// One instance belongs to one message and the caller's transaction/locked device.
+// Mỗi instance xử lý một bản tin, dùng transaction và khóa thiết bị do bên gọi quản lý.
 export class PostgresTelemetryRepository {
   constructor(client, context) { this.client = client; this.context = context; this.createdEvent = null; }
   async findByEventId(eventId) {
@@ -20,6 +20,7 @@ export class PostgresTelemetryRepository {
     const latest = clockSkew ? { rowCount: 0 } : await this.client.query(`INSERT INTO telemetry_latest(device_id,data_id,recorded_at) VALUES($1,$2,$3)
       ON CONFLICT(device_id) DO UPDATE SET data_id=EXCLUDED.data_id,recorded_at=EXCLUDED.recorded_at
       WHERE (EXCLUDED.recorded_at,EXCLUDED.data_id) > (telemetry_latest.recorded_at,telemetry_latest.data_id) RETURNING data_id`, [device.device_id, inserted.data_id, recordedAt]);
+    // Lưu lịch sử không đồng nghĩa đủ điều kiện điều khiển: chỉ mẫu latest mới, đúng giờ, từ ACTIVE.
     const eligible = device.lifecycle_status === "ACTIVE" && latest.rowCount > 0 && !clockSkew && !isBackfill;
     const payload = { data_id: inserted.data_id, device_id: device.device_id, room_id: device.room_id, eligible, is_latest: latest.rowCount > 0, is_backfill: isBackfill, clock_skew: clockSkew };
     const eventId = randomUUID();

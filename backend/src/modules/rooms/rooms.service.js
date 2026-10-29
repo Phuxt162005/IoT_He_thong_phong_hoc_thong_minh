@@ -41,7 +41,7 @@ export class RoomsService {
   }
   async assignUsers(actor, id, userIds, requestId) {
     return withTransaction(this.pool, async (client) => {
-      // Same lock order as account changes; role changes and scope replacement cannot cross.
+      // Giữ cùng thứ tự khóa với quản lý tài khoản để đổi vai trò/gán phòng không gây khóa chéo.
       await client.query("SELECT pg_advisory_xact_lock(172942,404)");
       await lockActor(client, actor, "rooms:write");
       requireFound((await client.query("SELECT * FROM rooms WHERE room_id=$1 FOR UPDATE", [id])).rows[0]);

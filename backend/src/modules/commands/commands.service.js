@@ -37,6 +37,8 @@ export class CommandsService {
     if (!credential || device.broker_sync_status !== "SYNCED") throw new AppError("CREDENTIAL_NOT_READY", 409, "Credential chưa sẵn sàng");
     return { room, credential };
   }
+  // Luồng ghi chung cho lệnh thủ công và tự động: lưu command, desired, audit và sự kiện cùng transaction.
+  // Bước này chưa publish MQTT và không thay đổi reported vì thiết bị chưa xác nhận thực thi.
   async enqueue(client, device, patch, { actor = null, ruleId = null, requestId = null, timeoutSeconds = this.timeoutSeconds } = {}) {
     const { room, credential } = await this.assertReady(client, device);
     if (!actor && (device.control_mode === "MANUAL" || device.manual_override_until > new Date())) throw new AppError("MANUAL_OVERRIDE", 409, "Thiết bị đang ưu tiên điều khiển thủ công");
@@ -61,6 +63,7 @@ export class CommandsService {
       const current = await lockActor(client, actor, "commands:create");
       await requireDeviceScope(client, current, id);
       const device = requireFound((await client.query("SELECT * FROM devices WHERE device_id=$1 FOR UPDATE", [id])).rows[0]);
+      // Kiểm tra cache trước trạng thái broker: retry cùng yêu cầu vẫn đọc lại được lệnh đã lưu khi mất mạng.
       if (idempotencyKey) {
         const existing = (await client.query("SELECT * FROM command_idempotency WHERE user_id=$1 AND device_id=$2 AND key=$3 AND expires_at>now()", [actor.user_id, id, idempotencyKey])).rows[0];
         if (existing) {
@@ -75,6 +78,7 @@ export class CommandsService {
       }
       return { command, cached: false };
     });
+    // Publish sau commit; nếu tiến trình dừng giữa hai bước, job sẽ gửi tiếp bằng cùng command_id.
     const command = queued.cached ? queued.command : await this.publishOne(queued.command.command_id);
     if (!queued.cached && command?.error_code === "PUBLISH_ERROR") throw new AppError("MQTT_PUBLISH_FAILED", 503, "Không gửi được lệnh MQTT", { command_id: queued.command.command_id });
     return { command: publicCommand(command), cached: queued.cached, shadow: await this.getShadow(actor, id) };
@@ -87,6 +91,7 @@ export class CommandsService {
     const initial = requireFound((await this.pool.query("SELECT * FROM commands WHERE command_id=$1", [commandId])).rows[0]);
     return withTransaction(this.pool, async (client) => {
       let permissionError = false;
+      // Quyền có thể đổi sau lúc tạo lệnh: kiểm tra lại người yêu cầu ngay trước khi publish.
       if (initial.source === "MANUAL") {
         try {
           const actor = await lockActor(client, { user_id: initial.requested_by, token_version: initial.requested_token_version }, "commands:create");
@@ -199,6 +204,7 @@ export class CommandsService {
         if (!command || command.device_id !== device.device_id || command.shadow_version !== data.shadow_version || command.session_id !== data.session_id || command.credential_version !== credential.version) throw new AppError("ACK_COMMAND_MISMATCH", 400, "ACK không khớp lệnh, version hoặc phiên thiết bị");
         if (data.status === "SUCCESS" && !Object.entries(command.desired_state).every(([key, value]) => data.reported_state[key] === value)) throw new AppError("ACK_STATE_MISMATCH", 400, "ACK thành công không khớp trạng thái đã yêu cầu");
         if (command.status === "PENDING" && command.timeout_at <= new Date()) command = await finishCommand(client, command, "TIMEOUT", "ACK_TIMEOUT");
+        // Kết quả cuối không bị ACK đến muộn/trùng sửa lại; trạng thái thực vẫn có thể cập nhật nếu không cũ.
         if (command.status !== "PENDING") {
           let late = false;
           if (["TIMEOUT", "FAILED"].includes(command.status) && !command.ack_payload && !command.late_ack_at) {

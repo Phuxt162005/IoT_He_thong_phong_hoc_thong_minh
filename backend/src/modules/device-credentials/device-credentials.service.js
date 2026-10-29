@@ -39,6 +39,8 @@ export class DeviceCredentialsService {
       await client.query("UPDATE device_credentials SET status='REVOKED',revoked_at=now() WHERE device_id=$1 AND status='ACTIVE'", [id]);
       const version = Number((await client.query("SELECT coalesce(max(version),0)+1 AS version FROM device_credentials WHERE device_id=$1", [id])).rows[0].version);
       await client.query("INSERT INTO device_credentials(credential_id,device_id,version,mqtt_username,secret_hash,status) VALUES($1,$2,$3,$4,$5,'ACTIVE')", [credentialId, id, version, device.device_code, hash]);
+      // Lưu thao tác chờ trước khi gọi broker; bản mã cho phép gửi lại sau lỗi/restart.
+      // Hash dùng để lưu credential lâu dài, còn secret mã hóa chỉ tồn tại đến khi đồng bộ xong.
       await client.query("INSERT INTO broker_operations(operation_id,device_id,credential_id,operation,secret_encrypted) VALUES($1,$2,$3,$4,$5)", [operationId, id, credentialId, operation, this.box.seal(secret, `${id}:${operationId}`)]);
       await client.query("UPDATE devices SET broker_sync_status='PENDING',connection_status='UNKNOWN',last_seen=NULL,last_heartbeat_at=NULL,session_id=NULL WHERE device_id=$1", [id]);
       await recordConnectionChange(client, device, "UNKNOWN", "CREDENTIAL_ISSUE");
@@ -47,6 +49,7 @@ export class DeviceCredentialsService {
       await writeAudit(client, { actorType: "USER", actorId: actor.user_id, action: "DEVICE_CREDENTIAL_ISSUE", targetType: "DEVICE", targetId: id, requestId, details: { credential_id: credentialId, version, operation } });
       return { username: device.device_code, client_id: device.device_code, room_code: room.room_code, version };
     });
+    // Chỉ thao tác với broker sau khi dữ liệu và audit đã commit; lỗi broker để lại PENDING cho job retry.
     const op = await this.reconcileOperation(operationId);
     if (op.status === "SUPERSEDED") throw new AppError("OPERATION_SUPERSEDED", 409, "Thao tác đã được thay thế bởi thay đổi mới");
     return { operation: op, credentials: { credential_id: credentialId, ...result, password: secret, mqtt_url: this.mqttUrl } };
@@ -79,6 +82,7 @@ export class DeviceCredentialsService {
         const retry = await client.query("UPDATE broker_operations SET attempts=attempts+1,last_error_code=$1,next_retry_at=now()+interval '5 seconds' WHERE operation_id=$2 RETURNING *", [code, operationId]);
         return safeOperation(retry.rows[0]);
       }
+      // Chỉ đánh dấu đồng bộ sau khi broker xác nhận, đồng thời xóa bản mã secret không còn cần dùng.
       const applied = (await client.query("UPDATE broker_operations SET status='APPLIED',attempts=attempts+1,secret_encrypted=NULL,last_error_code=NULL,applied_at=now() WHERE operation_id=$1 RETURNING *", [operationId])).rows[0];
       if (op.credential_id) await client.query("UPDATE device_credentials SET synced_at=now() WHERE credential_id=$1", [op.credential_id]);
       await client.query("UPDATE devices SET broker_sync_status='SYNCED' WHERE device_id=$1", [device.device_id]);

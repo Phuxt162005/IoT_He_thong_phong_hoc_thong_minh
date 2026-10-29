@@ -28,7 +28,7 @@ export class UsersService {
   }
   async update(actor, id, patch, requestId) {
     return withTransaction(this.pool, async (client) => {
-      // Serialize admin changes to preserve the last active admin and avoid crossed user locks.
+      // Tuần tự hóa thay đổi tài khoản để giữ ít nhất một Admin hoạt động và tránh khóa chéo.
       await client.query("SELECT pg_advisory_xact_lock(172942,404)");
       await lockActor(client, actor, "users:write");
       const user = requireFound((await client.query(`${userSelect} WHERE u.user_id=$1 FOR UPDATE OF u`, [id])).rows[0]);

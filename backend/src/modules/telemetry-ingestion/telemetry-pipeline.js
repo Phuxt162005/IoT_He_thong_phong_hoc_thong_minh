@@ -40,7 +40,8 @@ export class TelemetryPipeline {
         const credential = await client.query("SELECT credential_id FROM device_credentials WHERE device_id=$1 AND status='ACTIVE' AND synced_at IS NOT NULL", [device.device_id]);
         if (!credential.rowCount || device.device_type !== "SENSOR_NODE") throw new AppError("INVALID_SENSOR_IDENTITY", 403, "Không có định danh Sensor hợp lệ");
         const receivedAt = (await client.query("SELECT clock_timestamp() AS now")).rows[0].now;
-        // Valid old samples are offline backfill, not broken clocks. Future clocks/missing time are flagged.
+        // Mẫu đo cũ hợp lệ là dữ liệu bù sau mất mạng; giữ thời gian đo để tra cứu đúng lịch sử.
+        // Chỉ thiếu thời gian hoặc vượt tương lai quá mức mới bị đánh dấu lệch đồng hồ.
         const clockSkew = normalized.timestampMs === null || normalized.timestampMs > receivedAt.getTime() + 5 * 60 * 1000;
         const recordedAt = clockSkew ? receivedAt : new Date(normalized.timestampMs);
         const repository = new PostgresTelemetryRepository(client, { device, normalized, receivedAt, recordedAt, clockSkew, freshnessSeconds: this.freshnessSeconds });
@@ -62,6 +63,7 @@ export class TelemetryPipeline {
   }
   async handle(envelope) {
     if (envelope.kind !== "telemetry") return;
+    // ingest chỉ trả về sau commit. Nếu database lỗi, không gửi ACK STORED để bên gửi còn retry.
     const { result, receivedAt, legacy } = await this.ingest(envelope);
     const ack = legacy ? { messageType: "telemetry_ack", eventId: result.eventId, status: "STORED", duplicate: result.duplicate, timestamp: receivedAt.toISOString() }
       : { msg_id: result.eventId, device_id: envelope.deviceCode, room_id: envelope.roomCode, status: "STORED", duplicate: result.duplicate, timestamp: receivedAt.getTime() };

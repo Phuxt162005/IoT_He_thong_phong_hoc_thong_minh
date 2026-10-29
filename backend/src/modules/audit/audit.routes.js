@@ -19,6 +19,7 @@ export function createAuditRoutes(pool) {
     input.to ??= new Date(); input.from ??= new Date(input.to.getTime() - 7 * 86400000);
     parse(z.object({ from: z.date(), to: z.date() }).refine((v) => v.from < v.to && v.to - v.from <= 90 * 86400000), { from: input.from, to: input.to });
     const params = []; const clauses = [];
+    // Tên cột lấy từ danh sách cố định, giá trị đi qua parameter; không ghép SQL từ tên trường client gửi.
     for (const key of ["actor_type", "actor_id", "action", "target_type", "target_id", "result", "request_id"]) if (input[key] !== undefined) { params.push(input[key]); clauses.push(`${key}=$${params.length}`); }
     params.push(input.from, input.to); clauses.push(`created_at >= $${params.length - 1}`, `created_at < $${params.length}`);
     const where = `WHERE ${clauses.join(" AND ")}`;

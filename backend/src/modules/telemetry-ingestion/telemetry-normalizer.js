@@ -10,6 +10,8 @@ const lux = z.number().finite().min(0).max(65535);
 const canonical = z.object({ msg_id: eventId, device_id: code, room_id: code, timestamp: z.number().int().min(0).max(8640000000000000), data: z.object({ temperature, humidity, lux: lux.int(), occupancy: z.boolean() }).strict() }).strict();
 const legacy = z.object({ messageType: z.literal("telemetry"), eventId, deviceId: code, roomCode: code, timestamp: z.union([z.literal(""), z.iso.datetime({ offset: true })]).optional(), temperatureC: temperature, humidityPercent: humidity, illuminanceLux: lux, occupancy: z.boolean().optional() }).strict();
 
+// Chuyển payload chuẩn và payload cũ về cùng một mô hình; không chấp nhận trộn hai định dạng.
+// occupancy không có ở bản cũ được giữ NULL, không suy diễn thành "không có người".
 export function normalizeTelemetry(input) {
   const isLegacy = input != null && typeof input === "object" && Object.hasOwn(input, "eventId");
   const parsed = (isLegacy ? legacy : canonical).safeParse(input);
@@ -24,6 +26,7 @@ export function normalizeTelemetry(input) {
     timestampMs: value.timestamp, temperatureC: value.data.temperature,
     humidityPercent: value.data.humidity, illuminanceLux: value.data.lux, occupancy: value.data.occupancy,
   };
+  // Băm sau chuẩn hóa để phát hiện cùng msg_id nhưng bị gửi lại với nội dung khác.
   const payloadHash = createHash("sha256").update(JSON.stringify(event)).digest("hex");
   return { ...event, payloadHash, legacy: isLegacy };
 }

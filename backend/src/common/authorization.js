@@ -3,6 +3,7 @@ import { userSelect } from "../modules/auth/auth.service.js";
 import { writeAudit } from "../database/audit.js";
 
 const all = ["ADMIN", "OPERATOR", "VIEWER"];
+// Ma trận này kiểm tra vai trò; phạm vi phòng còn phải kiểm tra qua requireRoomScope.
 const permissions = Object.freeze({
   "users:read": ["ADMIN"], "users:write": ["ADMIN"],
   "rooms:read": all, "rooms:write": ["ADMIN"],
@@ -26,6 +27,7 @@ export function authorize(pool, permission) {
   };
 }
 
+// Đọc lại và khóa tài khoản trong transaction ghi để chặn phiên đã bị thu hồi/đổi quyền.
 export async function lockActor(client, user, permission) {
   const current = (await client.query(`${userSelect} WHERE u.user_id=$1 FOR UPDATE OF u`, [user.user_id])).rows[0];
   if (!current || current.status !== "ACTIVE" || current.token_version !== user.token_version) throw new AppError("UNAUTHORIZED", 401, "Phiên truy cập đã hết hiệu lực");
@@ -33,6 +35,7 @@ export async function lockActor(client, user, permission) {
   return current;
 }
 
+// Admin xem mọi phòng; Operator/Viewer chỉ xem phòng được gán. Ngoài phạm vi trả 404.
 export async function requireRoomScope(client, user, roomId) {
   const result = await client.query(`SELECT r.* FROM rooms r WHERE r.room_id=$1
     AND ($2::boolean OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.room_id=r.room_id AND ur.user_id=$3))`, [roomId, user.role === "ADMIN", user.user_id]);
@@ -41,6 +44,7 @@ export async function requireRoomScope(client, user, roomId) {
 
 export function apiRateLimit(pool) {
   return async (req, res, next) => {
+    // Tăng bộ đếm bằng một câu lệnh nguyên tử để các request đồng thời không vượt qua giới hạn.
     const result = await pool.query(`INSERT INTO api_rate_limits(user_id,window_started,request_count) VALUES($1,now(),1)
       ON CONFLICT(user_id) DO UPDATE SET
       request_count=CASE WHEN api_rate_limits.window_started > now()-interval '60 seconds' THEN api_rate_limits.request_count+1 ELSE 1 END,

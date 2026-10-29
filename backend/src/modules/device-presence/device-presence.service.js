@@ -27,6 +27,7 @@ export class DevicePresenceService {
       const credential = await client.query("SELECT credential_id FROM device_credentials WHERE device_id=$1 AND status='ACTIVE' AND synced_at IS NOT NULL", [device.device_id]);
       if (!credential.rowCount) return false;
       const known = (await client.query("SELECT * FROM device_sessions WHERE device_id=$1 AND session_id=$2", [device.device_id, data.session_id])).rows[0];
+      // LWT của phiên cũ không được kéo phiên hiện tại về OFFLINE sau khi thiết bị đã kết nối lại.
       if (data.status === "OFFLINE") {
         if (!known || known.closed_at || device.session_id !== data.session_id) return false;
         await client.query("UPDATE device_sessions SET closed_at=now() WHERE device_id=$1 AND session_id=$2", [device.device_id, data.session_id]);
@@ -37,6 +38,7 @@ export class DevicePresenceService {
       const now = (await client.query("SELECT clock_timestamp() AS now")).rows[0].now;
       if (data.timestamp < now.getTime() - this.timeoutSeconds * 1000 || data.timestamp > now.getTime() + 300000) return false;
       if (known?.closed_at || (known && device.session_id !== data.session_id)) return false;
+      // Heartbeat trùng hoặc uptime lùi không được làm mới last_seen và che mất tình trạng mất kết nối.
       if (known) {
         if (envelope.kind === "heartbeat") {
           if (known.last_msg_id === data.msg_id || (known.last_uptime_seconds !== null && data.uptime_seconds <= Number(known.last_uptime_seconds))) return false;
@@ -49,6 +51,7 @@ export class DevicePresenceService {
         await client.query("UPDATE device_sessions SET closed_at=now() WHERE device_id=$1 AND closed_at IS NULL", [device.device_id]);
         await client.query("INSERT INTO device_sessions(device_id,session_id,last_timestamp_ms) VALUES($1,$2,$3)", [device.device_id, data.session_id, data.timestamp]);
         await client.query("UPDATE devices SET last_heartbeat_at=NULL WHERE device_id=$1", [device.device_id]);
+        // Phiên mới chưa chứng minh trạng thái thực: đặt reported/cấu hình đã áp dụng về chưa xác nhận.
         await resetReportedForSession(client, device, data.session_id);
         await resetConfigForSession(client, device);
       }
@@ -61,6 +64,7 @@ export class DevicePresenceService {
       return true;
     });
   }
+  // Hết hạn heartbeat chỉ đổi trạng thái kết nối, không tự chuyển vòng đời ACTIVE/FAULT/MAINTENANCE.
   async scanOffline() {
     return withTransaction(this.pool, async (client) => {
       const expired = await client.query(`SELECT * FROM devices WHERE lifecycle_status=ANY($1::text[]) AND connection_status='ONLINE'

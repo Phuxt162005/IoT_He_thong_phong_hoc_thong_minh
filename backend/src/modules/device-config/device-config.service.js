@@ -32,7 +32,9 @@ export class DeviceConfigService {
       const { credential } = await this.ready(client, device);
       if (device.device_type !== "SENSOR_NODE" && "sample_interval_seconds" in patch) throw new AppError("UNSUPPORTED_SETTING", 400, "Control Node không có chu kỳ lấy mẫu");
       const current = requireFound((await client.query("SELECT * FROM device_settings WHERE device_id=$1 FOR UPDATE", [id])).rows[0]);
+      // Ghép patch thành cấu hình đầy đủ rồi tăng version; desired chưa có nghĩa thiết bị đã áp dụng.
       const settings = { ...current.desired_settings, ...patch };
+      // Chừa ít nhất ba chu kỳ heartbeat trong cửa sổ timeout để tránh cấu hình gây OFFLINE giả.
       if (settings.heartbeat_interval_seconds * 3 > this.heartbeatTimeoutSeconds) throw new AppError("UNSAFE_HEARTBEAT_INTERVAL", 400, "Chu kỳ heartbeat phải không quá một phần ba timeout backend");
       const version = current.desired_version + 1;
       const config = (await client.query(`INSERT INTO device_configs(config_id,device_id,room_id,version,settings,session_id,credential_version,requested_by,requested_token_version,timeout_at)
@@ -42,6 +44,7 @@ export class DeviceConfigService {
       await enqueueIotEvent(client, "config.updated", { config_id: config.config_id, device_id: id, room_id: device.room_id, status: "PENDING", version });
       return config;
     });
+    // Lưu trước, gửi sau: restart vẫn tìm được cấu hình chưa publish và dùng lại config_id.
     const config = await this.publishOne(queued.config_id);
     if (config.error_code === "PUBLISH_ERROR") throw new AppError("MQTT_PUBLISH_FAILED", 503, "Không gửi được cấu hình MQTT", { config_id: config.config_id });
     return view(config);
@@ -112,6 +115,8 @@ export class DeviceConfigService {
       if (current.status === "PENDING" && current.timeout_at <= new Date()) current = await finishConfig(client, current, "TIMEOUT", "CONFIG_TIMEOUT");
       const late = ["TIMEOUT", "FAILED"].includes(current.status) && current.acknowledged_at === null && current.late_ack_at === null;
       if (current.status !== "PENDING" && !late) return { duplicate: true };
+      // Chỉ ACK SUCCESS mới xác nhận applied; version cũ không được ghi đè cấu hình mới hơn.
+      // ACK muộn vẫn phản ánh thực tế thiết bị nhưng không sửa kết quả TIMEOUT/FAILED đã chốt.
       if (data.status === "SUCCESS") {
         await client.query("UPDATE device_settings SET applied_version=$1,applied_settings=$2,last_applied_at=now(),updated_at=now() WHERE device_id=$3 AND applied_version<$1", [config.version, config.settings, device.device_id]);
       }

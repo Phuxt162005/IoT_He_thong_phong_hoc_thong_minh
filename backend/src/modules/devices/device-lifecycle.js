@@ -4,6 +4,7 @@ import { enqueueIotEvent, recordConnectionChange } from "../../database/events.j
 import { cancelPendingDeviceCommands } from "../commands/command-state.js";
 import { cancelPendingDeviceConfigs } from "../device-config/device-config.state.js";
 
+// Vòng đời nghiệp vụ độc lập với ONLINE/OFFLINE; chỉ các cạnh liệt kê ở đây được phép chuyển.
 export const transitions = Object.freeze({
   REGISTERED: ["PROVISIONED", "DECOMMISSIONED"],
   PROVISIONED: ["ACTIVE", "REVOKED"],
@@ -20,6 +21,8 @@ export async function recordLifecycle(client, device, from, to, { actorType = "U
   await enqueueIotEvent(client, "device.lifecycle_changed", { device_id: device.device_id, room_id: device.room_id, from_status: from, lifecycle_status: to, reason });
 }
 
+// Bên gọi phải giữ khóa thiết bị và truyền client của transaction hiện tại.
+// Chuyển trạng thái, ghi lịch sử/audit/sự kiện và hủy yêu cầu chờ được lưu nguyên tử.
 export async function transitionDevice(client, device, to, context) {
   if (!transitions[device.lifecycle_status]?.includes(to)) throw new AppError("INVALID_DEVICE_TRANSITION", 409, "Chuyển trạng thái thiết bị không hợp lệ");
   const result = await client.query(`UPDATE devices SET lifecycle_status=$1::text,

@@ -28,7 +28,7 @@ const envSchema = z.object({
 export function loadConfig(env = process.env, { requireDatabase = false, requireAuth = false, requireBroker = false } = {}) {
   const result = envSchema.safeParse(env);
   if (!result.success) {
-    // Only field names are reported; never echo an environment value.
+    // Chỉ báo tên biến sai cấu hình, không in giá trị môi trường có thể chứa secret.
     throw new Error(`Cấu hình không hợp lệ: ${result.error.issues.map((i) => i.path.join(".")).join(", ")}`);
   }
   const data = result.data;

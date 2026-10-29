@@ -5,6 +5,7 @@ const options = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
 export async function hashPassword(password) {
   if (typeof password !== "string" || password.length < 12 || password.length > 128) throw new TypeError("Mật khẩu phải có 12–128 ký tự");
+  // Salt ngẫu nhiên giúp hai tài khoản cùng mật khẩu vẫn có chuỗi băm khác nhau.
   const salt = randomBytes(16).toString("hex");
   const derived = await scrypt(password, salt, 64, options);
   return `scrypt-v1$${salt}$${derived.toString("hex")}`;
@@ -15,5 +16,6 @@ export async function verifyPassword(password, encoded) {
   const match = /^scrypt-v1\$([a-f0-9]{32})\$([a-f0-9]{128})$/.exec(encoded);
   if (!match) return false;
   const derived = await scrypt(password, match[1], 64, options);
+  // So sánh hai chuỗi băm trong thời gian cố định, tránh so sánh từng ký tự bằng ===.
   return timingSafeEqual(derived, Buffer.from(match[2], "hex"));
 }

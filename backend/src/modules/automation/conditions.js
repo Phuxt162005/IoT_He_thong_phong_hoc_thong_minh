@@ -1,6 +1,7 @@
 const metrics = { temperature: [-10, 60], humidity: [0, 100], lux: [0, 65535] };
 const operators = ["GT", "GTE", "LT", "LTE", "EQ", "NE"];
 
+// Chỉ cho phép cây điều kiện có số nút/độ sâu hữu hạn, không thực thi biểu thức JavaScript tùy ý.
 export function validCondition(root) {
   let count = 0;
   function visit(node, depth) {
@@ -22,6 +23,7 @@ export function matches(condition, sample) {
   if (condition.all) return condition.all.every((child) => matches(child, sample));
   if (condition.any) return condition.any.some((child) => matches(child, sample));
   const actual = sample[condition.metric];
+  // Thiếu dữ liệu không được coi là điều kiện đúng, kể cả phép NE hoặc occupancy từ payload cũ.
   if (actual === null || actual === undefined) return false;
   switch (condition.operator) {
     case "GT": return actual > condition.value;
