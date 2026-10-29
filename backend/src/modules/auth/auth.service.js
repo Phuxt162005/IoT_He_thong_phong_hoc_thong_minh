@@ -6,6 +6,7 @@ import { withTransaction } from "../../database/pool.js";
 import { writeAudit } from "../../database/audit.js";
 
 const unauthorized = () => new AppError("UNAUTHORIZED", 401, "Thông tin đăng nhập hoặc phiên truy cập không hợp lệ");
+// Vẫn chạy phép băm khi username không tồn tại để giảm khác biệt thời gian với mật khẩu sai.
 const dummyHash = `scrypt-v1$${"0".repeat(32)}$${"0".repeat(128)}`;
 export const userSelect = `SELECT u.user_id,u.username,u.display_name,u.status,u.token_version,r.role_name AS role FROM users u JOIN roles r ON r.role_id=u.role_id`;
 export function publicUser(user) {
@@ -35,12 +36,14 @@ export class AuthService {
       ({ payload } = await jwtVerify(match[1], this.key, { algorithms: ["HS256"], issuer: "smartclassroom", audience: "smartclassroom-web", requiredClaims: ["sub", "ver", "exp", "iat"] }));
     } catch { throw unauthorized(); }
     if (!/^[1-9]\d{0,18}$/.test(payload.sub ?? "") || BigInt(payload.sub) > 9223372036854775807n || !Number.isSafeInteger(payload.ver) || payload.ver < 1) throw unauthorized();
+    // JWT đúng chữ ký vẫn có thể đã bị thu hồi: kiểm tra user và token_version mỗi lần gọi.
     const user = (await this.pool.query(`${userSelect} WHERE u.user_id=$1`, [payload.sub])).rows[0];
     if (!user || user.status !== "ACTIVE" || user.token_version !== payload.ver) throw unauthorized();
     return user;
   }
 
   async login({ username, password }, { ip, requestId } = {}) {
+    // Lưu bộ đếm theo cặp IP/username dưới dạng HMAC; không cần lưu khóa nhận diện dạng rõ.
     const loginKey = createHmac("sha256", this.key).update(JSON.stringify([ip ?? "unknown", username.toLowerCase()])).digest("hex");
     const outcome = await withTransaction(this.pool, async (client) => {
       await client.query("INSERT INTO login_attempts(login_key) VALUES($1) ON CONFLICT DO NOTHING", [loginKey]);
@@ -65,6 +68,7 @@ export class AuthService {
     return { access_token: await this.issueToken(outcome.user), token_type: "Bearer", expires_in: this.jwtExpiresIn, user: publicUser(outcome.user) };
   }
 
+  // Tăng token_version làm mọi JWT cũ của tài khoản mất hiệu lực, không chỉ phiên đang logout.
   async logout(user, requestId) {
     await withTransaction(this.pool, async (client) => {
       const result = await client.query("UPDATE users SET token_version=token_version+1,updated_at=now() WHERE user_id=$1 AND token_version=$2 AND status='ACTIVE' RETURNING user_id", [user.user_id, user.token_version]);

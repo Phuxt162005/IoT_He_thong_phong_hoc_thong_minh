@@ -1,6 +1,7 @@
 import { AppError } from "./errors.js";
 import { z } from "zod";
 
+// Giữ ID BIGINT dưới dạng chuỗi để tránh mất độ chính xác khi vượt giới hạn số nguyên JavaScript.
 export const idSchema = z.string().refine((v) => /^[1-9]\d{0,18}$/.test(v) && BigInt(v) <= 9223372036854775807n);
 export const pagination = {
   page: z.coerce.number().int().min(1).max(1000000).default(1),

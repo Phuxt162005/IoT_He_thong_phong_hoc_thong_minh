@@ -7,6 +7,7 @@ let pool;
 try {
   const command = process.argv[2];
   if (!["migrate", "seed"].includes(command)) throw new Error("Lệnh không hợp lệ");
+  // Tách tài khoản nâng cấp schema khỏi tài khoản nghiệp vụ dùng để seed/chạy ứng dụng.
   pool = createPool(command === "migrate" ? process.env.MIGRATION_DATABASE_URL : process.env.DATABASE_URL);
   const result = command === "migrate" ? await migrate(pool) : await seed(pool, {
     username: process.env.ADMIN_USERNAME, password: process.env.ADMIN_PASSWORD,

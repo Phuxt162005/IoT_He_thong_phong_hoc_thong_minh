@@ -13,7 +13,7 @@ export class DynamicSecurity {
     let deadline;
     const timeout = new Promise((_resolve, reject) => { deadline = setTimeout(() => reject(unavailable()), 5000); });
     const work = async () => {
-      // Replies share a broker topic; correlation is required even with separate connections.
+      // Phản hồi dùng chung topic: ghép bằng correlationData để không nhận nhầm kết quả lệnh khác.
       client = mqtt.connect(this.url, { username: this.username, password: this.password, clientId: `dynsec-${randomUUID()}`, reconnectPeriod: 0, connectTimeout: 2500, protocolVersion: 5, queueQoSZero: false });
       client.on("error", () => {});
       await new Promise((resolve, reject) => {
@@ -57,6 +57,7 @@ export class DynamicSecurity {
   async setIdentity({ username, password, deviceType, clientId = username, role }) {
     const roles = [{ rolename: role ?? (deviceType === "SENSOR_NODE" ? "sensor_role" : "control_role"), priority: 1 }];
     if (await this.getClient(username)) {
+      // Ngắt phiên cũ trước khi đổi mật khẩu/ACL, rồi mới cho phép kết nối với cấu hình mới.
       await this.request({ command: "disableClient", username });
       await this.request({ command: "modifyClient", username, password, clientid: clientId, roles, groups: [] });
       await this.request({ command: "enableClient", username });

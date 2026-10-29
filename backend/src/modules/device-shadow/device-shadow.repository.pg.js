@@ -1,3 +1,5 @@
+// Adapter đọc PostgreSQL và đổi tên trường sang mô hình shadow của module ADV-01.
+// Việc ghi desired/reported do luồng command xử lý để giữ tính nguyên tử với audit và ACK.
 export class PostgresDeviceShadowRepository {
   constructor(pool) { this.pool = pool; }
   async getShadow(deviceCode) {

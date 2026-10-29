@@ -15,10 +15,12 @@ export function attachRealtime({ server, pool, config, logger, authTimeoutMs = 5
     ws.send(JSON.stringify(message));
   };
   const closeAll = () => { for (const ws of wss.clients) ws.terminate(); };
+  // Socket đang mở vẫn phải kiểm tra lại JWT/token_version, không chỉ lúc bắt tay ban đầu.
   async function validate(ws) {
     try { ws.user = await auth.authenticate(ws.authorization); return true; }
     catch { ws.close(4001, "Authentication expired"); return false; }
   }
+  // NOTIFY chỉ mang event_id; đọc dữ liệu đã commit rồi kiểm tra scope của từng người nhận.
   async function broadcast(id) {
     if (stopped || !/^[a-f0-9-]{36}$/.test(id)) return;
     const event = (await pool.query("SELECT * FROM iot_events WHERE event_id=$1", [id])).rows[0];
@@ -40,6 +42,7 @@ export function attachRealtime({ server, pool, config, logger, authTimeoutMs = 5
     const connection = await pool.connect();
     if (stopped) { connection.release(); return; }
     client = connection;
+    // Mất listener có thể bỏ lỡ sự kiện: đóng socket để client reconnect và lấy lại HTTP snapshot.
     connection.on("error", () => { listening = false; closeAll(); if (client === connection) { client = null; connection.release(true); } });
     connection.on("notification", ({ channel: source, payload }) => {
       if (source !== channel) return;
@@ -72,7 +75,7 @@ export function attachRealtime({ server, pool, config, logger, authTimeoutMs = 5
         if (frame.type !== "authenticate" || Object.keys(frame).length !== 2 || typeof frame.token !== "string" || frame.token.length > 4096) throw new Error("Invalid auth frame");
         ws.authorization = `Bearer ${frame.token}`;
         const user = await auth.authenticate(ws.authorization);
-        // No awaits between counting and assignment: concurrent handshakes share the limit.
+        // Không await giữa đếm và gán user để các phiên bắt tay đồng thời dùng chung giới hạn.
         if ([...wss.clients].filter((other) => other.user?.user_id === user.user_id).length >= maxConnectionsPerUser) { ws.close(4008, "Connection limit"); return; }
         if (ws.readyState !== WebSocket.OPEN) return;
         ws.user = user; clearTimeout(timer);

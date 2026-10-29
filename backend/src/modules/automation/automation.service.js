@@ -52,6 +52,7 @@ export class AutomationService {
       return updated;
     });
   }
+  // Chỉ lấy latest còn mới từ Sensor ACTIVE/ONLINE có heartbeat mới; loại mẫu bù/lệch đồng hồ.
   async sample(client, roomId) {
     return (await client.query(`SELECT s.* FROM telemetry_latest l JOIN sensor_data s ON s.data_id=l.data_id
       JOIN devices d ON d.device_id=s.device_id JOIN rooms r ON r.room_id=s.room_id JOIN iot_events e ON e.data_id=s.data_id
@@ -61,6 +62,7 @@ export class AutomationService {
       AND s.recorded_at>=clock_timestamp()-($2::double precision * interval '1 second')
       ORDER BY s.recorded_at DESC,s.data_id DESC LIMIT 1`, [roomId, this.freshnessSeconds, this.heartbeatTimeoutSeconds])).rows[0];
   }
+  // Kiểm tra lại rule và manual override trước khi publish, vì chúng có thể đổi sau lúc xếp lệnh.
   async guard(client, command, device) {
     if (device.control_mode === "MANUAL" || device.manual_override_until > new Date()) return false;
     const rule = (await client.query("SELECT * FROM automation_rules WHERE rule_id=$1 AND is_enabled AND target_device_id=$2", [command.rule_id, device.device_id])).rows[0];
@@ -79,13 +81,16 @@ export class AutomationService {
       let count = 0;
       for (const rule of rules) {
         const satisfied = !!sample && matches(rule.condition, sample);
+        // Gián đoạn đánh giá quá cửa sổ freshness thì tính lại hold, không cộng thời gian thiếu dữ liệu.
         const continuous = rule.last_evaluated_at && Date.now() - rule.last_evaluated_at.getTime() <= this.freshnessSeconds * 1000;
         const since = satisfied ? (continuous ? rule.true_since : null) ?? new Date() : null;
         await client.query("UPDATE automation_rule_state SET true_since=$1,last_data_id=$2,last_evaluated_at=clock_timestamp() WHERE rule_id=$3", [since, sample?.data_id ?? null, rule.rule_id]);
         if (!satisfied || Date.now() - since.getTime() < rule.hold_seconds * 1000) continue;
         const key = `${rule.target_device_id}:${rule.actuator}`;
         if (winners.has(key)) continue;
+        // Rule thắng vẫn giữ ưu tiên trong cooldown; không nhường cho rule đối nghịch bật/tắt liên tục.
         winners.add(key);
+        // Ghi nhớ ID mẫu đã kích hoạt để tick/restart không tạo lệnh lần hai từ cùng dữ liệu.
         if (rule.last_trigger_data_id === sample.data_id || (rule.last_triggered_at && Date.now() - rule.last_triggered_at.getTime() < rule.cooldown_seconds * 1000)) continue;
         const device = (await client.query("SELECT * FROM devices WHERE device_id=$1 FOR UPDATE", [rule.target_device_id])).rows[0];
         if (!device || device.control_mode === "MANUAL" || device.manual_override_until > new Date()) continue;

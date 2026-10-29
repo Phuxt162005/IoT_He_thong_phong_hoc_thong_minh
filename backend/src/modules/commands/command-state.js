@@ -2,6 +2,7 @@ import { enqueueIotEvent } from "../../database/events.js";
 import { writeAudit } from "../../database/audit.js";
 import { AppError } from "../../common/errors.js";
 
+// Chỉ kết thúc lệnh PENDING; ACK trùng, timeout và các job đồng thời không ghi đè kết quả cuối.
 export async function finishCommand(client, command, status, errorCode, { ackPayload = null } = {}) {
   const result = await client.query(`UPDATE commands SET status=$1::text,error_code=$2,ack_payload=coalesce($3,ack_payload),
     acked_at=CASE WHEN $1::text IN ('SUCCESS','FAILED') AND $3::jsonb IS NOT NULL THEN now() ELSE acked_at END
@@ -36,6 +37,8 @@ export async function applyReportedState(client, device, { session_id, shadow_ve
   const shadow = (await client.query("SELECT * FROM device_shadows WHERE device_id=$1 FOR UPDATE", [device.device_id])).rows[0];
   if (!shadow || shadow_version > shadow.desired_version) throw new AppError("INVALID_SHADOW_VERSION", 409, "Version trạng thái không hợp lệ");
   let changed = 0;
+  // So sánh version theo từng actuator để ACK đèn/quạt đến khác thứ tự vẫn ghép đúng trạng thái.
+  // Với cùng version, chỉ nhận timestamp mới hơn trong phiên hiện tại.
   for (const [name, value] of Object.entries(reported_state)) {
     const result = await client.query(`UPDATE actuators SET current_state=$1,reported_version=$2,reported_session_id=$3,reported_timestamp_ms=$4,updated_at=now()
       WHERE device_id=$5 AND actuator_type=$6 AND (reported_session_id IS DISTINCT FROM $3 OR reported_version<$2 OR (reported_version=$2 AND reported_timestamp_ms<$4))`,

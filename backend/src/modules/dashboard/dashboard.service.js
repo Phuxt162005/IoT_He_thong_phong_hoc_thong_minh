@@ -9,6 +9,7 @@ export function publicTelemetry(row) {
 }
 export function csvCell(value) {
   let cell = value instanceof Date ? value.toISOString() : value === null || value === undefined ? "" : String(value);
+  // Chặn công thức trong ô chuỗi khi mở bằng bảng tính; giữ nguyên số âm để không sai dữ liệu đo.
   if (typeof value === "string" && /^[=+@\-\t\r]/.test(cell)) cell = `'${cell}`;
   return `"${cell.replaceAll('"', '""')}"`;
 }
@@ -25,6 +26,7 @@ export class DashboardService {
     await this.scope(user, scope);
     const { from, to, page, page_size } = query;
     const params = [scope.roomId ?? null, scope.deviceId ?? null, from, to];
+    // Lịch sử lọc theo thời gian đo, dùng khoảng [from, to): có from, không lấy mốc to.
     const where = "WHERE ($1::bigint IS NULL OR s.room_id=$1) AND ($2::bigint IS NULL OR s.device_id=$2) AND s.recorded_at >= $3 AND s.recorded_at < $4";
     if (csv) {
       const rows = (await this.pool.query(`SELECT ${columns} FROM sensor_data s ${where} ORDER BY s.recorded_at,s.data_id LIMIT 5001`, params)).rows;

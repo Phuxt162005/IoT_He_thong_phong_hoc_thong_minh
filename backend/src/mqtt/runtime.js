@@ -11,6 +11,7 @@ export class MqttRuntime extends EventEmitter {
     this.client.on("offline", () => { this.ready = false; });
     this.client.on("close", () => { this.ready = false; });
     this.client.on("reconnect", () => { this.client.options.reconnectPeriod = Math.min(30000, this.client.options.reconnectPeriod * 2); });
+    // Chỉ báo ready sau khi broker chấp nhận đủ subscription, không chỉ sau khi kết nối TCP.
     this.client.on("connect", async () => {
       this.client.options.reconnectPeriod = 1000;
       try {
@@ -27,11 +28,12 @@ export class MqttRuntime extends EventEmitter {
     let payload;
     try { payload = JSON.parse(raw.toString()); } catch { throw new AppError("INVALID_JSON", 400, "JSON không hợp lệ"); }
     const envelope = { topic, roomCode: match[1], deviceCode: match[2], kind: match[3], payload };
-    // Further business handlers are registered by BE-08 onwards; return their promises to avoid detached failures.
+    // Chờ từng handler của bản tin để lỗi nghiệp vụ được truyền ra ngoài và ghi log tập trung.
     for (const handler of this.listeners("device-message")) await handler(envelope);
   }
   async publish(topic, payload) {
     if (!this.ready || !this.client.connected) throw new AppError("BROKER_UNAVAILABLE", 503, "MQTT broker chưa sẵn sàng");
+    // QoS 1 có thể giao lặp; command/config vẫn cần ACK nghiệp vụ, không suy ra thành công từ publish.
     await this.client.publishAsync(topic, JSON.stringify(payload), { qos: 1, retain: false });
   }
   async stop() { this.ready = false; await this.client.endAsync(true); }

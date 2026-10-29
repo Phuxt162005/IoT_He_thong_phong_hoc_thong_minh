@@ -9,6 +9,7 @@ const fires = (threshold, value) => threshold?.is_enabled && (threshold.operator
 
 export class AlertsService {
   constructor({ pool, freshnessSeconds = 30 }) { this.pool = pool; this.freshnessSeconds = freshnessSeconds; }
+  // Mỗi cặp cảm biến/mức độ chọn ngưỡng riêng của phòng trước, không có thì dùng ngưỡng toàn hệ thống.
   async thresholds(client, roomId) {
     return (await client.query(`SELECT DISTINCT ON(sensor_type,severity) * FROM alert_thresholds
       WHERE room_id=$1 OR room_id IS NULL ORDER BY sensor_type,severity,(room_id IS NOT NULL) DESC`, [roomId])).rows;
@@ -75,7 +76,9 @@ export class AlertsService {
       if (candidate) await this.raise(client, device, type, candidate.severity, value);
       return;
     }
+    // Hysteresis: phải có ba mẫu liên tiếp qua ngưỡng phục hồi để tránh cảnh báo bật/tắt liên tục.
     const clearCount = !fires(active, value) && value <= active.clear_value ? alert.clear_count + 1 : 0;
+    // Nếu đã hết CRITICAL nhưng còn WARNING, đóng bản cũ và mở bản mới để giữ lịch sử mức nghiêm trọng.
     if (clearCount >= 3) {
       await this.resolve(client, alert, "AUTO_RECOVERED");
       if (candidate) await this.raise(client, device, type, candidate.severity, value);
@@ -85,6 +88,7 @@ export class AlertsService {
     const updated = (await client.query("UPDATE alerts SET clear_count=$1,value=$2 WHERE alert_id=$3 RETURNING *", [candidate?.severity === "CRITICAL" && alert.severity !== "CRITICAL" ? 0 : clearCount, value, alert.alert_id])).rows[0];
     if (!candidate) await this.event(client, updated);
   }
+  // Khóa thiết bị rồi sự kiện; cảnh báo và dấu đã xử lý cùng transaction để retry không tạo trùng.
   async consumeTelemetry() {
     const pending = (await this.pool.query(`SELECT e.event_id,d.device_id FROM iot_events e JOIN sensor_data d ON d.data_id=e.data_id
       WHERE e.event_type='telemetry.stored' AND NOT EXISTS(SELECT 1 FROM iot_event_deliveries x WHERE x.event_id=e.event_id AND x.consumer='alerts') ORDER BY d.data_id LIMIT 100`)).rows;

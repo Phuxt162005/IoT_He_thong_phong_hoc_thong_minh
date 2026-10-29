@@ -18,7 +18,7 @@ export function createApp({ config, logger = new LoggingService({ sink: new Cons
     res.on("finish", () => logger.info("http.request", {
       request_id: req.requestId, method: req.method, status: res.statusCode,
       duration_ms: Math.round(performance.now() - started),
-      // Do not log raw URLs, headers or bodies: they can contain credentials.
+      // Không log URL/header/body gốc vì chúng có thể chứa mật khẩu hoặc token.
       route: req.route?.path ?? "unmatched",
     }));
     next();
@@ -29,7 +29,7 @@ export function createApp({ config, logger = new LoggingService({ sink: new Cons
   app.get("/health", (_req, res) => res.json({ success: true, data: { status: "UP" } }));
   app.get("/ready", async (_req, res) => {
     let healthy = false;
-    try { healthy = await ready(); } catch { /* dependency details stay private */ }
+    try { healthy = await ready(); } catch { /* Không trả chi tiết lỗi dịch vụ phụ thuộc ra ngoài. */ }
     res.status(healthy ? 200 : 503).json({ success: healthy, data: { status: healthy ? "READY" : "NOT_READY" } });
   });
   if (routes) app.use("/api/v1", routes);
