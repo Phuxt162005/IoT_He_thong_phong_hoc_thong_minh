@@ -1,0 +1,10 @@
+export type Role = 'ADMIN' | 'OPERATOR' | 'VIEWER';
+export type Status = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
+export type User = { id: string; username: string; display_name: string; role: Role; status: 'ACTIVE' | 'DISABLED'; };
+export type Room = { id: string; room_code: string; room_name: string; status: 'ACTIVE' | 'INACTIVE'; device_count?: number; };
+export type Device = { id: string; device_code: string; device_type: 'SENSOR_NODE' | 'CONTROL_NODE'; room_id: string; room_name?: string; lifecycle_status: string; connection_status: Status; firmware_version?: string; last_seen?: string; wifi_rssi_dbm?: number; free_heap_bytes?: number; uptime_seconds?: number; maintenance_reason?: string; };
+export type Alert = { id: string; alert_type: string; severity: 'WARNING' | 'CRITICAL'; status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED'; room_name?: string; device_code?: string; value?: number; occurrence_count: number; created_at: string; };
+export type Command = { id: string; actuator_type: 'LIGHT' | 'FAN'; target_state: 'ON' | 'OFF'; status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT'; created_at: string; ack_at?: string; error_code?: string; };
+export type LatestTelemetry = { temperature?: number; humidity?: number; lux?: number; occupancy?: boolean; updated_at?: string; light_state?: 'ON' | 'OFF' | 'UNKNOWN'; fan_state?: 'ON' | 'OFF' | 'UNKNOWN'; };
+export type ApiResponse<T> = { success: true; data: T; meta?: { page: number; page_size: number; total: number } };
+export type DeviceAction = 'maintenance' | 'resume' | 'clear-fault' | 'recover' | 'decommission';
