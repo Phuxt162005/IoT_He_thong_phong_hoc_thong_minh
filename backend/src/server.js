@@ -22,7 +22,7 @@ import { runRetention } from "./database/retention.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 try {
-  // Khởi tạo dependency dùng chung; service nghiệp vụ không tự tạo kết nối riêng cho mỗi request.
+  // Khởi tạo dependency dùng chung: pool database, MQTT runtime và các service nghiệp vụ.
   const config = loadConfig(process.env, { requireDatabase: true, requireAuth: true, requireBroker: true });
   const pool = createPool(config.databaseUrl);
   const schemaVersion = await expectedSchemaVersion();

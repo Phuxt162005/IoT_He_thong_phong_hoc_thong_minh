@@ -33,7 +33,7 @@ export class MqttRuntime extends EventEmitter {
   }
   async publish(topic, payload) {
     if (!this.ready || !this.client.connected) throw new AppError("BROKER_UNAVAILABLE", 503, "MQTT broker chưa sẵn sàng");
-    // QoS 1 có thể giao lặp; service vẫn phải chống trùng và chờ ACK nghiệp vụ từ thiết bị.
+    // QoS 1 có thể giao lặp; command/config vẫn cần ACK nghiệp vụ, không suy ra thành công từ publish.
     await this.client.publishAsync(topic, JSON.stringify(payload), { qos: 1, retain: false });
   }
   async stop() { this.ready = false; await this.client.endAsync(true); }
