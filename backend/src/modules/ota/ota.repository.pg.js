@@ -1,0 +1,285 @@
+import { AppError, requireFound } from "../../common/errors.js";
+
+const firmwareColumns = `
+  firmware_id, version, device_type, hardware_target,
+  file_name, storage_path, file_size, sha256,
+  release_notes, status, created_by, created_at, published_at
+`;
+
+const jobColumns = `
+  job_id, firmware_id, device_id, room_id, session_id,
+  credential_version, previous_firmware_version, status,
+  progress, error_code, requested_by, created_at,
+  started_at, last_status_at, finished_at, timeout_at
+`;
+
+export class OtaRepository {
+  constructor(pool) {
+    if (!pool) throw new TypeError("OtaRepository cần pool");
+    this.pool = pool;
+  }
+
+  async createFirmware(client, input) {
+    const result = await client.query(
+      `INSERT INTO firmware_releases(
+        firmware_id,version,device_type,hardware_target,
+        file_name,storage_path,file_size,sha256,
+        release_notes,created_by
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING ${firmwareColumns}`,
+      [
+        input.firmware_id,
+        input.version,
+        input.device_type,
+        input.hardware_target,
+        input.file_name,
+        input.storage_path,
+        input.file_size,
+        input.sha256,
+        input.release_notes ?? "",
+        input.created_by,
+      ],
+    );
+
+    return result.rows[0];
+  }
+
+  async getFirmware(client, firmwareId, { forUpdate = false } = {}) {
+    const result = await client.query(
+      `SELECT ${firmwareColumns}
+       FROM firmware_releases
+       WHERE firmware_id=$1
+       ${forUpdate ? "FOR UPDATE" : ""}`,
+      [firmwareId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async getPublishedFirmware(client, firmwareId) {
+    const result = await client.query(
+      `SELECT ${firmwareColumns}
+       FROM firmware_releases
+       WHERE firmware_id=$1 AND status='PUBLISHED'`,
+      [firmwareId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async publishFirmware(client, firmwareId) {
+    const result = await client.query(
+      `UPDATE firmware_releases
+       SET status='PUBLISHED',published_at=clock_timestamp()
+       WHERE firmware_id=$1 AND status='DRAFT'
+       RETURNING ${firmwareColumns}`,
+      [firmwareId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async revokeFirmware(client, firmwareId) {
+    const result = await client.query(
+      `UPDATE firmware_releases
+       SET status='REVOKED'
+       WHERE firmware_id=$1 AND status='PUBLISHED'
+       RETURNING ${firmwareColumns}`,
+      [firmwareId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async listFirmware(
+    client,
+    { device_type, hardware_target, status, page = 1, page_size = 20 } = {},
+  ) {
+    const params = [
+      device_type ?? null,
+      hardware_target ?? null,
+      status ?? null,
+    ];
+
+    const where = `
+      WHERE ($1::varchar IS NULL OR device_type=$1)
+        AND ($2::varchar IS NULL OR hardware_target=$2)
+        AND ($3::varchar IS NULL OR status=$3)
+    `;
+
+    const count = await client.query(
+      `SELECT count(*) FROM firmware_releases ${where}`,
+      params,
+    );
+
+    const result = await client.query(
+      `SELECT ${firmwareColumns}
+       FROM firmware_releases
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT $4 OFFSET $5`,
+      [...params, page_size, (page - 1) * page_size],
+    );
+
+    return {
+      data: result.rows,
+      meta: {
+        page,
+        page_size,
+        total: Number(count.rows[0].count),
+      },
+    };
+  }
+
+  async createJob(client, input) {
+    const result = await client.query(
+      `INSERT INTO ota_jobs(
+        job_id,firmware_id,device_id,room_id,session_id,
+        credential_version,previous_firmware_version,
+        requested_by,timeout_at
+      )
+      VALUES(
+        $1,$2,$3,$4,$5,$6,$7,$8,
+        clock_timestamp()+($9::double precision * interval '1 second')
+      )
+      RETURNING ${jobColumns}`,
+      [
+        input.job_id,
+        input.firmware_id,
+        input.device_id,
+        input.room_id,
+        input.session_id,
+        input.credential_version,
+        input.previous_firmware_version ?? null,
+        input.requested_by,
+        input.timeout_seconds,
+      ],
+    );
+
+    return result.rows[0];
+  }
+
+  async getJob(client, jobId, { forUpdate = false } = {}) {
+    const result = await client.query(
+      `SELECT ${jobColumns}
+       FROM ota_jobs
+       WHERE job_id=$1
+       ${forUpdate ? "FOR UPDATE" : ""}`,
+      [jobId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async updateJobStatus(
+    client,
+    jobId,
+    { status, progress, error_code = null },
+  ) {
+    const terminal = [
+      "SUCCESS",
+      "FAILED",
+      "ROLLED_BACK",
+      "CANCELLED",
+      "TIMEOUT",
+    ].includes(status);
+
+    const result = await client.query(
+      `UPDATE ota_jobs
+       SET status=$1,
+           progress=COALESCE($2,progress),
+           error_code=$3,
+           started_at=CASE
+             WHEN $1='DOWNLOADING' AND started_at IS NULL
+             THEN clock_timestamp()
+             ELSE started_at
+           END,
+           last_status_at=clock_timestamp(),
+           finished_at=CASE
+             WHEN $4::boolean THEN clock_timestamp()
+             ELSE NULL
+           END
+       WHERE job_id=$5
+       RETURNING ${jobColumns}`,
+      [status, progress ?? null, error_code, terminal, jobId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async listJobs(
+    client,
+    { device_id, room_id, status, page = 1, page_size = 20 } = {},
+  ) {
+    const params = [device_id ?? null, room_id ?? null, status ?? null];
+
+    const where = `
+      WHERE ($1::bigint IS NULL OR device_id=$1)
+        AND ($2::bigint IS NULL OR room_id=$2)
+        AND ($3::varchar IS NULL OR status=$3)
+    `;
+
+    const count = await client.query(
+      `SELECT count(*) FROM ota_jobs ${where}`,
+      params,
+    );
+
+    const result = await client.query(
+      `SELECT ${jobColumns}
+       FROM ota_jobs
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT $4 OFFSET $5`,
+      [...params, page_size, (page - 1) * page_size],
+    );
+
+    return {
+      data: result.rows,
+      meta: {
+        page,
+        page_size,
+        total: Number(count.rows[0].count),
+      },
+    };
+  }
+
+  async getDevice(client, deviceId, { forUpdate = false } = {}) {
+    const result = await client.query(
+      `SELECT d.*,r.room_code,r.status AS room_status
+       FROM devices d
+       LEFT JOIN rooms r ON r.room_id=d.room_id
+       WHERE d.device_id=$1
+       ${forUpdate ? "FOR UPDATE OF d" : ""}`,
+      [deviceId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async getActiveCredential(client, deviceId) {
+    const result = await client.query(
+      `SELECT credential_id,version,status,synced_at
+       FROM device_credentials
+       WHERE device_id=$1
+         AND status='ACTIVE'
+         AND synced_at IS NOT NULL`,
+      [deviceId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async getCurrentSession(client, deviceId, sessionId) {
+    const result = await client.query(
+      `SELECT session_id
+       FROM device_sessions
+       WHERE device_id=$1
+         AND session_id=$2
+         AND closed_at IS NULL`,
+      [deviceId, sessionId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+}
