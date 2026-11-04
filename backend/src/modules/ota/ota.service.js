@@ -105,6 +105,7 @@ export class OtaService {
     this.heartbeatTimeoutSeconds = heartbeatTimeoutSeconds;
     this.timeoutSeconds = timeoutSeconds;
     this.downloadUrlLifetimeSeconds = downloadUrlLifetimeSeconds;
+    this.publishingJobs = new Set();
   }
 
   async assertDeviceReady(client, device) {
@@ -320,7 +321,9 @@ export class OtaService {
       const { credential } = await this.assertDeviceReady(client, device);
 
       const firmware = requireFound(
-        await this.repository.getPublishedFirmware(client, firmwareId),
+        await this.repository.getPublishedFirmware(client, firmwareId, {
+          forUpdate: true,
+        }),
         "Không tìm thấy firmware đã phát hành",
       );
 
@@ -396,64 +399,119 @@ export class OtaService {
   }
 
   async publishOne(jobId) {
-    const initial = requireFound(
-      (await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [jobId]))
-        .rows[0],
-      "Không tìm thấy OTA Job",
-    );
-
-    return withTransaction(this.pool, async (client) => {
-      const device = requireFound(
-        await this.repository.getDevice(client, initial.device_id, {
-          forUpdate: true,
-        }),
-        "Không tìm thấy thiết bị",
-      );
-
-      const job = requireFound(
-        await this.repository.getJob(client, jobId, { forUpdate: true }),
+    if (this.publishingJobs.has(jobId)) {
+      return requireFound(
+        (
+          await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
+            jobId,
+          ])
+        ).rows[0],
         "Không tìm thấy OTA Job",
       );
+    }
 
-      if (job.status !== "PENDING") return job;
+    this.publishingJobs.add(jobId);
 
-      if (job.timeout_at <= new Date()) {
-        return this.repository.updateJobStatus(client, jobId, {
-          status: "TIMEOUT",
-          error_code: "OTA_TIMEOUT",
-        });
-      }
-
-      let firmware;
-      let context;
+    try {
+      let prepared;
 
       try {
-        firmware = requireFound(
-          await this.repository.getPublishedFirmware(client, job.firmware_id),
-          "Firmware không còn được phát hành",
-        );
-
-        context = await this.assertDeviceReady(client, device);
-
-        if (
-          device.session_id !== job.session_id ||
-          context.credential.version !== job.credential_version
-        ) {
-          throw new AppError(
-            "DEVICE_SESSION_INVALID",
-            409,
-            "Phiên hoặc credential của thiết bị đã thay đổi",
+        prepared = await withTransaction(this.pool, async (client) => {
+          const initial = requireFound(
+            (
+              await client.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
+                jobId,
+              ])
+            ).rows[0],
+            "Không tìm thấy OTA Job",
           );
-        }
+
+          const device = requireFound(
+            await this.repository.getDevice(client, initial.device_id, {
+              forUpdate: true,
+            }),
+            "Không tìm thấy thiết bị",
+          );
+
+          const job = requireFound(
+            await this.repository.getJob(client, jobId, { forUpdate: true }),
+            "Không tìm thấy OTA Job",
+          );
+
+          if (job.status !== "PENDING") return { job };
+
+          if (job.timeout_at <= new Date()) {
+            return {
+              job: await this.repository.updateJobStatus(client, jobId, {
+                status: "TIMEOUT",
+                error_code: "OTA_TIMEOUT",
+              }),
+            };
+          }
+
+          const firmware = requireFound(
+            await this.repository.getPublishedFirmware(
+              client,
+              job.firmware_id,
+              { forUpdate: true },
+            ),
+            "Firmware không còn được phát hành",
+          );
+
+          const { credential } = await this.assertDeviceReady(client, device);
+
+          if (
+            device.session_id !== job.session_id ||
+            credential.version !== job.credential_version
+          ) {
+            throw new AppError(
+              "DEVICE_SESSION_INVALID",
+              409,
+              "Phiên hoặc credential của thiết bị đã thay đổi",
+            );
+          }
+
+          if (
+            firmware.device_type !== device.device_type ||
+            firmware.hardware_target !== device.hardware_version
+          ) {
+            throw new AppError(
+              "FIRMWARE_INCOMPATIBLE",
+              409,
+              "Firmware không tương thích với thiết bị",
+            );
+          }
+
+          return { job, firmware, device };
+        });
       } catch (error) {
         if (!(error instanceof AppError)) throw error;
+        if (error.code === "BROKER_UNAVAILABLE") {
+          return requireFound(
+            (
+              await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
+                jobId,
+              ])
+            ).rows[0],
+            "Không tìm thấy OTA Job",
+          );
+        }
+        return await withTransaction(this.pool, async (client) => {
+          const job = await this.repository.getJob(client, jobId, {
+            forUpdate: true,
+          });
+          if (!job || job.status !== "PENDING") return job;
 
-        return this.repository.updateJobStatus(client, jobId, {
-          status: "FAILED",
-          error_code: error.code,
+          return this.repository.updateJobStatus(client, jobId, {
+            status: "FAILED",
+            error_code: error.code,
+          });
         });
       }
 
+      if (!prepared.firmware) return prepared.job;
+
+      const { job, firmware, device } = prepared;
       const expiresAt = new Date(
         Date.now() + this.downloadUrlLifetimeSeconds * 1000,
       );
@@ -479,29 +537,43 @@ export class OtaService {
         expires_at: expiresAt.getTime(),
       };
 
+      // Publish sau COMMIT. Nếu publish lỗi, Job vẫn PENDING để scheduler thử lại.
       try {
         await this.mqtt.publish(topic, payload);
       } catch {
-        return this.repository.updateJobStatus(client, jobId, {
-          status: "FAILED",
-          error_code: "MQTT_PUBLISH_FAILED",
-        });
+        return requireFound(
+          (
+            await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
+              jobId,
+            ])
+          ).rows[0],
+          "Không tìm thấy OTA Job",
+        );
       }
 
-      const sent = await this.repository.updateJobStatus(client, jobId, {
-        status: "NOTIFIED",
-        progress: 0,
-      });
+      return withTransaction(this.pool, async (client) => {
+        const current = await this.repository.getJob(client, jobId, {
+          forUpdate: true,
+        });
+        if (!current || current.status !== "PENDING") return current;
 
-      await enqueueIotEvent(client, "ota.job_updated", {
-        job_id: job.job_id,
-        device_id: device.device_id,
-        room_id: device.room_id,
-        status: "NOTIFIED",
-      });
+        const sent = await this.repository.updateJobStatus(client, jobId, {
+          status: "NOTIFIED",
+          progress: 0,
+        });
 
-      return sent;
-    });
+        await enqueueIotEvent(client, "ota.job_updated", {
+          job_id: jobId,
+          device_id: device.device_id,
+          room_id: device.room_id,
+          status: "NOTIFIED",
+        });
+
+        return sent;
+      });
+    } finally {
+      this.publishingJobs.delete(jobId);
+    }
   }
 
   async handle(envelope) {
@@ -569,15 +641,23 @@ export class OtaService {
         "Không tìm thấy OTA Job",
       );
 
+      const postRebootStatus = ["SUCCESS", "FAILED", "ROLLED_BACK"].includes(
+        data.status,
+      );
+
+      const validSession =
+        job.session_id === data.session_id ||
+        (job.status === "REBOOTING" && postRebootStatus);
+
       if (
         job.device_id !== device.device_id ||
-        job.session_id !== data.session_id ||
+        !validSession ||
         job.credential_version !== credential.version
       ) {
         throw new AppError(
           "OTA_JOB_MISMATCH",
           400,
-          "OTA Job không thuộc phiên thiết bị hiện tại",
+          "OTA Job không thuộc phiên thiết bị hợp lệ",
         );
       }
 
@@ -675,4 +755,112 @@ export class OtaService {
     const result = await this.repository.listJobs(this.pool, filters);
     return { ...result, data: result.data.map(jobView) };
   }
+
+  async processPending() {
+    const rows = await this.repository.listPendingJobs(this.pool, 10);
+    let processed = 0;
+
+    for (const row of rows) {
+      await this.publishOne(row.job_id);
+      processed++;
+    }
+
+    return processed;
+  }
+
+  async expirePending() {
+    const rows = await this.repository.listExpiredJobs(this.pool, 100);
+    let expired = 0;
+
+    for (const row of rows) {
+      await withTransaction(this.pool, async (client) => {
+        const job = await this.repository.getJob(client, row.job_id, {
+          forUpdate: true,
+        });
+
+        if (
+          !job ||
+          ![
+            "PENDING",
+            "NOTIFIED",
+            "DOWNLOADING",
+            "VERIFYING",
+            "INSTALLING",
+            "REBOOTING",
+          ].includes(job.status)
+        )
+          return;
+        if (job.timeout_at > new Date()) return;
+
+        await this.repository.updateJobStatus(client, job.job_id, {
+          status: "TIMEOUT",
+          error_code: "OTA_TIMEOUT",
+        });
+
+        await enqueueIotEvent(client, "ota.job_updated", {
+          job_id: job.job_id,
+          device_id: job.device_id,
+          room_id: job.room_id,
+          status: "TIMEOUT",
+        });
+
+        expired++;
+      });
+    }
+    return expired;
+  }
+
+  async revokeFirmware(actor, firmwareId, requestId) {
+    return withTransaction(this.pool, async (client) => {
+      const current = await lockActor(client, actor, "ota:firmware:write");
+
+      const firmware = requireFound(
+        await this.repository.getFirmware(client, firmwareId, {
+          forUpdate: true,
+        }),
+        "Không tìm thấy firmware",
+      );
+
+      if (firmware.status !== "PUBLISHED") {
+        throw new AppError(
+          "FIRMWARE_NOT_PUBLISHED",
+          409,
+          "Chỉ firmware đã phát hành mới có thể thu hồi",
+        );
+      }
+
+      const revoked = await this.repository.revokeFirmware(client, firmwareId);
+
+      if (!revoked) {
+        throw new AppError(
+          "FIRMWARE_IN_USE",
+          409,
+          "Không thể thu hồi firmware đang có OTA Job hoạt động",
+        );
+      }
+
+      await writeAudit(client, {
+        actorType: "USER",
+        actorId: current.user_id,
+        action: "OTA_FIRMWARE_REVOKE",
+        targetType: "FIRMWARE",
+        targetId: firmwareId,
+        requestId,
+        details: { version: firmware.version },
+      });
+
+      await enqueueIotEvent(client, "ota.firmware_revoked", {
+        firmware_id: firmwareId,
+        version: firmware.version,
+      });
+
+      return firmwareView(revoked);
+    });
+  }
+}
+
+export function bindOta(mqtt, ota) {
+  const handler = (envelope) => ota.handle(envelope);
+  mqtt.on("device-message", handler);
+  return () => mqtt.off("device-message", handler);
 }

@@ -1,20 +1,33 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   HOST: z.string().min(1).default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
-  DATABASE_URL: z.string().url().refine((v) => /^postgres(ql)?:\/\//.test(v)).optional(),
+  DATABASE_URL: z
+    .string()
+    .url()
+    .refine((v) => /^postgres(ql)?:\/\//.test(v))
+    .optional(),
   JWT_SECRET: z.string().min(32).optional(),
   JWT_EXPIRES_IN: z.coerce.number().int().min(60).max(86400).default(3600),
-  MQTT_URL: z.string().url().refine((v) => /^mqtts?:\/\//.test(v)).optional(),
+  MQTT_URL: z
+    .string()
+    .url()
+    .refine((v) => /^mqtts?:\/\//.test(v))
+    .optional(),
   MQTT_USERNAME: z.string().min(1).max(40).default("backend_service"),
   MQTT_PASSWORD: z.string().min(16).optional(),
   MQTT_CLIENT_ID: z.string().min(1).max(64).default("backend-01"),
   MQTT_ADMIN_USERNAME: z.string().min(1).max(40).default("admin"),
   MQTT_ADMIN_PASSWORD: z.string().min(16).optional(),
-  DEVICE_SECRET_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  DEVICE_SECRET_KEY: z
+    .string()
+    .regex(/^[a-fA-F0-9]{64}$/)
+    .optional(),
   TELEMETRY_FRESHNESS_S: z.coerce.number().int().min(1).max(300).default(30),
   HEARTBEAT_TIMEOUT_S: z.coerce.number().int().min(5).max(300).default(30),
   COMMAND_TIMEOUT_S: z.coerce.number().int().min(3).max(10).default(5),
@@ -23,28 +36,118 @@ const envSchema = z.object({
   RETENTION_ENABLED: z.enum(["true", "false"]).default("false"),
   SENSOR_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
   EVENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(7),
+  OTA_STORAGE_DIR: z.string().min(1).default("./storage/firmware"),
+  OTA_DOWNLOAD_BASE_URL: z.string().url().optional(),
+  OTA_DOWNLOAD_SECRET: z.string().min(32).optional(),
+  OTA_MAX_FIRMWARE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(16777216)
+    .default(4194304),
+  OTA_TIMEOUT_S: z.coerce.number().int().min(60).max(3600).default(900),
+  OTA_DOWNLOAD_URL_LIFETIME_S: z.coerce
+    .number()
+    .int()
+    .min(30)
+    .max(1800)
+    .default(300),
 });
 
-export function loadConfig(env = process.env, { requireDatabase = false, requireAuth = false, requireBroker = false } = {}) {
+export function loadConfig(
+  env = process.env,
+  {
+    requireDatabase = false,
+    requireAuth = false,
+    requireBroker = false,
+    requireOta = false,
+  } = {},
+) {
   const result = envSchema.safeParse(env);
   if (!result.success) {
     // Chỉ báo tên biến sai cấu hình, không in giá trị môi trường có thể chứa secret.
-    throw new Error(`Cấu hình không hợp lệ: ${result.error.issues.map((i) => i.path.join(".")).join(", ")}`);
+    throw new Error(
+      `Cấu hình không hợp lệ: ${result.error.issues.map((i) => i.path.join(".")).join(", ")}`,
+    );
   }
   const data = result.data;
-  if (data.EVENT_RETENTION_DAYS > data.SENSOR_RETENTION_DAYS) throw new Error("EVENT_RETENTION_DAYS không được lớn hơn SENSOR_RETENTION_DAYS");
-  if (requireDatabase && !data.DATABASE_URL) throw new Error("Cấu hình không hợp lệ: DATABASE_URL");
-  if (requireAuth && !data.JWT_SECRET) throw new Error("Cấu hình không hợp lệ: JWT_SECRET");
-  if (requireBroker && ["MQTT_URL", "MQTT_PASSWORD", "MQTT_ADMIN_PASSWORD", "DEVICE_SECRET_KEY"].some((key) => !data[key])) throw new Error("Cấu hình không hợp lệ: MQTT/DEVICE_SECRET_KEY");
-  if (data.MQTT_USERNAME === data.MQTT_ADMIN_USERNAME) throw new Error("Tài khoản backend và quản trị MQTT phải tách biệt");
-  const corsOrigins = data.CORS_ORIGINS.split(",").map((v) => v.trim()).filter(Boolean);
-  if (corsOrigins.some((v) => { try { return new URL(v).origin !== v; } catch { return true; } })) {
+  if (data.EVENT_RETENTION_DAYS > data.SENSOR_RETENTION_DAYS)
+    throw new Error(
+      "EVENT_RETENTION_DAYS không được lớn hơn SENSOR_RETENTION_DAYS",
+    );
+  if (requireDatabase && !data.DATABASE_URL)
+    throw new Error("Cấu hình không hợp lệ: DATABASE_URL");
+  if (requireAuth && !data.JWT_SECRET)
+    throw new Error("Cấu hình không hợp lệ: JWT_SECRET");
+  if (
+    requireBroker &&
+    [
+      "MQTT_URL",
+      "MQTT_PASSWORD",
+      "MQTT_ADMIN_PASSWORD",
+      "DEVICE_SECRET_KEY",
+    ].some((key) => !data[key])
+  )
+    throw new Error("Cấu hình không hợp lệ: MQTT/DEVICE_SECRET_KEY");
+  if (
+    requireOta &&
+    (!data.OTA_DOWNLOAD_BASE_URL || !data.OTA_DOWNLOAD_SECRET)
+  ) {
+    throw new Error(
+      "Cấu hình không hợp lệ: OTA_DOWNLOAD_BASE_URL/OTA_DOWNLOAD_SECRET",
+    );
+  }
+
+  if (data.OTA_DOWNLOAD_BASE_URL) {
+    const url = new URL(data.OTA_DOWNLOAD_BASE_URL);
+    if (url.protocol !== "https:") {
+      throw new Error("OTA_DOWNLOAD_BASE_URL bắt buộc sử dụng HTTPS");
+    }
+  }
+  if (data.MQTT_USERNAME === data.MQTT_ADMIN_USERNAME)
+    throw new Error("Tài khoản backend và quản trị MQTT phải tách biệt");
+  const corsOrigins = data.CORS_ORIGINS.split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  if (
+    corsOrigins.some((v) => {
+      try {
+        return new URL(v).origin !== v;
+      } catch {
+        return true;
+      }
+    })
+  ) {
     throw new Error("Cấu hình không hợp lệ: CORS_ORIGINS");
   }
-  return Object.freeze({ env: data.NODE_ENV, host: data.HOST, port: data.PORT, corsOrigins, databaseUrl: data.DATABASE_URL, jwtSecret: data.JWT_SECRET, jwtExpiresIn: data.JWT_EXPIRES_IN,
-    mqttUrl: data.MQTT_URL, mqttUsername: data.MQTT_USERNAME, mqttPassword: data.MQTT_PASSWORD, mqttClientId: data.MQTT_CLIENT_ID,
-    mqttAdminUsername: data.MQTT_ADMIN_USERNAME, mqttAdminPassword: data.MQTT_ADMIN_PASSWORD, deviceSecretKey: data.DEVICE_SECRET_KEY,
-    telemetryFreshnessSeconds: data.TELEMETRY_FRESHNESS_S, heartbeatTimeoutSeconds: data.HEARTBEAT_TIMEOUT_S,
-    commandTimeoutSeconds: data.COMMAND_TIMEOUT_S, manualOverrideSeconds: data.MANUAL_OVERRIDE_S,
-    configTimeoutSeconds: data.CONFIG_TIMEOUT_S, retentionEnabled: data.RETENTION_ENABLED === "true", sensorRetentionDays: data.SENSOR_RETENTION_DAYS, eventRetentionDays: data.EVENT_RETENTION_DAYS });
+  return Object.freeze({
+    env: data.NODE_ENV,
+    host: data.HOST,
+    port: data.PORT,
+    corsOrigins,
+    databaseUrl: data.DATABASE_URL,
+    jwtSecret: data.JWT_SECRET,
+    jwtExpiresIn: data.JWT_EXPIRES_IN,
+    mqttUrl: data.MQTT_URL,
+    mqttUsername: data.MQTT_USERNAME,
+    mqttPassword: data.MQTT_PASSWORD,
+    mqttClientId: data.MQTT_CLIENT_ID,
+    mqttAdminUsername: data.MQTT_ADMIN_USERNAME,
+    mqttAdminPassword: data.MQTT_ADMIN_PASSWORD,
+    deviceSecretKey: data.DEVICE_SECRET_KEY,
+    telemetryFreshnessSeconds: data.TELEMETRY_FRESHNESS_S,
+    heartbeatTimeoutSeconds: data.HEARTBEAT_TIMEOUT_S,
+    commandTimeoutSeconds: data.COMMAND_TIMEOUT_S,
+    manualOverrideSeconds: data.MANUAL_OVERRIDE_S,
+    configTimeoutSeconds: data.CONFIG_TIMEOUT_S,
+    retentionEnabled: data.RETENTION_ENABLED === "true",
+    sensorRetentionDays: data.SENSOR_RETENTION_DAYS,
+    eventRetentionDays: data.EVENT_RETENTION_DAYS,
+    otaStorageDirectory: data.OTA_STORAGE_DIR,
+    otaDownloadBaseUrl: data.OTA_DOWNLOAD_BASE_URL,
+    otaDownloadSecret: data.OTA_DOWNLOAD_SECRET,
+    otaMaxFirmwareBytes: data.OTA_MAX_FIRMWARE_BYTES,
+    otaTimeoutSeconds: data.OTA_TIMEOUT_S,
+    otaDownloadUrlLifetimeSeconds: data.OTA_DOWNLOAD_URL_LIFETIME_S,
+  });
 }

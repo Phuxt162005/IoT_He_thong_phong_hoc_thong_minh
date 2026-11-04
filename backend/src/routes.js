@@ -12,23 +12,68 @@ import { createAlertsRoutes } from "./modules/alerts/alerts.routes.js";
 import { createAutomationRoutes } from "./modules/automation/automation.routes.js";
 import { createDashboardRoutes } from "./modules/dashboard/dashboard.routes.js";
 import { createAuditRoutes } from "./modules/audit/audit.routes.js";
+import { createOtaRoutes } from "./modules/ota/ota.routes.js";
+import { createOtaDownloadRoutes } from "./modules/ota/ota.download.routes.js";
 
-export function createRoutes({ pool, config, credentials, commands, configs, alerts, automation }) {
+export function createRoutes({
+  pool,
+  config,
+  credentials,
+  commands,
+  configs,
+  alerts,
+  automation,
+  ota,
+  firmwareStorage,
+  downloadSigner,
+}) {
   const router = Router();
-  const auth = new AuthService({ pool, jwtSecret: config.jwtSecret, jwtExpiresIn: config.jwtExpiresIn });
-  // Đặt các route xác thực trước; /auth/login là điểm vào không cần JWT.
+  const auth = new AuthService({
+    pool,
+    jwtSecret: config.jwtSecret,
+    jwtExpiresIn: config.jwtExpiresIn,
+  });
+
+  // URL tải firmware dùng chữ ký riêng, không yêu cầu JWT người dùng.
+  router.use(
+    createOtaDownloadRoutes({
+      storage: firmwareStorage,
+      signer: downloadSigner,
+    }),
+  );
+
   router.use(createAuthRoutes(auth));
-  // Tất cả module phía sau cần phiên hợp lệ, giới hạn tần suất và không được cache phản hồi.
-  router.use(authenticate(auth), apiRateLimit(pool), (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
+  router.use(authenticate(auth), apiRateLimit(pool), (_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+  });
+
   router.use(createUsersRoutes(pool));
   router.use(createRoomsRoutes(pool));
-  router.use(createDevicesRoutes(pool, { heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds }));
+  router.use(
+    createDevicesRoutes(pool, {
+      heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds,
+    }),
+  );
   router.use(createDeviceCredentialsRoutes(pool, credentials));
   router.use(createCommandsRoutes(pool, commands));
   router.use(createDeviceConfigRoutes(pool, configs));
   router.use(createAlertsRoutes(pool, alerts));
   router.use(createAutomationRoutes(pool, automation));
-  router.use(createDashboardRoutes(pool, { freshnessSeconds: config.telemetryFreshnessSeconds }));
+
+  // Các route quản lý OTA cần JWT và quyền tương ứng.
+  router.use(
+    createOtaRoutes(pool, ota, {
+      maxFirmwareBytes: config.otaMaxFirmwareBytes,
+    }),
+  );
+
+  router.use(
+    createDashboardRoutes(pool, {
+      freshnessSeconds: config.telemetryFreshnessSeconds,
+    }),
+  );
   router.use(createAuditRoutes(pool));
+
   return router;
 }

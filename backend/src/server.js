@@ -37,6 +37,10 @@ import { attachRealtime } from "./modules/realtime/realtime.js";
 import { expectedSchemaVersion, schemaReady } from "./database/readiness.js";
 import { runRetention } from "./database/retention.js";
 import { AnomalyDetectionConsumer } from "./modules/anomaly-detection/anomaly-detection.consumer.js";
+import { OtaRepository } from "./modules/ota/ota.repository.pg.js";
+import { OtaService, bindOta } from "./modules/ota/ota.service.js";
+import { LocalFirmwareStorage } from "./modules/ota/ota.storage.js";
+import { OtaDownloadSigner } from "./modules/ota/ota.download-signer.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 
@@ -45,6 +49,7 @@ try {
     requireDatabase: true,
     requireAuth: true,
     requireBroker: true,
+    requireOta: true,
   });
   const pool = createPool(config.databaseUrl);
   const schemaVersion = await expectedSchemaVersion();
@@ -52,6 +57,39 @@ try {
   pool.on("error", () => logger.error("database.pool_error"));
 
   const mqtt = new MqttRuntime({ config, pool, logger });
+  const otaRepository = new OtaRepository(pool);
+
+  const firmwareStorage = new LocalFirmwareStorage({
+    directory: config.otaStorageDirectory,
+  });
+
+  const downloadSigner = new OtaDownloadSigner({
+    baseUrl: config.otaDownloadBaseUrl,
+    secret: config.otaDownloadSecret,
+  });
+
+  await firmwareStorage.ensureDirectory();
+
+  const ota = new OtaService({
+    pool,
+    repository: otaRepository,
+    mqtt,
+    storage: firmwareStorage,
+    downloadUrlSigner: downloadSigner,
+    heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds,
+    timeoutSeconds: config.otaTimeoutSeconds,
+    downloadUrlLifetimeSeconds: config.otaDownloadUrlLifetimeSeconds,
+  });
+
+  const unbindOta = bindOta(mqtt, ota);
+  const otaRecovery = startJob(
+    "ota-recovery",
+    async () => {
+      await ota.expirePending();
+      await ota.processPending();
+    },
+    { intervalMs: 2000, logger },
+  );
   const admin = new DynamicSecurity({
     url: config.mqttUrl,
     username: config.mqttAdminUsername,
@@ -214,6 +252,7 @@ try {
     (cleaning ??= (async () => {
       await realtime.stop();
       await Promise.all([
+        otaRecovery.stop(),
         reconcile.stop(),
         offlineScan.stop(),
         commandRecovery.stop(),
@@ -230,6 +269,7 @@ try {
       unbindCommands();
       unbindConfigs();
       unbindTelemetry();
+      unbindOta();
       await pool.end();
     })());
 
@@ -242,6 +282,9 @@ try {
     routes: createRoutes({
       pool,
       config,
+      ota,
+      firmwareStorage,
+      downloadSigner,
       credentials,
       commands,
       configs,
