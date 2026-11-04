@@ -113,6 +113,18 @@ export class AnomalyDetectionConsumer {
             return "SKIPPED";
           }
 
+          const latest = (
+            await client.query(
+              `SELECT data_id FROM telemetry_latest WHERE device_id=$1`,
+              [sample.device_id],
+            )
+          ).rows[0];
+
+          if (!latest || String(latest.data_id) !== String(sample.data_id)) {
+            await markDelivered();
+            return "SKIPPED";
+          }
+
           const repository = new PostgresAnomalyRepository({
             client,
             dataId: sample.data_id,
@@ -131,23 +143,6 @@ export class AnomalyDetectionConsumer {
             illuminanceLux: sample.lux,
           });
 
-          const latest = (
-            await client.query(
-              `SELECT data_id FROM telemetry_latest WHERE device_id=$1`,
-              [sample?.device_id],
-            )
-          ).rows[0];
-
-          if (
-            !sample ||
-            !latest ||
-            String(latest.data_id) !== String(sample.data_id)
-          ) {
-            await markDelivered();
-            return "SKIPPED";
-          }
-
-          // Chỉ đánh dấu đã xử lý sau khi kết quả và baseline được lưu thành công.
           await markDelivered();
           return "PROCESSED";
         });

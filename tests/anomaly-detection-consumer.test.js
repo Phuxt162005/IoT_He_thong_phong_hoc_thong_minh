@@ -6,6 +6,7 @@ const CONSUMER = "anomaly_detection";
 
 function fixture(overrides = {}) {
   const state = {
+    latestDataId: "1001",
     event: {
       event_id: "event-001",
       data_id: "1001",
@@ -15,7 +16,6 @@ function fixture(overrides = {}) {
         is_latest: true,
         is_backfill: false,
         clock_skew: false,
-        latestDataId: "1001",
       },
     },
     sample: {
