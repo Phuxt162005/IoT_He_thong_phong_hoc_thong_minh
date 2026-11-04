@@ -1,6 +1,4 @@
-
--- Baseline được lưu riêng theo từng thiết bị và chỉ số cảm biến.
--- Mỗi baseline giữ tối đa 30 mẫu gần nhất để phục vụ Robust Z-score.
+-- Lưu baseline riêng cho từng thiết bị và từng chỉ số cảm biến.
 CREATE TABLE anomaly_baselines (
   device_id BIGINT NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
   metric VARCHAR(32) NOT NULL CHECK (
@@ -14,8 +12,7 @@ CREATE TABLE anomaly_baselines (
   CHECK (sample_count BETWEEN 0 AND 30)
 );
 
--- Lưu một kết quả phân tích cho mỗi bản ghi telemetry.
--- findings chứa kết quả chi tiết của từng chỉ số được phân tích.
+-- Mỗi bản ghi telemetry chỉ có một kết quả phân tích.
 CREATE TABLE anomaly_detection_results (
   result_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   data_id BIGINT NOT NULL UNIQUE
@@ -28,7 +25,6 @@ CREATE TABLE anomaly_detection_results (
   CHECK (jsonb_typeof(findings) = 'array')
 );
 
--- Phục vụ truy vấn kết quả bất thường theo thời gian.
 CREATE INDEX anomaly_results_detected_time_idx
   ON anomaly_detection_results(analyzed_at DESC)
   WHERE anomaly_detected = true;

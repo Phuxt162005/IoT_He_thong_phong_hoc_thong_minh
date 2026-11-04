@@ -37,13 +37,17 @@ export class PostgresAnomalyRepository {
 
     const result = await this.client.query(
       `SELECT data_id,device_id,room_id,anomaly_detected,findings,analyzed_at
-       FROM anomaly_detection_results
-       WHERE data_id=$1 AND device_id=$2`,
-      [eventId, deviceId],
+     FROM anomaly_detection_results
+     WHERE data_id=$1`,
+      [eventId],
     );
 
     const row = result.rows[0];
     if (!row) return null;
+
+    if (String(row.device_id) !== String(deviceId)) {
+      throw new Error("ANOMALY_EVENT_DEVICE_MISMATCH");
+    }
 
     return {
       eventId: String(row.data_id),

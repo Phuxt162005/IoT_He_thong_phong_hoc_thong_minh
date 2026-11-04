@@ -6,6 +6,10 @@ const CONSUMER = "anomaly_detection";
 
 export class AnomalyDetectionConsumer {
   constructor({ pool, logger, batchSize = 100 }) {
+    if (!pool) throw new TypeError("Cần PostgreSQL pool");
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1000) {
+      throw new TypeError("batchSize phải nằm trong khoảng 1–1000");
+    }
     this.pool = pool;
     this.logger = logger;
     this.batchSize = batchSize;
@@ -14,7 +18,7 @@ export class AnomalyDetectionConsumer {
   async consumePending() {
     const pending = (
       await this.pool.query(
-        `SELECT e.event_id,e.data_id,e.payload
+        `SELECT e.event_id
          FROM iot_events e
          WHERE e.event_type='telemetry.stored'
            AND NOT EXISTS (
@@ -58,12 +62,31 @@ export class AnomalyDetectionConsumer {
             ])
           ).rows[0];
 
-          if (!sample || !event.payload.eligible) {
+          const markDelivered = async () => {
             await client.query(
               `INSERT INTO iot_event_deliveries(event_id,consumer)
                VALUES($1,$2) ON CONFLICT DO NOTHING`,
               [item.event_id, CONSUMER],
             );
+          };
+
+          if (!sample) {
+            await markDelivered();
+            return "SKIPPED";
+          }
+
+          // Chỉ phân tích dữ liệu mới nhất, hợp lệ, không lệch đồng hồ,
+          // không phải dữ liệu bù và được pipeline đánh dấu eligible.
+          const eligible =
+            event.payload?.eligible === true &&
+            event.payload?.is_latest === true &&
+            event.payload?.is_backfill === false &&
+            event.payload?.clock_skew === false &&
+            sample.is_backfill === false &&
+            sample.clock_skew === false;
+
+          if (!eligible) {
+            await markDelivered();
             return "SKIPPED";
           }
 
@@ -74,12 +97,19 @@ export class AnomalyDetectionConsumer {
             )
           ).rows[0];
 
-          if (!device || device.lifecycle_status !== "ACTIVE") {
-            await client.query(
-              `INSERT INTO iot_event_deliveries(event_id,consumer)
-               VALUES($1,$2) ON CONFLICT DO NOTHING`,
-              [item.event_id, CONSUMER],
-            );
+          const room = (
+            await client.query(`SELECT status FROM rooms WHERE room_id=$1`, [
+              sample.room_id,
+            ])
+          ).rows[0];
+
+          if (
+            !device ||
+            device.lifecycle_status !== "ACTIVE" ||
+            !room ||
+            room.status !== "ACTIVE"
+          ) {
+            await markDelivered();
             return "SKIPPED";
           }
 
@@ -90,9 +120,7 @@ export class AnomalyDetectionConsumer {
             roomId: sample.room_id,
           });
 
-          const service = new AnomalyDetectionService({
-            repository,
-          });
+          const service = new AnomalyDetectionService({ repository });
 
           await service.analyzeTelemetry({
             eventId: String(sample.data_id),
@@ -103,12 +131,8 @@ export class AnomalyDetectionConsumer {
             illuminanceLux: sample.lux,
           });
 
-          await client.query(
-            `INSERT INTO iot_event_deliveries(event_id,consumer)
-             VALUES($1,$2) ON CONFLICT DO NOTHING`,
-            [item.event_id, CONSUMER],
-          );
-
+          // Chỉ đánh dấu đã xử lý sau khi kết quả và baseline được lưu thành công.
+          await markDelivered();
           return "PROCESSED";
         });
 
