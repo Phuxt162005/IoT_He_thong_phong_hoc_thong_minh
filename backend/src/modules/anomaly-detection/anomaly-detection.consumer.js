@@ -18,7 +18,7 @@ export class AnomalyDetectionConsumer {
            SELECT 1 FROM iot_event_deliveries d
            WHERE d.event_id=e.event_id AND d.consumer='anomaly'
          )
-       ORDER BY e.created_at, e.event_id
+       ORDER BY e.data_id, e.event_id
        LIMIT $1`,
       [limit],
     )).rows;
