@@ -27,15 +27,6 @@ export class AnomalyDetectionConsumer {
     for (const item of pending) {
       try {
         await withTransaction(this.pool, async (client) => {
-          const candidate = (await client.query(
-            `SELECT s.*, d.device_code
-             FROM sensor_data s JOIN devices d ON d.device_id=s.device_id
-             WHERE s.data_id=$1`,
-            [item.data_id],
-          )).rows[0];
-          if (!candidate) return;
-          // Tuần tự hóa baseline theo thiết bị khi nhiều worker cùng xử lý telemetry.
-          await client.query("SELECT device_id FROM devices WHERE device_id=$1 FOR UPDATE", [candidate.device_id]);
           const event = (await client.query(
             "SELECT * FROM iot_events WHERE event_id=$1 FOR UPDATE",
             [item.event_id],
@@ -46,7 +37,13 @@ export class AnomalyDetectionConsumer {
             [item.event_id],
           );
           if (delivered.rowCount) return;
-          const sample = candidate;
+
+          const sample = (await client.query(
+            `SELECT s.*, d.device_code
+             FROM sensor_data s JOIN devices d ON d.device_id=s.device_id
+             WHERE s.data_id=$1`,
+            [event.data_id],
+          )).rows[0];
           if (!sample) {
             await client.query(
               "INSERT INTO iot_event_deliveries(event_id,consumer) VALUES($1,'anomaly') ON CONFLICT DO NOTHING",
