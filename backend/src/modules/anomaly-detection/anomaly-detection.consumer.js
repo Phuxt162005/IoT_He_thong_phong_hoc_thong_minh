@@ -46,14 +46,15 @@ export class AnomalyDetectionConsumer {
             [item.event_id],
           );
           if (delivered.rowCount) return;
-          const sample = candidate;
-          if (!sample) {
+          // Chỉ dùng mẫu đủ điều kiện hiện hành; backfill và clock-skew chỉ phục vụ lịch sử.
+          if (!event.payload?.eligible) {
             await client.query(
               "INSERT INTO iot_event_deliveries(event_id,consumer) VALUES($1,'anomaly') ON CONFLICT DO NOTHING",
               [item.event_id],
             );
             return;
           }
+          const sample = candidate;
 
           const repository = new PostgresAnomalyRepository(client, {
             deviceId: sample.device_id,
