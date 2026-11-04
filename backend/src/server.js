@@ -36,6 +36,7 @@ import { AutomationService } from "./modules/automation/automation.service.js";
 import { attachRealtime } from "./modules/realtime/realtime.js";
 import { expectedSchemaVersion, schemaReady } from "./database/readiness.js";
 import { runRetention } from "./database/retention.js";
+import { AnomalyDetectionConsumer } from "./modules/anomaly-detection/anomaly-detection.consumer.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 
@@ -115,6 +116,7 @@ try {
     logger,
     freshnessSeconds: config.telemetryFreshnessSeconds,
   });
+  const anomalyDetection = new AnomalyDetectionConsumer({ pool, logger });
   const unbindTelemetry = bindTelemetry(mqtt, telemetry);
 
   const reconcile = startJob(
@@ -167,6 +169,12 @@ try {
       )
     : null;
 
+  const anomalyMonitor = startJob(
+    "anomaly-detection",
+    () => anomalyDetection.consumePending(),
+    { intervalMs: 2000, logger },
+  );
+
   const server = createServer();
   const realtime = attachRealtime({ server, pool, config, logger });
 
@@ -214,6 +222,7 @@ try {
         automationMonitor.stop(),
         monitoringScan.stop(),
         retention?.stop(),
+        anomalyMonitor.stop(),
       ]);
       await mqtt.stop();
       unbindPresence();
