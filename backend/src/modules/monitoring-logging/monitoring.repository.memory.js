@@ -32,6 +32,8 @@ export class InMemoryMonitoringRepository {
   ) {
     const record = {
       deviceId,
+      connectionStatus: "ONLINE",
+      lifecycleStatus: "ACTIVE",
       lastSeenAt: timestamp,
       metadata: structuredClone(metadata),
     };
