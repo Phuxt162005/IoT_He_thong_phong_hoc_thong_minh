@@ -4,6 +4,7 @@ import { LoggingService } from "../backend/src/modules/monitoring-logging/loggin
 import { MemoryLogSink } from "../backend/src/modules/monitoring-logging/logging.sinks.js";
 import { InMemoryMonitoringRepository } from "../backend/src/modules/monitoring-logging/monitoring.repository.memory.js";
 import { MonitoringService } from "../backend/src/modules/monitoring-logging/monitoring.service.js";
+import { PostgresMonitoringRepository } from "../backend/src/modules/monitoring-logging/monitoring.repository.postgres.js";
 
 function fixture() {
   let clock = "2026-10-28T12:00:00.000Z";
@@ -127,4 +128,81 @@ test("không tăng counter khi log level không hợp lệ", async () => {
 
   const snapshot = await monitoring.getSnapshot();
   assert.equal(snapshot.counters["telemetry.received"], undefined);
+});
+
+test("PostgreSQL repository lưu trạng thái component", async () => {
+  let captured;
+  const pool = {
+    async query(sql, params) {
+      captured = { sql, params };
+      return {
+        rows: [
+          {
+            name: params[0],
+            status: params[1],
+            details: JSON.parse(params[2]),
+            updated_at: params[3],
+          },
+        ],
+      };
+    },
+  };
+
+  const repository = new PostgresMonitoringRepository(pool);
+  const result = await repository.setComponent(
+    "mqtt-broker",
+    "UP",
+    { connected: true },
+    "2026-11-04T12:00:00.000Z",
+  );
+
+  assert.equal(result.name, "mqtt-broker");
+  assert.equal(result.status, "UP");
+  assert.equal(result.details.connected, true);
+  assert.match(captured.sql, /ON CONFLICT\(name\) DO UPDATE/);
+});
+
+test("PostgreSQL repository đọc trạng thái thiết bị từ bảng devices", async () => {
+  const pool = {
+    async query(sql) {
+      assert.match(sql, /FROM devices/);
+      assert.match(sql, /connection_status/);
+      return {
+        rows: [
+          {
+            deviceId: "SENSOR_01",
+            connectionStatus: "ONLINE",
+            lifecycleStatus: "ACTIVE",
+            lastSeenAt: "2026-11-04T12:00:00.000Z",
+            roomId: "1",
+          },
+        ],
+      };
+    },
+  };
+
+  const repository = new PostgresMonitoringRepository(pool);
+  const devices = await repository.getDevices();
+
+  assert.equal(devices.length, 1);
+  assert.equal(devices[0].deviceId, "SENSOR_01");
+  assert.equal(devices[0].connectionStatus, "ONLINE");
+});
+
+test("PostgreSQL repository tăng counter bằng thao tác upsert", async () => {
+  let captured;
+  const pool = {
+    async query(sql, params) {
+      captured = { sql, params };
+      return { rows: [{ value: "12" }] };
+    },
+  };
+
+  const repository = new PostgresMonitoringRepository(pool);
+  const value = await repository.incrementCounter("mqtt.telemetry.received", 2);
+
+  assert.equal(value, 12);
+  assert.equal(captured.params[0], "mqtt.telemetry.received");
+  assert.equal(captured.params[1], 2);
+  assert.match(captured.sql, /monitoring_counters\.value\+EXCLUDED\.value/);
 });
