@@ -32,7 +32,6 @@ import {
   bindDeviceConfig,
 } from "./modules/device-config/device-config.service.js";
 import { AlertsService } from "./modules/alerts/alerts.service.js";
-import { AnomalyDetectionConsumer } from "./modules/anomaly-detection/anomaly-detection.consumer.js";
 import { AutomationService } from "./modules/automation/automation.service.js";
 import { attachRealtime } from "./modules/realtime/realtime.js";
 import { expectedSchemaVersion, schemaReady } from "./database/readiness.js";
@@ -103,7 +102,6 @@ try {
     pool,
     freshnessSeconds: config.telemetryFreshnessSeconds,
   });
-  const anomalyDetection = new AnomalyDetectionConsumer({ pool, logger });
   const automation = new AutomationService({
     pool,
     commands,
@@ -150,11 +148,6 @@ try {
       await alerts.consumeTelemetry();
       await alerts.scanDevices();
     },
-    { intervalMs: 1000, logger },
-  );
-  const anomalyMonitor = startJob(
-    "anomaly-detection",
-    () => anomalyDetection.consumePending(),
     { intervalMs: 1000, logger },
   );
   const automationMonitor = startJob(
@@ -218,7 +211,6 @@ try {
         commandRecovery.stop(),
         configRecovery.stop(),
         alertMonitor.stop(),
-        anomalyMonitor.stop(),
         automationMonitor.stop(),
         monitoringScan.stop(),
         retention?.stop(),
