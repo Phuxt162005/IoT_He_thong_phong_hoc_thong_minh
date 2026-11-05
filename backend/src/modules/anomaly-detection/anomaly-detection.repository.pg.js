@@ -36,9 +36,11 @@ export class PostgresAnomalyRepository {
     if (!eventId) return null;
 
     const result = await this.client.query(
-      `SELECT data_id,device_id,room_id,anomaly_detected,findings,analyzed_at
-     FROM anomaly_detection_results
-     WHERE data_id=$1`,
+      `SELECT r.data_id,r.device_id,r.room_id,r.anomaly_detected,
+            r.findings,r.analyzed_at,s.recorded_at
+     FROM anomaly_detection_results r
+     JOIN sensor_data s ON s.data_id=r.data_id
+     WHERE r.data_id=$1`,
       [eventId],
     );
 
@@ -52,7 +54,7 @@ export class PostgresAnomalyRepository {
     return {
       eventId: String(row.data_id),
       deviceId: String(row.device_id),
-      timestamp: null,
+      timestamp: row.recorded_at?.toISOString() ?? null,
       analyzedAt: row.analyzed_at.toISOString(),
       anomalyDetected: row.anomaly_detected,
       findings: row.findings,
