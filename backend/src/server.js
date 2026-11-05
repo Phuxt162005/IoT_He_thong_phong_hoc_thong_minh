@@ -41,6 +41,7 @@ import { OtaRepository } from "./modules/ota/ota.repository.pg.js";
 import { OtaService, bindOta } from "./modules/ota/ota.service.js";
 import { LocalFirmwareStorage } from "./modules/ota/ota.storage.js";
 import { OtaDownloadSigner } from "./modules/ota/ota.download-signer.js";
+import { PostgresLogSink } from "./modules/monitoring-logging/logging.sinks.js";
 
 const logger = new LoggingService({ sink: new ConsoleLogSink() });
 
@@ -52,6 +53,13 @@ try {
     requireOta: true,
   });
   const pool = createPool(config.databaseUrl);
+  const persistentLogSink = new PostgresLogSink(pool, {
+    fallback: logger.sink,
+    maxQueueSize: 10000,
+    batchSize: 100,
+  });
+
+  logger.sink = persistentLogSink;
   const schemaVersion = await expectedSchemaVersion();
 
   pool.on("error", () => logger.error("database.pool_error"));
@@ -119,6 +127,12 @@ try {
   });
   const unbindPresence = bindPresence(mqtt, presence);
   const unbindMonitoring = bindMonitoring(mqtt, monitoring);
+
+  const logFlush = startJob(
+    "monitoring-log-flush",
+    () => persistentLogSink.flush(),
+    { intervalMs: 1000, logger },
+  );
 
   const commands = new CommandsService({
     pool,
@@ -261,9 +275,11 @@ try {
         alertMonitor.stop(),
         automationMonitor.stop(),
         monitoringScan.stop(),
-        retention?.stop(),
         anomalyMonitor.stop(),
+        logFlush.stop(),
+        retention?.stop(),
       ]);
+      await persistentLogSink.close();
       await mqtt.stop();
       unbindPresence();
       unbindMonitoring();
@@ -291,6 +307,7 @@ try {
       configs,
       alerts,
       automation,
+      monitoring,
     }),
   });
 

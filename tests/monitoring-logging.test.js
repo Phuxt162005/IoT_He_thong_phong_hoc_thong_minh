@@ -5,6 +5,7 @@ import { MemoryLogSink } from "../backend/src/modules/monitoring-logging/logging
 import { InMemoryMonitoringRepository } from "../backend/src/modules/monitoring-logging/monitoring.repository.memory.js";
 import { MonitoringService } from "../backend/src/modules/monitoring-logging/monitoring.service.js";
 import { PostgresMonitoringRepository } from "../backend/src/modules/monitoring-logging/monitoring.repository.postgres.js";
+import { PostgresLogSink } from "../backend/src/modules/monitoring-logging/logging.sinks.js";
 
 function fixture() {
   let clock = "2026-10-28T12:00:00.000Z";
@@ -205,4 +206,138 @@ test("PostgreSQL repository tăng counter bằng thao tác upsert", async () => 
   assert.equal(captured.params[0], "mqtt.telemetry.received");
   assert.equal(captured.params[1], 2);
   assert.match(captured.sql, /monitoring_counters\.value\+EXCLUDED\.value/);
+});
+
+test("PostgresLogSink ghi log theo lô", async () => {
+  let captured;
+  const pool = {
+    async query(sql, params) {
+      captured = { sql, params };
+      return { rowCount: 2 };
+    },
+  };
+
+  const sink = new PostgresLogSink(pool, { batchSize: 10 });
+
+  sink.write({
+    timestamp: "2026-11-05T10:00:00.000Z",
+    level: "INFO",
+    service: "backend",
+    message: "test.one",
+    metadata: {},
+  });
+
+  sink.write({
+    timestamp: "2026-11-05T10:00:01.000Z",
+    level: "ERROR",
+    service: "backend",
+    message: "test.two",
+    metadata: { code: "TEST" },
+  });
+
+  assert.equal(sink.getStats().queued, 2);
+
+  const flushed = await sink.flush();
+
+  assert.equal(flushed, 2);
+  assert.equal(sink.getStats().queued, 0);
+  assert.match(captured.sql, /INSERT INTO monitoring_logs/);
+
+  const rows = JSON.parse(captured.params[0]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].level, "ERROR");
+});
+
+test("PostgresLogSink giữ lại log khi PostgreSQL lỗi", async () => {
+  let shouldFail = true;
+
+  const pool = {
+    async query() {
+      if (shouldFail) throw new Error("DATABASE_UNAVAILABLE");
+      return { rowCount: 1 };
+    },
+  };
+
+  const sink = new PostgresLogSink(pool);
+
+  sink.write({
+    timestamp: "2026-11-05T10:00:00.000Z",
+    level: "ERROR",
+    service: "backend",
+    message: "database.failure",
+    metadata: {},
+  });
+
+  await assert.rejects(() => sink.flush());
+  assert.equal(sink.getStats().queued, 1);
+
+  shouldFail = false;
+
+  assert.equal(await sink.flush(), 1);
+  assert.equal(sink.getStats().queued, 0);
+});
+
+test("PostgresLogSink giới hạn hàng đợi và đếm log bị loại bỏ", () => {
+  const sink = new PostgresLogSink(
+    { query: async () => ({ rowCount: 1 }) },
+    { maxQueueSize: 2 },
+  );
+
+  for (let i = 0; i < 3; i++) {
+    sink.write({
+      timestamp: "2026-11-05T10:00:00.000Z",
+      level: "INFO",
+      service: "backend",
+      message: `event.${i}`,
+      metadata: {},
+    });
+  }
+
+  assert.equal(sink.getStats().queued, 2);
+  assert.equal(sink.getStats().dropped, 1);
+});
+
+test("PostgreSQL repository truy vấn log với bộ lọc và phân trang", async () => {
+  let calls = [];
+
+  const pool = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+
+      if (sql.includes("count(*)")) {
+        return { rows: [{ total: "1" }] };
+      }
+
+      return {
+        rows: [
+          {
+            log_id: "1",
+            logged_at: "2026-11-05T10:00:00.000Z",
+            level: "ERROR",
+            service: "backend",
+            message: "database.failure",
+            metadata: {},
+          },
+        ],
+      };
+    },
+  };
+
+  const repository = new PostgresMonitoringRepository(pool);
+
+  const result = await repository.getLogs({
+    page: 1,
+    pageSize: 20,
+    level: "ERROR",
+    service: "backend",
+    from: new Date("2026-11-05T00:00:00.000Z"),
+    to: new Date("2026-11-06T00:00:00.000Z"),
+  });
+
+  assert.equal(result.total, 1);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].level, "ERROR");
+  assert.match(calls[0].sql, /level=\$1/);
+  assert.match(calls[0].sql, /service=\$2/);
+  assert.match(calls[1].sql, /ORDER BY logged_at DESC/);
 });

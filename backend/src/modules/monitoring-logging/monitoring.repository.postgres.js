@@ -78,4 +78,72 @@ export class PostgresMonitoringRepository {
       result.rows.map((row) => [row.name, Number(row.value)]),
     );
   }
+
+  async getLogs({ page = 1, pageSize = 20, level, service, search, from, to }) {
+    const params = [];
+    const conditions = [];
+
+    if (level) {
+      params.push(level);
+      conditions.push(`level=$${params.length}`);
+    }
+
+    if (service) {
+      params.push(service);
+      conditions.push(`service=$${params.length}`);
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      conditions.push(`message ILIKE $${params.length}`);
+    }
+
+    if (from) {
+      params.push(from);
+      conditions.push(`logged_at >= $${params.length}`);
+    }
+
+    if (to) {
+      params.push(to);
+      conditions.push(`logged_at < $${params.length}`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const totalResult = await this.pool.query(
+      `SELECT count(*)::bigint AS total FROM monitoring_logs ${where}`,
+      params,
+    );
+
+    const total = Number(totalResult.rows[0].total);
+
+    params.push(pageSize);
+    const limitPosition = params.length;
+
+    params.push((page - 1) * pageSize);
+    const offsetPosition = params.length;
+
+    const result = await this.pool.query(
+      `SELECT log_id,logged_at,level,service,message,metadata
+       FROM monitoring_logs
+       ${where}
+       ORDER BY logged_at DESC,log_id DESC
+       LIMIT $${limitPosition} OFFSET $${offsetPosition}`,
+      params,
+    );
+
+    return {
+      items: result.rows.map((row) => ({
+        logId: String(row.log_id),
+        timestamp: row.logged_at,
+        level: row.level,
+        service: row.service,
+        message: row.message,
+        metadata: row.metadata,
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
 }

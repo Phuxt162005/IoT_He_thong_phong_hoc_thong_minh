@@ -14,6 +14,7 @@ import { createDashboardRoutes } from "./modules/dashboard/dashboard.routes.js";
 import { createAuditRoutes } from "./modules/audit/audit.routes.js";
 import { createOtaRoutes } from "./modules/ota/ota.routes.js";
 import { createOtaDownloadRoutes } from "./modules/ota/ota.download.routes.js";
+import { createMonitoringRoutes } from "./modules/monitoring-logging/monitoring.routes.js";
 
 export function createRoutes({
   pool,
@@ -26,6 +27,7 @@ export function createRoutes({
   ota,
   firmwareStorage,
   downloadSigner,
+  monitoring,
 }) {
   const router = Router();
   const auth = new AuthService({
@@ -75,6 +77,6 @@ export function createRoutes({
     }),
   );
   router.use(createAuditRoutes(pool));
-
+  router.use(createMonitoringRoutes(pool, monitoring));
   return router;
 }

@@ -118,7 +118,19 @@ export class MonitoringService {
         ageMs !== null &&
         ageMs >= 0 &&
         ageMs <= this.offlineAfterMs;
-      return { ...device, online, ageMs };
+      return {
+        ...device,
+        online,
+        ageMs,
+        presenceStatus: online ? "ONLINE" : "OFFLINE",
+        offlineReason: online
+          ? null
+          : ageMs === null
+            ? "NO_HEARTBEAT"
+            : ageMs < 0
+              ? "INVALID_TIMESTAMP"
+              : "HEARTBEAT_TIMEOUT",
+      };
     });
 
     return {
