@@ -21,7 +21,9 @@ test("OTA download signer creates verifiable expiring HTTPS URLs", () => {
   const url = new URL(signer.sign(firmwareId, storagePath, expiresAt));
   assert.equal(url.origin, "https://iot.example.test");
   assert.match(url.pathname, /^\/api\/v1\/ota\/download\//);
-  const [, , token, signature] = url.pathname.split("/");
+  const pathParts = url.pathname.split("/");
+  const token = pathParts.at(-2);
+  const signature = pathParts.at(-1);
   const payload = signer.verify(token, signature);
   assert.equal(payload.firmware_id, firmwareId);
   assert.equal(payload.storage_path, storagePath);
