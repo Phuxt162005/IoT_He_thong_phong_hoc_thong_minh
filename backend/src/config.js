@@ -97,7 +97,7 @@ export function loadConfig(
       !data.OTA_SIGNING_PRIVATE_KEY_B64)
   ) {
     throw new Error(
-      "Cấu hình không hợp lệ: OTA_DOWNLOAD_BASE_URL/OTA_DOWNLOAD_SECRET",
+      "Cấu hình không hợp lệ: OTA_DOWNLOAD_BASE_URL/OTA_DOWNLOAD_SECRET/OTA_SIGNING_PRIVATE_KEY_B64",
     );
   }
 
