@@ -35,9 +35,9 @@ test("real server entrypoint runs telemetry, alerts, automation, ACK/config, res
   const base = `http://127.0.0.1:${port}`;
   const start = async () => {
     const { privateKey } = generateKeyPairSync("ed25519");
-    const otaSigningPrivateKeyB64 = privateKey
-      .export({ type: "pkcs8", format: "der" })
-      .toString("base64");
+    const otaSigningPrivateKeyB64 = Buffer.from(
+      privateKey.export({ type: "pkcs8", format: "pem" }),
+    ).toString("base64");
     child = spawn(process.execPath, ["backend/src/server.js"], {
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
