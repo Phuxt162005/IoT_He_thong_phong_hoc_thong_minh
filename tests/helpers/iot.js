@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import mqtt from "mqtt";
 import { testDatabase } from "./database.js";

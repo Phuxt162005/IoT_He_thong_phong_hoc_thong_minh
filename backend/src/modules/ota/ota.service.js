@@ -63,7 +63,7 @@ const firmwareView = (row) => ({
   device_type: row.device_type,
   hardware_target: row.hardware_target,
   file_name: row.file_name,
-  file_size: row.file_size,
+  file_size: Number(row.file_size),
   sha256: row.sha256,
   release_notes: row.release_notes,
   status: row.status,
