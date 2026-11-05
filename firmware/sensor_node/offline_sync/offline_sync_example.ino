@@ -1,30 +1,39 @@
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <PubSubClient.h>
+#include <time.h>
+
 #include "OfflineQueue.h"
 #include "MqttSyncManager.h"
 
 #ifndef WIFI_SSID
 #error "WIFI_SSID must be configured"
 #endif
+
 #ifndef WIFI_PASSWORD
 #error "WIFI_PASSWORD must be configured"
 #endif
+
 #ifndef MQTT_HOST
 #error "MQTT_HOST must be configured"
 #endif
+
 #ifndef MQTT_PORT
 #error "MQTT_PORT must be configured"
 #endif
+
 #ifndef DEVICE_ID
 #error "DEVICE_ID must be configured"
 #endif
+
 #ifndef ROOM_ID
 #error "ROOM_ID must be configured"
 #endif
+
 #ifndef MQTT_USERNAME
 #error "MQTT_USERNAME must be configured"
 #endif
+
 #ifndef MQTT_PASSWORD
 #error "MQTT_PASSWORD must be configured"
 #endif
@@ -40,13 +49,15 @@ uint32_t lastMqttAttempt = 0;
 uint32_t lastSampleAt = 0;
 
 bool previousMqttState = false;
+bool timeSyncStarted = false;
 
 const uint32_t RECONNECT_INTERVAL_MS = 5000;
 const uint32_t SAMPLE_INTERVAL_MS = 5000;
 
 bool readSensorSample(TelemetrySample& sample) {
-  // Người tích hợp phần cứng thay phần này bằng driver cảm biến.
-  // Không gửi dữ liệu giả lên backend.
+  // Điểm tích hợp driver cảm biến.
+  // Firmware tích hợp sẽ điền các trường sample
+  // và trả về true khi đọc được dữ liệu hợp lệ.
   return false;
 }
 
@@ -92,7 +103,10 @@ void setup() {
 
   if (!LittleFS.begin(false)) {
     Serial.println("LittleFS mount failed; stop to protect data");
-    while (true) delay(1000);
+
+    while (true) {
+      delay(1000);
+    }
   }
 
   syncManager = new MqttSyncManager(
@@ -104,7 +118,10 @@ void setup() {
 
   if (!syncManager->begin()) {
     Serial.println(syncManager->lastError());
-    while (true) delay(1000);
+
+    while (true) {
+      delay(1000);
+    }
   }
 
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
@@ -123,12 +140,24 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
 
-  if (WiFi.status() != WL_CONNECTED &&
-      now - lastWifiAttempt >= RECONNECT_INTERVAL_MS) {
-    lastWifiAttempt = now;
-    connectWiFi();
+  // Quản lý kết nối Wi-Fi.
+  if (WiFi.status() != WL_CONNECTED) {
+    timeSyncStarted = false;
+
+    if (now - lastWifiAttempt >= RECONNECT_INTERVAL_MS) {
+      lastWifiAttempt = now;
+      connectWiFi();
+    }
   }
 
+  // Đồng bộ thời gian sau khi Wi-Fi kết nối.
+  if (WiFi.status() == WL_CONNECTED &&
+      !timeSyncStarted) {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    timeSyncStarted = true;
+  }
+
+  // Quản lý kết nối MQTT.
   if (WiFi.status() == WL_CONNECTED &&
       !mqttClient.connected() &&
       now - lastMqttAttempt >= RECONNECT_INTERVAL_MS) {
@@ -138,6 +167,7 @@ void loop() {
 
   mqttClient.loop();
 
+  // Phát hiện MQTT vừa kết nối trở lại.
   const bool currentMqttState = mqttClient.connected();
 
   if (currentMqttState && !previousMqttState) {
@@ -148,10 +178,12 @@ void loop() {
 
   previousMqttState = currentMqttState;
 
+  // Thu thập telemetry định kỳ.
   if (now - lastSampleAt >= SAMPLE_INTERVAL_MS) {
     lastSampleAt = now;
 
     TelemetrySample sample;
+
     if (readSensorSample(sample)) {
       if (!syncManager->enqueueSample(sample)) {
         Serial.println(syncManager->lastError());
@@ -159,5 +191,6 @@ void loop() {
     }
   }
 
+  // Xử lý gửi dữ liệu đang chờ và nhận ACK.
   syncManager->loop();
 }

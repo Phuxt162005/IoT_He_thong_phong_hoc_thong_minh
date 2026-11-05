@@ -310,14 +310,21 @@ bool OfflineQueue::peek(String& jsonRecord) {
 }
 
 bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
+  errorMessage = "";
+
   File source = fs.open(queuePath, FILE_READ);
+
   if (!source) {
     errorMessage = "Khong doc duoc hang doi goc";
     return false;
   }
 
-  if (fs.exists(tempPath)) fs.remove(tempPath);
+  if (fs.exists(tempPath)) {
+    fs.remove(tempPath);
+  }
+
   File target = fs.open(tempPath, FILE_WRITE);
+
   if (!target) {
     source.close();
     errorMessage = "Khong tao duoc file tam";
@@ -326,13 +333,16 @@ bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
 
   bool found = false;
   bool ok = true;
+  size_t expectedSize = 0;
 
   while (source.available()) {
     String line = source.readStringUntil('\n');
     line.trim();
+
     if (line.isEmpty()) continue;
 
     String currentId;
+
     if (!validateRecord(line, &currentId)) {
       ok = false;
       break;
@@ -343,10 +353,14 @@ bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
       continue;
     }
 
-    if (target.println(line) == 0) {
+    const size_t written = target.println(line);
+
+    if (written != line.length() + 2) {
       ok = false;
       break;
     }
+
+    expectedSize += written;
   }
 
   target.flush();
@@ -355,12 +369,32 @@ bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
 
   if (!ok || !found) {
     fs.remove(tempPath);
-    errorMessage = !ok ? "Hang doi loi hoac ghi file tam that bai"
-                       : "Khong tim thay msg_id can xac nhan";
+
+    errorMessage = !ok
+      ? "Hang doi loi hoac ghi file tam that bai"
+      : "Khong tim thay msg_id can xac nhan";
+
     return false;
   }
 
-  if (fs.exists(backupPath)) fs.remove(backupPath);
+  // Kiểm tra kích thước file tạm trước khi thay thế.
+  File check = fs.open(tempPath, FILE_READ);
+
+  if (!check || check.size() != expectedSize) {
+    if (check) check.close();
+
+    fs.remove(tempPath);
+    errorMessage = "Kiem tra file tam that bai";
+
+    return false;
+  }
+
+  check.close();
+
+  // Backup queue hiện tại.
+  if (fs.exists(backupPath)) {
+    fs.remove(backupPath);
+  }
 
   if (!fs.rename(queuePath, backupPath)) {
     fs.remove(tempPath);
@@ -368,13 +402,22 @@ bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
     return false;
   }
 
+  // Đưa file tạm thành queue chính.
   if (!fs.rename(tempPath, queuePath)) {
-    fs.rename(backupPath, queuePath);
-    errorMessage = "Khong thay the duoc hang doi";
+    if (!fs.rename(backupPath, queuePath)) {
+      errorMessage = "Khong thay the duoc queue va khong khoi phuc duoc backup";
+    } else {
+      errorMessage = "Khong thay the duoc hang doi";
+    }
+
+    fs.remove(tempPath);
     return false;
   }
 
+  // Chỉ xóa backup sau khi queue mới đã thay thế thành công.
   fs.remove(backupPath);
+
+  errorMessage = "";
   return true;
 }
 
