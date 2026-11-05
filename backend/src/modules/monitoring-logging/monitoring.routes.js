@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { authorize } from "../../common/authorization.js";
 import { pagination, parse } from "../../common/validation.js";
+import { AppError } from "../../common/errors.js";
 
 const time = z.iso
   .datetime({ offset: true })
@@ -22,7 +23,13 @@ const logQuery = z
 
 export function createMonitoringRoutes(pool, monitoring) {
   const router = Router();
-  const repository = monitoring.repository;
+  if (!monitoring?.repository) {
+    throw new AppError(
+      "MONITORING_UNAVAILABLE",
+      503,
+      "Monitoring service chưa được khởi tạo",
+    );
+  }
 
   router.get(
     "/monitoring/snapshot",
@@ -42,7 +49,6 @@ export function createMonitoringRoutes(pool, monitoring) {
     authorize(pool, "monitoring:read"),
     async (req, res) => {
       const input = parse(logQuery, req.query);
-
       input.to ??= new Date();
       input.from ??= new Date(input.to.getTime() - 24 * 60 * 60 * 1000);
 
@@ -56,7 +62,7 @@ export function createMonitoringRoutes(pool, monitoring) {
         throw error;
       }
 
-      const result = await repository.getLogs({
+      const result = await monitoring.repository.getLogs({
         page: input.page,
         pageSize: input.page_size,
         level: input.level,
