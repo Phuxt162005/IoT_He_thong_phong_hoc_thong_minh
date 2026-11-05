@@ -35,11 +35,13 @@ export function createRoutes({
   });
 
   // URL tải firmware dùng chữ ký riêng, không yêu cầu JWT người dùng.
-  createOtaDownloadRoutes({
-    pool,
-    storage: firmwareStorage,
-    signer: downloadSigner,
-  });
+  router.use(
+    createOtaDownloadRoutes({
+      pool,
+      storage: firmwareStorage,
+      signer: downloadSigner,
+    }),
+  );
 
   router.use(createAuthRoutes(auth));
   router.use(authenticate(auth), apiRateLimit(pool), (_req, res, next) => {
