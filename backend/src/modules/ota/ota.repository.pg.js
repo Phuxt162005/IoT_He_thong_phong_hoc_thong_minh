@@ -141,7 +141,14 @@ export class OtaRepository {
         input.timeout_seconds,
       ],
     );
-    return result.rows[0];
+
+    const job = result.rows[0];
+
+    await client.query(`INSERT INTO ota_command_outbox(job_id) VALUES($1)`, [
+      job.job_id,
+    ]);
+
+    return job;
   }
 
   async getJob(client, jobId, { forUpdate = false } = {}) {
@@ -294,6 +301,80 @@ export class OtaRepository {
       `SELECT session_id FROM device_sessions
        WHERE device_id=$1 AND session_id=$2 AND closed_at IS NULL`,
       [deviceId, sessionId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async claimOtaCommands(client, limit = 10) {
+    const result = await client.query(
+      `WITH candidates AS (
+       SELECT outbox_id
+       FROM ota_command_outbox
+       WHERE (
+         status = 'PENDING'
+         OR (status = 'PROCESSING' AND locked_until <= clock_timestamp())
+       )
+       AND available_at <= clock_timestamp()
+       ORDER BY available_at, outbox_id
+       FOR UPDATE SKIP LOCKED
+       LIMIT $1
+     )
+     UPDATE ota_command_outbox o
+     SET status = 'PROCESSING',
+         attempts = attempts + 1,
+         locked_until = clock_timestamp() + interval '30 seconds',
+         updated_at = clock_timestamp()
+     FROM candidates c
+     WHERE o.outbox_id = c.outbox_id
+     RETURNING o.outbox_id, o.job_id, o.attempts`,
+      [limit],
+    );
+    return result.rows;
+  }
+
+  async getOtaCommandData(client, jobId) {
+    const result = await client.query(
+      `SELECT j.*, d.device_code, d.device_type, d.hardware_version,
+            d.lifecycle_status, d.connection_status, d.session_id AS current_session_id,
+            d.broker_sync_status, d.last_heartbeat_at,
+            r.room_code, r.status AS room_status,
+            f.version, f.hardware_target, f.storage_path,
+            f.file_size, f.sha256, f.status AS firmware_status
+     FROM ota_jobs j
+     JOIN devices d ON d.device_id = j.device_id
+     JOIN rooms r ON r.room_id = j.room_id
+     JOIN firmware_releases f ON f.firmware_id = j.firmware_id
+     WHERE j.job_id = $1`,
+      [jobId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async markOtaCommandSent(client, outboxId) {
+    const result = await client.query(
+      `UPDATE ota_command_outbox SET status = 'SENT',
+         sent_at = clock_timestamp(),
+         locked_until = NULL,
+         last_error = NULL,
+         updated_at = clock_timestamp()
+     WHERE outbox_id = $1 AND status = 'PROCESSING'
+     RETURNING *`,
+      [outboxId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async retryOtaCommand(client, outboxId, errorCode) {
+    const result = await client.query(
+      `UPDATE ota_command_outbox SET status = 'PENDING',
+         locked_until = NULL,
+         available_at = clock_timestamp() +
+           LEAST(30, GREATEST(1, attempts * 2)) * interval '1 second',
+         last_error = $2,
+         updated_at = clock_timestamp()
+     WHERE outbox_id = $1 AND status = 'PROCESSING'
+     RETURNING *`,
+      [outboxId, errorCode],
     );
     return result.rows[0] ?? null;
   }
