@@ -70,6 +70,23 @@ jobs:
       - run: npm ci
       - run: npm run setup:local
       - name: Build and start complete backend stack
+      - name: Collect deployment diagnostics
+        if: failure()
+        run: |
+          echo "===== CONTAINER STATUS ====="
+          docker compose --env-file .env -f deployment/compose.yml --profile app ps -a || true
+
+          echo "===== BACKEND LOGS ====="
+          docker compose --env-file .env -f deployment/compose.yml --profile app logs --no-color --tail=200 backend || true
+
+          echo "===== BACKEND INIT LOGS ====="
+          docker compose --env-file .env -f deployment/compose.yml --profile app logs --no-color --tail=100 backend-init || true
+
+          echo "===== DATABASE LOGS ====="
+          docker compose --env-file .env -f deployment/compose.yml --profile app logs --no-color --tail=100 db || true
+
+          echo "===== MQTT LOGS ====="
+          docker compose --env-file .env -f deployment/compose.yml --profile app logs --no-color --tail=100 mqtt || true
         run: docker compose --env-file .env -f deployment/compose.yml --profile app up -d --build --wait backend
       - name: Simulated device flow, backup/restore and graceful restart
         run: npm run check:stack
