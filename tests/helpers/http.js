@@ -14,7 +14,13 @@ export async function testHttp(t, pool, { config = loadConfig({ JWT_SECRET: rand
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
     config, sink, base, server,
-    async requestRaw(path, { method = "POST", body, token, headers = {} } = {}) {\n      const response = await fetch(`${base}/api/v1${path}`, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers }, body });\n      const text = await response.text();\n      let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }\n      return { status: response.status, body: parsed, headers: response.headers };\n    },\n    async request(path, { method = "GET", body, token, headers = {} } = {}) {
+    async requestRaw(path, { method = "POST", body, token, headers = {} } = {}) {
+      const response = await fetch(`${base}/api/v1${path}`, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers }, body });
+      const text = await response.text();
+      let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
+      return { status: response.status, body: parsed, headers: response.headers };
+    },
+    async request(path, { method = "GET", body, token, headers = {} } = {}) {
       const response = await fetch(`${base}/api/v1${path}`, {
         method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
         body: body === undefined ? undefined : JSON.stringify(body),
