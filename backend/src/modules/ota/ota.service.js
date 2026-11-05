@@ -105,7 +105,6 @@ export class OtaService {
     this.heartbeatTimeoutSeconds = heartbeatTimeoutSeconds;
     this.timeoutSeconds = timeoutSeconds;
     this.downloadUrlLifetimeSeconds = downloadUrlLifetimeSeconds;
-    this.publishingJobs = new Set();
   }
 
   async assertDeviceReady(client, device) {
@@ -402,184 +401,6 @@ export class OtaService {
 
     await this.processPending();
     return jobView(queued.job);
-  }
-
-  async publishOne(jobId) {
-    if (this.publishingJobs.has(jobId)) {
-      return requireFound(
-        (
-          await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
-            jobId,
-          ])
-        ).rows[0],
-        "Không tìm thấy OTA Job",
-      );
-    }
-
-    this.publishingJobs.add(jobId);
-
-    try {
-      let prepared;
-
-      try {
-        prepared = await withTransaction(this.pool, async (client) => {
-          const initial = requireFound(
-            (
-              await client.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
-                jobId,
-              ])
-            ).rows[0],
-            "Không tìm thấy OTA Job",
-          );
-
-          const device = requireFound(
-            await this.repository.getDevice(client, initial.device_id, {
-              forUpdate: true,
-            }),
-            "Không tìm thấy thiết bị",
-          );
-
-          const job = requireFound(
-            await this.repository.getJob(client, jobId, { forUpdate: true }),
-            "Không tìm thấy OTA Job",
-          );
-
-          if (job.status !== "PENDING") return { job };
-
-          if (job.timeout_at <= new Date()) {
-            return {
-              job: await this.repository.updateJobStatus(client, jobId, {
-                status: "TIMEOUT",
-                error_code: "OTA_TIMEOUT",
-              }),
-            };
-          }
-
-          const firmware = requireFound(
-            await this.repository.getPublishedFirmware(
-              client,
-              job.firmware_id,
-              { forUpdate: true },
-            ),
-            "Firmware không còn được phát hành",
-          );
-
-          const { credential } = await this.assertDeviceReady(client, device);
-
-          if (
-            device.session_id !== job.session_id ||
-            credential.version !== job.credential_version
-          ) {
-            throw new AppError(
-              "DEVICE_SESSION_INVALID",
-              409,
-              "Phiên hoặc credential của thiết bị đã thay đổi",
-            );
-          }
-
-          if (
-            firmware.device_type !== device.device_type ||
-            firmware.hardware_target !== device.hardware_version
-          ) {
-            throw new AppError(
-              "FIRMWARE_INCOMPATIBLE",
-              409,
-              "Firmware không tương thích với thiết bị",
-            );
-          }
-
-          return { job, firmware, device };
-        });
-      } catch (error) {
-        if (!(error instanceof AppError)) throw error;
-        if (error.code === "BROKER_UNAVAILABLE") {
-          return requireFound(
-            (
-              await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
-                jobId,
-              ])
-            ).rows[0],
-            "Không tìm thấy OTA Job",
-          );
-        }
-        return await withTransaction(this.pool, async (client) => {
-          const job = await this.repository.getJob(client, jobId, {
-            forUpdate: true,
-          });
-          if (!job || job.status !== "PENDING") return job;
-
-          return this.repository.updateJobStatus(client, jobId, {
-            status: "FAILED",
-            error_code: error.code,
-          });
-        });
-      }
-
-      if (!prepared.firmware) return prepared.job;
-
-      const { job, firmware, device } = prepared;
-      const expiresAt = new Date(
-        Date.now() + this.downloadUrlLifetimeSeconds * 1000,
-      );
-      const downloadUrl = await this.downloadUrlSigner.create(
-        firmware.storage_path,
-        expiresAt,
-      );
-
-      const topic = `smartclassroom/room/${device.room_code}/device/${device.device_code}/ota/command`;
-
-      const payload = {
-        job_id: job.job_id,
-        device_id: device.device_code,
-        room_id: device.room_code,
-        session_id: job.session_id,
-        firmware_id: firmware.firmware_id,
-        version: firmware.version,
-        device_type: firmware.device_type,
-        hardware_target: firmware.hardware_target,
-        download_url: downloadUrl,
-        file_size: Number(firmware.file_size),
-        sha256: firmware.sha256,
-        expires_at: expiresAt.getTime(),
-      };
-
-      // Publish sau COMMIT. Nếu publish lỗi, Job vẫn PENDING để scheduler thử lại.
-      try {
-        await this.mqtt.publish(topic, payload);
-      } catch {
-        return requireFound(
-          (
-            await this.pool.query("SELECT * FROM ota_jobs WHERE job_id=$1", [
-              jobId,
-            ])
-          ).rows[0],
-          "Không tìm thấy OTA Job",
-        );
-      }
-
-      return withTransaction(this.pool, async (client) => {
-        const current = await this.repository.getJob(client, jobId, {
-          forUpdate: true,
-        });
-        if (!current || current.status !== "PENDING") return current;
-
-        const sent = await this.repository.updateJobStatus(client, jobId, {
-          status: "NOTIFIED",
-          progress: 0,
-        });
-
-        await enqueueIotEvent(client, "ota.job_updated", {
-          job_id: jobId,
-          device_id: device.device_id,
-          room_id: device.room_id,
-          status: "NOTIFIED",
-        });
-
-        return sent;
-      });
-    } finally {
-      this.publishingJobs.delete(jobId);
-    }
   }
 
   async handle(envelope) {
@@ -909,7 +730,7 @@ export class OtaService {
           job_id: row.job_id,
           device_id: row.device_code,
           room_id: row.room_code,
-          session_id: row.session_id,
+          session_id: row.job_session_id,
           version: row.version,
           device_type: row.device_type,
           hardware_target: row.hardware_target,
@@ -925,6 +746,10 @@ export class OtaService {
 
         processed++;
       } catch (error) {
+        const code = /^[A-Z0-9_]{1,40}$/.test(error.code ?? "")
+          ? error.code
+          : "OTA_PUBLISH_ERROR";
+
         const transientErrors = new Set([
           "BROKER_UNAVAILABLE",
           "DEVICE_NOT_READY",
