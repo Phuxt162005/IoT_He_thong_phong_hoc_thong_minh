@@ -691,7 +691,7 @@ export class OtaService {
        d.session_id AS current_session_id,
        d.broker_sync_status, d.last_heartbeat_at,
        r.room_code, r.status AS room_status,
-       f.version, f.device_type AS firmware_device_type,
+       f.firmware_id, f.version, f.device_type AS firmware_device_type,
        f.hardware_target, f.storage_path, f.file_size,
        f.sha256, f.status AS firmware_status, f.signature,
        c.version AS active_credential_version

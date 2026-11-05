@@ -27,12 +27,11 @@ export async function bootstrapBroker(
     await admin.request({ command: "deleteClient", username: "democlient" });
   const roles = {
     sensor_role: nodeAcls(
-      ["telemetry", "heartbeat", "status", "config/ack"],
+      ["telemetry", "heartbeat", "status", "config/ack", "ota/status"],
       ["telemetry/ack", "config", "ota/command"],
     ),
-
     control_role: nodeAcls(
-      ["ack", "reported", "heartbeat", "status", "config/ack"],
+      ["ack", "reported", "heartbeat", "status", "config/ack", "ota/status"],
       ["command", "config", "ota/command"],
     ),
     backend_role: [
