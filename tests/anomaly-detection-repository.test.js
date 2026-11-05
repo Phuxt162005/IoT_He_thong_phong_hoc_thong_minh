@@ -80,3 +80,82 @@ test("getProcessedEvent không truy vấn khi eventId không tồn tại", async
   assert.equal(result, null);
   assert.equal(queries.length, 0);
 });
+
+test("phát sự kiện anomaly.detected khi lưu kết quả bất thường mới", async () => {
+  const queries = [];
+  const client = {
+    async query(sql, params = []) {
+      queries.push({ sql, params });
+
+      if (sql.includes("INSERT INTO anomaly_detection_results")) {
+        return { rows: [{ result_id: "501" }], rowCount: 1 };
+      }
+
+      if (sql.includes("INSERT INTO iot_events")) {
+        return { rows: [], rowCount: 1 };
+      }
+
+      return { rows: [], rowCount: 0 };
+    },
+  };
+
+  const repository = new PostgresAnomalyRepository({
+    client,
+    dataId: "1001",
+    deviceId: "10",
+    roomId: "20",
+  });
+
+  await repository.saveProcessedEvent("10", "1001", {
+    anomalyDetected: true,
+    analyzedAt: "2026-11-05T10:00:00.000Z",
+    findings: [
+      {
+        metric: "temperatureC",
+        value: 45,
+        anomaly: true,
+        status: "ANOMALY",
+      },
+    ],
+  });
+
+  const eventQuery = queries.find((q) =>
+    q.sql.includes("INSERT INTO iot_events"),
+  );
+
+  assert.ok(eventQuery);
+  assert.equal(eventQuery.params[2], "anomaly.detected");
+  assert.equal(eventQuery.params[3].room_id, "20");
+  assert.equal(eventQuery.params[3].device_id, "10");
+});
+
+test("không phát sự kiện khi kết quả bình thường", async () => {
+  const queries = [];
+  const client = {
+    async query(sql) {
+      queries.push(sql);
+      if (sql.includes("INSERT INTO anomaly_detection_results")) {
+        return { rows: [{ result_id: "502" }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    },
+  };
+
+  const repository = new PostgresAnomalyRepository({
+    client,
+    dataId: "1002",
+    deviceId: "10",
+    roomId: "20",
+  });
+
+  await repository.saveProcessedEvent("10", "1002", {
+    anomalyDetected: false,
+    analyzedAt: "2026-11-05T10:00:00.000Z",
+    findings: [],
+  });
+
+  assert.equal(
+    queries.some((sql) => sql.includes("INSERT INTO iot_events")),
+    false,
+  );
+});

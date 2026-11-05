@@ -1,3 +1,5 @@
+import { enqueueIotEvent } from "../../database/events.js";
+
 export class PostgresAnomalyRepository {
   constructor({ client, dataId, deviceId, roomId }) {
     this.client = client;
@@ -32,34 +34,36 @@ export class PostgresAnomalyRepository {
     return samples;
   }
 
-  async getProcessedEvent(deviceId, eventId) {
-    if (!eventId) return null;
+  async saveProcessedEvent(deviceId, eventId, result) {
+    if (!eventId) return;
 
-    const result = await this.client.query(
-      `SELECT r.data_id,r.device_id,r.room_id,r.anomaly_detected,
-            r.findings,r.analyzed_at,s.recorded_at
-     FROM anomaly_detection_results r
-     JOIN sensor_data s ON s.data_id=r.data_id
-     WHERE r.data_id=$1`,
-      [eventId],
+    const inserted = await this.client.query(
+      `INSERT INTO anomaly_detection_results
+       (data_id,device_id,room_id,anomaly_detected,findings,analyzed_at)
+       VALUES($1,$2,$3,$4,$5,$6)
+       ON CONFLICT(data_id) DO NOTHING
+       RETURNING result_id`,
+      [
+        eventId,
+        deviceId,
+        this.roomId,
+        result.anomalyDetected,
+        JSON.stringify(result.findings),
+        result.analyzedAt,
+      ],
     );
 
-    const row = result.rows[0];
-    if (!row) return null;
-
-    if (String(row.device_id) !== String(deviceId)) {
-      throw new Error("ANOMALY_EVENT_DEVICE_MISMATCH");
+    // Chỉ phát sự kiện khi kết quả mới được lưu và thực sự có bất thường.
+    if (inserted.rowCount > 0 && result.anomalyDetected) {
+      await enqueueIotEvent(this.client, "anomaly.detected", {
+        anomaly_result_id: String(inserted.rows[0].result_id),
+        data_id: String(eventId),
+        device_id: String(deviceId),
+        room_id: String(this.roomId),
+        anomaly_detected: true,
+        findings: result.findings.filter((item) => item.anomaly),
+      });
     }
-
-    return {
-      eventId: String(row.data_id),
-      deviceId: String(row.device_id),
-      timestamp: row.recorded_at?.toISOString() ?? null,
-      analyzedAt: row.analyzed_at.toISOString(),
-      anomalyDetected: row.anomaly_detected,
-      findings: row.findings,
-      duplicate: false,
-    };
   }
 
   async saveProcessedEvent(deviceId, eventId, result) {

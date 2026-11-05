@@ -13,6 +13,7 @@ const permissions = Object.freeze({
   "devices:write": ["ADMIN"],
   "telemetry:read": all,
   "dashboard:read": all,
+  "anomalies:read": all,
   "commands:read": all,
   "commands:create": ["ADMIN", "OPERATOR"],
   "configs:read": all,

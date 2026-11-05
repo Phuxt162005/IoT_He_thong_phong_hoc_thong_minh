@@ -15,6 +15,7 @@ import { createAuditRoutes } from "./modules/audit/audit.routes.js";
 import { createOtaRoutes } from "./modules/ota/ota.routes.js";
 import { createOtaDownloadRoutes } from "./modules/ota/ota.download.routes.js";
 import { createMonitoringRoutes } from "./modules/monitoring-logging/monitoring.routes.js";
+import { createAnomalyDetectionRoutes } from "./modules/anomaly-detection/anomaly-detection.routes.js";
 
 export function createRoutes({
   pool,
@@ -63,6 +64,7 @@ export function createRoutes({
   router.use(createDeviceConfigRoutes(pool, configs));
   router.use(createAlertsRoutes(pool, alerts));
   router.use(createAutomationRoutes(pool, automation));
+  router.use(createAnomalyDetectionRoutes(pool));
 
   // Các route quản lý OTA cần JWT và quyền tương ứng.
   router.use(

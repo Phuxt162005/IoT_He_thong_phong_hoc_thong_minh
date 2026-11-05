@@ -169,3 +169,39 @@ test("từ chối eventId không phải chuỗi", async () => {
     (error) => error.code === "MISSING_EVENT_ID",
   );
 });
+
+test("từ chối nhiệt độ nằm ngoài miền hợp lệ", async () => {
+  const { service } = fixture();
+
+  for (const value of [-11, 61]) {
+    await assert.rejects(
+      () => service.analyzeTelemetry(telemetry(`TEMP_${value}`, value)),
+      (error) => error.code === "OUT_OF_RANGE",
+    );
+  }
+});
+
+test("từ chối độ rọi không phải số nguyên hoặc vượt miền hợp lệ", async () => {
+  const { service } = fixture();
+
+  for (const value of [-1, 65536, 12.5]) {
+    await assert.rejects(
+      () =>
+        service.analyzeTelemetry(
+          telemetry(`LUX_${value}`, 25, { illuminanceLux: value }),
+        ),
+      (error) => error.code === "OUT_OF_RANGE",
+    );
+  }
+});
+
+test("chấp nhận nhiệt độ và độ rọi tại hai biên hợp lệ", async () => {
+  const { service } = fixture();
+
+  const result = await service.analyzeTelemetry(
+    telemetry("BOUNDARY_1", -10, { illuminanceLux: 65535 }),
+  );
+
+  assert.equal(result.findings.length, 2);
+  assert.equal(result.anomalyDetected, false);
+});

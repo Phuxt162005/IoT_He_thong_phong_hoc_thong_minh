@@ -89,6 +89,16 @@ export class AnomalyDetectionService {
     }
 
     if (
+      measurements.temperatureC !== undefined &&
+      (measurements.temperatureC < -10 || measurements.temperatureC > 60)
+    ) {
+      throw new AnomalyDetectionError(
+        "Nhiệt độ phải nằm trong khoảng -10 đến 60°C",
+        "OUT_OF_RANGE",
+      );
+    }
+
+    if (
       measurements.humidityPercent !== undefined &&
       (measurements.humidityPercent < 0 || measurements.humidityPercent > 100)
     ) {
@@ -97,11 +107,17 @@ export class AnomalyDetectionService {
         "OUT_OF_RANGE",
       );
     }
+
     if (
       measurements.illuminanceLux !== undefined &&
-      measurements.illuminanceLux < 0
+      (!Number.isInteger(measurements.illuminanceLux) ||
+        measurements.illuminanceLux < 0 ||
+        measurements.illuminanceLux > 65535)
     ) {
-      throw new AnomalyDetectionError("Độ rọi không được âm", "OUT_OF_RANGE");
+      throw new AnomalyDetectionError(
+        "Độ rọi phải là số nguyên trong khoảng 0–65535 Lux",
+        "OUT_OF_RANGE",
+      );
     }
 
     return measurements;
