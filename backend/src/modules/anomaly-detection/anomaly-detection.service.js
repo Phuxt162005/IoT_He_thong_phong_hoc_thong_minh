@@ -50,15 +50,11 @@ export class AnomalyDetectionService {
     if (typeof telemetry.deviceId !== "string" || !telemetry.deviceId.trim()) {
       throw new AnomalyDetectionError("Thiếu deviceId", "MISSING_DEVICE_ID");
     }
-    if (
-      telemetry.eventId !== undefined &&
-      (typeof telemetry.eventId !== "string" || !telemetry.eventId.trim())
-    ) {
-      throw new AnomalyDetectionError(
-        "eventId không hợp lệ",
-        "INVALID_EVENT_ID",
-      );
+
+    if (typeof telemetry.eventId !== "string" || !telemetry.eventId.trim()) {
+      throw new AnomalyDetectionError("Thiếu eventId", "MISSING_EVENT_ID");
     }
+
     if (
       telemetry.timestamp !== undefined &&
       (typeof telemetry.timestamp !== "string" ||

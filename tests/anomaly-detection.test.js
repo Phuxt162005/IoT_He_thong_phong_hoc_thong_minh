@@ -138,3 +138,34 @@ test("từ chối reset với chỉ số không hỗ trợ", async () => {
     (error) => error.code === "INVALID_METRIC",
   );
 });
+
+test("từ chối telemetry thiếu eventId", async () => {
+  const { service } = fixture();
+  const input = telemetry("E_MISSING", 25.0);
+  delete input.eventId;
+
+  await assert.rejects(
+    () => service.analyzeTelemetry(input),
+    (error) => error.code === "MISSING_EVENT_ID",
+  );
+});
+
+test("từ chối eventId rỗng hoặc chỉ chứa khoảng trắng", async () => {
+  const { service } = fixture();
+
+  for (const eventId of ["", "   "]) {
+    await assert.rejects(
+      () => service.analyzeTelemetry(telemetry(eventId, 25.0)),
+      (error) => error.code === "MISSING_EVENT_ID",
+    );
+  }
+});
+
+test("từ chối eventId không phải chuỗi", async () => {
+  const { service } = fixture();
+
+  await assert.rejects(
+    () => service.analyzeTelemetry(telemetry(123, 25.0)),
+    (error) => error.code === "MISSING_EVENT_ID",
+  );
+});
