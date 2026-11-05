@@ -150,18 +150,18 @@ void MqttSyncManager::scheduleRetry(uint32_t now) {
 bool MqttSyncManager::publishNext() {
   String record;
 
-  if (!queue.peek(record)) {
+    if (!queue.peek(record)) {
     if (!queue.lastError().isEmpty()) {
-      errorMessage = queue.lastError();
+        errorMessage = queue.lastError();
+        scheduleRetry(millis());
     } else {
-      // Queue rỗng: kiểm tra lại sau một khoảng ngắn.
-      nextPublishAt = millis() + queuePollIntervalMs;
-      retryScheduled = true;
-      errorMessage = "";
+        // Queue rỗng: kiểm tra lại sau một khoảng ngắn.
+        nextPublishAt = millis() + queuePollIntervalMs;
+        retryScheduled = true;
+        errorMessage = "";
     }
-
     return false;
-  }
+    }
 
   const uint32_t now = millis();
 
