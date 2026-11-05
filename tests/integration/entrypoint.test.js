@@ -70,15 +70,26 @@ test("real server entrypoint runs telemetry, alerts, automation, ACK/config, res
       output += raw;
     });
     child.on("error", () => {});
-    await waitFor(async () => {
-      if (child.exitCode !== null)
-        throw new Error("Entrypoint exited unexpectedly");
-      try {
-        return (await fetch(`${base}/ready`)).ok;
-      } catch {
-        return false;
-      }
-    });
+
+    let readyStatus = null;
+    try {
+      await waitFor(async () => {
+        if (child.exitCode !== null) {
+          throw new Error("Entrypoint exited unexpectedly");
+        }
+        try {
+          const response = await fetch(`${base}/ready`);
+          readyStatus = response.status;
+          return response.ok;
+        } catch {
+          return false;
+        }
+      });
+    } catch (error) {
+      throw new Error(
+        `${error.message}; ready_status=${readyStatus}; child_exit=${child.exitCode}; output=${output.slice(-6000)}`,
+      );
+    }
   };
   let token;
   const request = async (path, body, method = body ? "POST" : "GET") => {
