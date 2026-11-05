@@ -388,7 +388,7 @@ export class OtaService {
         job_id: job.job_id,
         device_id: device.device_id,
         room_id: device.room_id,
-        status: job.status,
+        status: notifiedJob.status,
       });
 
       return {
