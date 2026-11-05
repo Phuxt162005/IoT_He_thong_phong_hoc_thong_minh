@@ -109,20 +109,12 @@ export class OtaService {
   }
 
   async assertDeviceReady(client, device) {
-    if (!this.mqtt.ready) {
-      throw new AppError(
-        "BROKER_UNAVAILABLE",
-        503,
-        "MQTT broker chưa sẵn sàng",
-      );
-    }
-
     if (
       !["PROVISIONED", "ACTIVE"].includes(device.lifecycle_status) ||
       device.connection_status !== "ONLINE" ||
       !device.session_id ||
       !device.last_heartbeat_at ||
-      Date.now() - device.last_heartbeat_at.getTime() >
+      Date.now() - new Date(device.last_heartbeat_at).getTime() >
         this.heartbeatTimeoutSeconds * 1000
     ) {
       throw new AppError(
@@ -607,14 +599,29 @@ export class OtaService {
         "Không tìm thấy thiết bị",
       );
 
+      const job = requireFound(
+        await this.repository.getJob(client, data.job_id, { forUpdate: true }),
+        "Không tìm thấy OTA Job",
+      );
+
+      const postRebootStatus = ["SUCCESS", "FAILED", "ROLLED_BACK"].includes(
+        data.status,
+      );
+
+      const isPostReboot = job.status === "REBOOTING" && postRebootStatus;
+
+      const isOriginalSession = job.session_id === data.session_id;
+      const isCurrentDeviceSession = device.session_id === data.session_id;
+
       if (
-        device.session_id !== data.session_id ||
-        device.broker_sync_status !== "SYNCED"
+        device.broker_sync_status !== "SYNCED" ||
+        !isCurrentDeviceSession ||
+        (!isOriginalSession && !isPostReboot)
       ) {
         throw new AppError(
           "OTA_SESSION_INVALID",
           409,
-          "Phiên OTA không còn hợp lệ",
+          "Phiên OTA không hợp lệ hoặc thiết bị chưa đồng bộ MQTT",
         );
       }
 
@@ -623,6 +630,7 @@ export class OtaService {
         device.device_id,
         data.session_id,
       );
+
       const credential = await this.repository.getActiveCredential(
         client,
         device.device_id,
@@ -636,14 +644,16 @@ export class OtaService {
         );
       }
 
-      const job = requireFound(
-        await this.repository.getJob(client, data.job_id, { forUpdate: true }),
-        "Không tìm thấy OTA Job",
-      );
-
-      const postRebootStatus = ["SUCCESS", "FAILED", "ROLLED_BACK"].includes(
-        data.status,
-      );
+      if (
+        job.device_id !== device.device_id ||
+        job.credential_version !== credential.version
+      ) {
+        throw new AppError(
+          "OTA_JOB_MISMATCH",
+          400,
+          "OTA Job không thuộc thiết bị hoặc credential hợp lệ",
+        );
+      }
 
       const validSession =
         job.session_id === data.session_id ||
@@ -735,8 +745,19 @@ export class OtaService {
   }
 
   async listFirmware(actor, filters) {
-    const result = await this.repository.listFirmware(this.pool, filters);
-    return { ...result, data: result.data.map(firmwareView) };
+    const scopedFilters = {
+      ...filters,
+      // Chỉ ADMIN được xem firmware ở mọi trạng thái.
+      // OPERATOR và VIEWER chỉ được xem firmware đã phát hành.
+      ...(actor.role !== "ADMIN" ? { status: "PUBLISHED" } : {}),
+    };
+
+    const result = await this.repository.listFirmware(this.pool, scopedFilters);
+
+    return {
+      ...result,
+      data: result.data.map(firmwareView),
+    };
   }
 
   async listJobs(actor, filters) {
