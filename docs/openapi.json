@@ -3114,6 +3114,475 @@
           }
         }
       }
+    },
+    "/api/v1/ota/download/{token}/{signature}": {
+      "get": {
+        "summary": "Download published firmware using signed URL",
+        "description": "Public signed download URL. Firmware must remain PUBLISHED; revoked firmware cannot be downloaded.",
+        "operationId": "get__api_v1_ota_download__token___signature_",
+        "tags": [
+          "ota"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          {
+            "in": "path",
+            "name": "signature",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/ota/firmware": {
+      "get": {
+        "summary": "List firmware releases",
+        "description": "",
+        "operationId": "get__api_v1_ota_firmware",
+        "tags": [
+          "ota"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SENSOR_NODE",
+                "CONTROL_NODE"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "hardware_target",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "REVOKED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Upload firmware binary",
+        "description": "Upload application/octet-stream. Metadata is provided through HTTP headers. The backend calculates SHA-256 and signs the digest using Ed25519.",
+        "operationId": "post_api_v1_ota_firmware",
+        "tags": [
+          "ota"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-firmware-version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SENSOR_NODE",
+                "CONTROL_NODE"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-hardware-target",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-firmware-file-name",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-release-notes",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Firmware registered successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Upload validation, authorization, size limit or storage error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ota/jobs": {
+      "get": {
+        "summary": "List OTA update jobs",
+        "description": "",
+        "operationId": "get__api_v1_ota_jobs",
+        "tags": [
+          "ota"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "room_id",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "NOTIFIED",
+                "DOWNLOADING",
+                "VERIFYING",
+                "INSTALLING",
+                "REBOOTING",
+                "SUCCESS",
+                "FAILED",
+                "ROLLED_BACK",
+                "CANCELLED",
+                "TIMEOUT"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ota/firmware/{id}/publish": {
+      "post": {
+        "summary": "Publish firmware release",
+        "description": "",
+        "operationId": "post__api_v1_ota_firmware__id__publish",
+        "tags": [
+          "ota"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ota/firmware/{id}/revoke": {
+      "post": {
+        "summary": "Revoke firmware release",
+        "description": "",
+        "operationId": "post__api_v1_ota_firmware__id__revoke",
+        "tags": [
+          "ota"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}/ota": {
+      "post": {
+        "summary": "Create OTA update job",
+        "description": "",
+        "operationId": "post__api_v1_devices__id__ota",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "PostgreSQL BIGINT ID, serialized as a string."
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtaRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3509,6 +3978,19 @@
         },
         "required": [
           "settings"
+        ],
+        "additionalProperties": false
+      },
+      "OtaRequest": {
+        "type": "object",
+        "properties": {
+          "firmware_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "firmware_id"
         ],
         "additionalProperties": false
       },
