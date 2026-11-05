@@ -4,35 +4,42 @@
 OfflineQueue::OfflineQueue(fs::FS& filesystem, size_t maxRecords)
   : fs(filesystem), capacity(maxRecords) {}
 
+String OfflineQueue::lastError() const { return errorMessage; }
+
 bool OfflineQueue::begin() {
   errorMessage = "";
+  if (capacity == 0) {
+    errorMessage = "Dung luong hang doi phai lon hon 0";
+    return false;
+  }
   return recoverFiles();
 }
 
-String OfflineQueue::lastError() const {
-  return errorMessage;
-}
-
 bool OfflineQueue::recoverFiles() {
+  // Nếu queue đã tồn tại thì đây là bản chính.
   if (fs.exists(queuePath)) {
     if (fs.exists(tempPath)) fs.remove(tempPath);
     if (fs.exists(backupPath)) fs.remove(backupPath);
     return true;
   }
 
+  // Crash sau khi đổi tên queue -> backup.
   if (fs.exists(backupPath)) {
-    if (fs.rename(backupPath, queuePath)) {
-      if (fs.exists(tempPath)) fs.remove(tempPath);
-      return true;
+    if (!fs.rename(backupPath, queuePath)) {
+      errorMessage = "Khong khoi phuc duoc backup";
+      return false;
     }
-    errorMessage = "Khong khoi phuc duoc file backup";
-    return false;
+    if (fs.exists(tempPath)) fs.remove(tempPath);
+    return true;
   }
 
+  // Chỉ dùng temp khi chưa có queue và backup.
   if (fs.exists(tempPath)) {
-    if (fs.rename(tempPath, queuePath)) return true;
-    errorMessage = "Khong khoi phuc duoc file tam";
-    return false;
+    if (!fs.rename(tempPath, queuePath)) {
+      errorMessage = "Khong khoi phuc duoc file tam";
+      return false;
+    }
+    return true;
   }
 
   File file = fs.open(queuePath, FILE_WRITE);
@@ -44,29 +51,48 @@ bool OfflineQueue::recoverFiles() {
   return true;
 }
 
-bool OfflineQueue::validateRecord(const String& jsonRecord, String* eventId) {
-  StaticJsonDocument<768> doc;
-  DeserializationError err = deserializeJson(doc, jsonRecord);
+bool OfflineQueue::validateRecord(const String& json, String* messageId) {
+  StaticJsonDocument<2048> doc;
+  DeserializationError err = deserializeJson(doc, json);
 
   if (err || !doc.is<JsonObject>()) {
     errorMessage = "Ban ghi JSON khong hop le";
     return false;
   }
 
-  const char* id = doc["eventId"];
-  if (!id || String(id).length() == 0) {
-    errorMessage = "Ban ghi thieu eventId";
+  // Hỗ trợ cả payload MQTT chuẩn và payload legacy.
+  const char* id = doc["msg_id"];
+  if (!id) id = doc["eventId"];
+  if (!id || !*id || strlen(id) > 64) {
+    errorMessage = "Ban ghi thieu msg_id/eventId hop le";
     return false;
   }
 
-  if (eventId) *eventId = String(id);
+  if (doc.containsKey("msg_id")) {
+    const char* deviceId = doc["device_id"];
+    const char* roomId = doc["room_id"];
+    if (!deviceId || !*deviceId || !roomId || !*roomId) {
+      errorMessage = "Payload chuan thieu device_id/room_id";
+      return false;
+    }
+  } else {
+    const char* deviceId = doc["deviceId"];
+    const char* roomId = doc["roomCode"];
+    if (!deviceId || !*deviceId || !roomId || !*roomId) {
+      errorMessage = "Payload legacy thieu deviceId/roomCode";
+      return false;
+    }
+  }
+
+  if (messageId) *messageId = String(id);
   return true;
 }
 
 size_t OfflineQueue::count() {
+  errorMessage = "";
   File file = fs.open(queuePath, FILE_READ);
   if (!file) {
-    errorMessage = "Khong doc duoc file hang doi";
+    errorMessage = "Khong doc duoc hang doi";
     return 0;
   }
 
@@ -74,28 +100,36 @@ size_t OfflineQueue::count() {
   while (file.available()) {
     String line = file.readStringUntil('\n');
     line.trim();
-    if (!line.isEmpty()) total++;
+    if (line.isEmpty()) continue;
+
+    if (!validateRecord(line)) {
+      file.close();
+      return 0;
+    }
+    ++total;
   }
+
   file.close();
   return total;
 }
 
 bool OfflineQueue::isFull() {
-  return count() >= capacity;
+  const size_t current = count();
+  if (!errorMessage.isEmpty()) return true;
+  return current >= capacity;
 }
 
 bool OfflineQueue::enqueue(const String& jsonRecord) {
   errorMessage = "";
+  String incomingId;
+  if (!validateRecord(jsonRecord, &incomingId)) return false;
 
-  if (!validateRecord(jsonRecord)) return false;
-  if (isFull()) {
+  const size_t current = count();
+  if (!errorMessage.isEmpty()) return false;
+  if (current >= capacity) {
     errorMessage = "Hang doi day; khong ghi de du lieu cu";
     return false;
   }
-
-  // Chống thêm lại eventId đã có trong hàng đợi.
-  String incomingId;
-  if (!validateRecord(jsonRecord, &incomingId)) return false;
 
   File reader = fs.open(queuePath, FILE_READ);
   if (!reader) {
@@ -115,7 +149,7 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
     }
     if (existingId == incomingId) {
       reader.close();
-      errorMessage = "eventId da ton tai trong hang doi";
+      errorMessage = "msg_id da ton tai trong hang doi";
       return false;
     }
   }
@@ -123,7 +157,7 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
 
   File writer = fs.open(queuePath, FILE_APPEND);
   if (!writer) {
-    errorMessage = "Khong mo duoc hang doi de ghi";
+    errorMessage = "Khong mo duoc file de ghi";
     return false;
   }
 
@@ -132,13 +166,14 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
   writer.close();
 
   if (written == 0) {
-    errorMessage = "Ghi ban ghi that bai";
+    errorMessage = "Ghi telemetry that bai";
     return false;
   }
   return true;
 }
 
 bool OfflineQueue::peek(String& jsonRecord) {
+  errorMessage = "";
   File file = fs.open(queuePath, FILE_READ);
   if (!file) {
     errorMessage = "Khong doc duoc hang doi";
@@ -161,10 +196,10 @@ bool OfflineQueue::peek(String& jsonRecord) {
   }
 
   file.close();
-  return false; // Hàng đợi rỗng.
+  return false;
 }
 
-bool OfflineQueue::rewriteWithoutEvent(const String& eventId) {
+bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
   File source = fs.open(queuePath, FILE_READ);
   if (!source) {
     errorMessage = "Khong doc duoc hang doi goc";
@@ -193,7 +228,7 @@ bool OfflineQueue::rewriteWithoutEvent(const String& eventId) {
       break;
     }
 
-    if (currentId == eventId) {
+    if (currentId == messageId) {
       found = true;
       continue;
     }
@@ -210,8 +245,8 @@ bool OfflineQueue::rewriteWithoutEvent(const String& eventId) {
 
   if (!ok || !found) {
     fs.remove(tempPath);
-    if (!ok) errorMessage = "Du lieu hang doi khong hop le hoac ghi file tam that bai";
-    else errorMessage = "Khong tim thay eventId can xac nhan";
+    errorMessage = !ok ? "Hang doi loi hoac ghi file tam that bai"
+                       : "Khong tim thay msg_id can xac nhan";
     return false;
   }
 
@@ -219,7 +254,7 @@ bool OfflineQueue::rewriteWithoutEvent(const String& eventId) {
 
   if (!fs.rename(queuePath, backupPath)) {
     fs.remove(tempPath);
-    errorMessage = "Khong tao duoc backup hang doi";
+    errorMessage = "Khong tao duoc backup";
     return false;
   }
 
@@ -233,11 +268,27 @@ bool OfflineQueue::rewriteWithoutEvent(const String& eventId) {
   return true;
 }
 
-bool OfflineQueue::acknowledge(const String& eventId) {
+bool OfflineQueue::acknowledge(const String& messageId) {
   errorMessage = "";
-  if (eventId.isEmpty()) {
-    errorMessage = "eventId ACK rong";
+  if (messageId.isEmpty()) {
+    errorMessage = "msg_id ACK rong";
     return false;
   }
-  return rewriteWithoutEvent(eventId);
+
+  // Chỉ cho phép xóa bản ghi đầu hàng đợi.
+  // ACK cũ hoặc ACK cho bản tin khác không được làm mất dữ liệu.
+  String firstRecord;
+  if (!peek(firstRecord)) {
+    if (errorMessage.isEmpty()) errorMessage = "Hang doi rong";
+    return false;
+  }
+
+  String firstId;
+  if (!validateRecord(firstRecord, &firstId)) return false;
+  if (firstId != messageId) {
+    errorMessage = "ACK khong khop ban ghi dau hang doi";
+    return false;
+  }
+
+  return rewriteWithoutMessage(messageId);
 }
