@@ -107,11 +107,22 @@ export class OtaService {
       throw new TypeError("Thiếu khóa ký firmware Ed25519");
     }
 
-    this.firmwareSigningKey = createPrivateKey({
-      key: Buffer.from(firmwareSigningPrivateKeyB64, "base64"),
-      format: "der",
-      type: "pkcs8",
-    });
+    const encodedKey = Buffer.from(firmwareSigningPrivateKeyB64, "base64");
+
+    if (encodedKey.length === 0) {
+      throw new TypeError("Khóa ký firmware không hợp lệ");
+    }
+
+    const keyText = encodedKey.toString("utf8").trim();
+
+    this.firmwareSigningKey = keyText.startsWith("-----BEGIN")
+      ? createPrivateKey(keyText)
+      : createPrivateKey({
+          key: encodedKey,
+          format: "der",
+          type: "pkcs8",
+        });
+
     if (this.firmwareSigningKey.asymmetricKeyType !== "ed25519") {
       throw new TypeError("Khóa ký firmware phải sử dụng Ed25519");
     }

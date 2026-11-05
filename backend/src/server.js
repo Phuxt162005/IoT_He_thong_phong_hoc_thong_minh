@@ -344,7 +344,21 @@ try {
 
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
-} catch {
-  logger.error("server.configuration_invalid");
+} catch (error) {
+  const sensitiveKeys = /PASSWORD|SECRET|TOKEN|PRIVATE_KEY|DATABASE_URL/i;
+  let message = error?.message ?? "Unknown startup error";
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (sensitiveKeys.test(key) && value) {
+      message = message.split(value).join("[REDACTED]");
+    }
+  }
+
+  logger.error("server.startup_failed", {
+    name: error?.name ?? "Error",
+    code: error?.code ?? "STARTUP_ERROR",
+    message,
+  });
+
   process.exitCode = 1;
 }
