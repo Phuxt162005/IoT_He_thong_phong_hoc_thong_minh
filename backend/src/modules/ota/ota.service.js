@@ -1,4 +1,9 @@
-import { randomUUID, createHash } from "node:crypto";
+import {
+  randomUUID,
+  createHash,
+  createPrivateKey,
+  sign as signBytes,
+} from "node:crypto";
 import { z } from "zod";
 import { AppError, requireFound } from "../../common/errors.js";
 import { lockActor, requireRoomScope } from "../../common/authorization.js";
@@ -64,6 +69,7 @@ const firmwareView = (row) => ({
   status: row.status,
   created_at: row.created_at,
   published_at: row.published_at,
+  signature: row.signature,
 });
 
 const jobView = (row) => ({
@@ -92,11 +98,21 @@ export class OtaService {
     heartbeatTimeoutSeconds = 30,
     timeoutSeconds = 900,
     downloadUrlLifetimeSeconds = 300,
+    firmwareSigningPrivateKeyB64,
   }) {
     if (!pool || !repository || !mqtt || !storage || !downloadUrlSigner) {
       throw new TypeError("OtaService thiếu dependency bắt buộc");
     }
+    if (!firmwareSigningPrivateKeyB64) {
+      throw new TypeError("Thiếu khóa ký firmware Ed25519");
+    }
 
+    this.firmwareSigningKey = createPrivateKey(
+      Buffer.from(firmwareSigningPrivateKeyB64, "base64"),
+    );
+    if (this.firmwareSigningKey.asymmetricKeyType !== "ed25519") {
+      throw new TypeError("Khóa ký firmware phải sử dụng Ed25519");
+    }
     this.pool = pool;
     this.repository = repository;
     this.mqtt = mqtt;
@@ -271,8 +287,14 @@ export class OtaService {
         );
       }
 
+      const signature = signBytes(
+        null,
+        Buffer.from(firmware.sha256, "hex"),
+        this.firmwareSigningKey,
+      ).toString("base64");
+
       const published = requireFound(
-        await this.repository.publishFirmware(client, firmwareId),
+        await this.repository.publishFirmware(client, firmwareId, signature),
         "Không thể phát hành firmware",
       );
 
@@ -606,9 +628,28 @@ export class OtaService {
   async listJobs(actor, filters) {
     if (filters.room_id) {
       await requireRoomScope(this.pool, actor, filters.room_id);
-    } else if (filters.device_id) {
-      await requireDeviceScope(this.pool, actor, filters.device_id);
-    } else if (actor.role !== "ADMIN") {
+    }
+
+    if (filters.device_id) {
+      const device = await requireDeviceScope(
+        this.pool,
+        actor,
+        filters.device_id,
+      );
+
+      if (
+        filters.room_id &&
+        String(device.room_id) !== String(filters.room_id)
+      ) {
+        throw new AppError(
+          "DEVICE_ROOM_MISMATCH",
+          400,
+          "Thiết bị không thuộc phòng được chỉ định",
+        );
+      }
+    }
+
+    if (!filters.room_id && !filters.device_id && actor.role !== "ADMIN") {
       throw new AppError(
         "SCOPE_REQUIRED",
         400,
@@ -639,7 +680,7 @@ export class OtaService {
        r.room_code, r.status AS room_status,
        f.version, f.device_type AS firmware_device_type,
        f.hardware_target, f.storage_path, f.file_size,
-       f.sha256, f.status AS firmware_status,
+       f.sha256, f.status AS firmware_status, f.signature,
        c.version AS active_credential_version
         FROM ota_jobs j
         JOIN devices d ON d.device_id = j.device_id
@@ -720,6 +761,7 @@ export class OtaService {
         );
 
         const downloadUrl = await this.downloadUrlSigner.create(
+          row.firmware_id,
           row.storage_path,
           expiresAt,
         );
@@ -728,6 +770,7 @@ export class OtaService {
 
         await this.mqtt.publish(topic, {
           job_id: row.job_id,
+          firmware_id: row.firmware_id,
           device_id: row.device_code,
           room_id: row.room_code,
           session_id: row.job_session_id,
@@ -738,6 +781,7 @@ export class OtaService {
           file_size: Number(row.file_size),
           sha256: row.sha256,
           expires_at: expiresAt.getTime(),
+          signature: row.signature,
         });
 
         await withTransaction(this.pool, (client) =>

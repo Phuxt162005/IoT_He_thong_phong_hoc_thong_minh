@@ -79,6 +79,7 @@ try {
     heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds,
     timeoutSeconds: config.otaTimeoutSeconds,
     downloadUrlLifetimeSeconds: config.otaDownloadUrlLifetimeSeconds,
+    firmwareSigningPrivateKeyB64: config.otaSigningPrivateKeyB64,
   });
 
   const unbindOta = bindOta(mqtt, ota);

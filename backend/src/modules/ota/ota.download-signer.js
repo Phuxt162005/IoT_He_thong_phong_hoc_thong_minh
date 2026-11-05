@@ -20,9 +20,10 @@ export class OtaDownloadSigner {
     this.secret = secret;
   }
 
-  sign(storagePath, expiresAt) {
+  sign(firmwareId, storagePath, expiresAt) {
     const payload = encode(
       JSON.stringify({
+        firmware_id: firmwareId,
         storage_path: storagePath,
         expires_at: expiresAt.getTime(),
       }),
@@ -35,8 +36,8 @@ export class OtaDownloadSigner {
     return `${this.baseUrl}/ota/download/${payload}/${signature}`;
   }
 
-  async create(storagePath, expiresAt) {
-    return this.sign(storagePath, expiresAt);
+  async create(firmwareId, storagePath, expiresAt) {
+    return this.sign(firmwareId, storagePath, expiresAt);
   }
 
   verify(payload, signature) {
@@ -57,6 +58,8 @@ export class OtaDownloadSigner {
       const data = JSON.parse(Buffer.from(payload, "base64url").toString());
 
       if (
+        typeof data.firmware_id !== "string" ||
+        !/^[0-9a-f-]{36}$/i.test(data.firmware_id) ||
         typeof data.storage_path !== "string" ||
         !Number.isSafeInteger(data.expires_at) ||
         data.expires_at <= Date.now()

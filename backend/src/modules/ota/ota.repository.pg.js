@@ -1,6 +1,6 @@
 import { AppError } from "../../common/errors.js";
 
-const firmwareColumns = `firmware_id,version,device_type,hardware_target,file_name,storage_path,file_size,sha256,release_notes,status,created_by,created_at,published_at`;
+const firmwareColumns = `firmware_id,version,device_type,hardware_target,file_name,storage_path,file_size,sha256,signature,release_notes,status,created_by,created_at,published_at`;
 const jobColumns = `job_id,firmware_id,device_id,room_id,session_id,credential_version,previous_firmware_version,status,progress,error_code,requested_by,created_at,started_at,last_status_at,finished_at,timeout_at`;
 
 const terminalStatuses = [
@@ -63,13 +63,17 @@ export class OtaRepository {
     return result.rows[0] ?? null;
   }
 
-  async publishFirmware(client, firmwareId) {
+  async publishFirmware(client, firmwareId, signature) {
     const result = await client.query(
-      `UPDATE firmware_releases SET status='PUBLISHED',published_at=clock_timestamp()
-       WHERE firmware_id=$1 AND status='DRAFT'
-       RETURNING ${firmwareColumns}`,
-      [firmwareId],
+      `UPDATE firmware_releases
+      SET status='PUBLISHED',
+         signature=$2,
+         published_at=clock_timestamp()
+      WHERE firmware_id=$1 AND status='DRAFT'
+      RETURNING ${firmwareColumns}`,
+      [firmwareId, signature],
     );
+
     return result.rows[0] ?? null;
   }
 

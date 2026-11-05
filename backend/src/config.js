@@ -52,6 +52,7 @@ const envSchema = z.object({
     .min(30)
     .max(1800)
     .default(300),
+  OTA_SIGNING_PRIVATE_KEY_B64: z.string().min(1).optional(),
 });
 
 export function loadConfig(
@@ -91,7 +92,9 @@ export function loadConfig(
     throw new Error("Cấu hình không hợp lệ: MQTT/DEVICE_SECRET_KEY");
   if (
     requireOta &&
-    (!data.OTA_DOWNLOAD_BASE_URL || !data.OTA_DOWNLOAD_SECRET)
+    (!data.OTA_DOWNLOAD_BASE_URL ||
+      !data.OTA_DOWNLOAD_SECRET ||
+      !data.OTA_SIGNING_PRIVATE_KEY_B64)
   ) {
     throw new Error(
       "Cấu hình không hợp lệ: OTA_DOWNLOAD_BASE_URL/OTA_DOWNLOAD_SECRET",
@@ -149,5 +152,6 @@ export function loadConfig(
     otaMaxFirmwareBytes: data.OTA_MAX_FIRMWARE_BYTES,
     otaTimeoutSeconds: data.OTA_TIMEOUT_S,
     otaDownloadUrlLifetimeSeconds: data.OTA_DOWNLOAD_URL_LIFETIME_S,
+    otaSigningPrivateKeyB64: data.OTA_SIGNING_PRIVATE_KEY_B64,
   });
 }
