@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { generateKeyPairSync, randomUUID } from "node:crypto";
+import { createHmac, generateKeyPairSync, randomUUID } from "node:crypto";
 import { OtaDownloadSigner } from "../backend/src/modules/ota/ota.download-signer.js";
 import { LocalFirmwareStorage } from "../backend/src/modules/ota/ota.storage.js";
 import { OtaRepository } from "../backend/src/modules/ota/ota.repository.pg.js";
@@ -44,7 +44,6 @@ test("OTA download signer rejects tampered, expired and non-HTTPS tokens", () =>
     storage_path: storagePath,
     expires_at: Date.now() - 1,
   })).toString("base64url");
-  const { createHmac } = await import("node:crypto");
   const signature = createHmac("sha256", "test-download-secret-that-is-long-enough").update(expired).digest("base64url");
   assert.throws(() => signer.verify(expired, signature), (error) => error.code === "OTA_DOWNLOAD_TOKEN_INVALID");
   assert.throws(() => new OtaDownloadSigner({ baseUrl: "http://iot.example.test", secret: "test-download-secret-that-is-long-enough" }), /HTTPS/);
