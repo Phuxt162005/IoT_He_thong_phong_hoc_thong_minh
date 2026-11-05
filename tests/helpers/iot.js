@@ -1,4 +1,7 @@
-import { randomBytes, generateKeyPairSync } from "node:crypto";\nimport { mkdtemp, rm } from "node:fs/promises";\nimport { tmpdir } from "node:os";\nimport path from "node:path";
+import { randomBytes, generateKeyPairSync } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { once } from "node:events";
 import mqtt from "mqtt";
 import { testDatabase } from "./database.js";
@@ -14,7 +17,11 @@ import { DevicePresenceService, bindPresence } from "../../backend/src/modules/d
 import { CommandsService, bindCommands } from "../../backend/src/modules/commands/commands.service.js";
 import { DeviceConfigService, bindDeviceConfig } from "../../backend/src/modules/device-config/device-config.service.js";
 import { AlertsService } from "../../backend/src/modules/alerts/alerts.service.js";
-import { AutomationService } from "../../backend/src/modules/automation/automation.service.js";\nimport { OtaRepository } from "../../backend/src/modules/ota/ota.repository.pg.js";\nimport { OtaService, bindOta } from "../../backend/src/modules/ota/ota.service.js";\nimport { LocalFirmwareStorage } from "../../backend/src/modules/ota/ota.storage.js";\nimport { OtaDownloadSigner } from "../../backend/src/modules/ota/ota.download-signer.js";
+import { AutomationService } from "../../backend/src/modules/automation/automation.service.js";
+import { OtaRepository } from "../../backend/src/modules/ota/ota.repository.pg.js";
+import { OtaService, bindOta } from "../../backend/src/modules/ota/ota.service.js";
+import { LocalFirmwareStorage } from "../../backend/src/modules/ota/ota.storage.js";
+import { OtaDownloadSigner } from "../../backend/src/modules/ota/ota.download-signer.js";
 
 export async function waitFor(predicate) {
   for (let i = 0; i < 80; i++) { if (await predicate()) return; await new Promise((r) => setTimeout(r, 50)); }
@@ -54,7 +61,17 @@ export async function iotFixture(t) {
   const unbindConfigs = bindDeviceConfig(runtime, configs);
   t.after(unbindConfigs);
   const alerts = new AlertsService({ pool: db.pool });
-  const automation = new AutomationService({ pool: db.pool, commands });\n  const firmwareDirectory = await mkdtemp(path.join(tmpdir(), "iot-ota-test-"));\n  t.after(() => rm(firmwareDirectory, { recursive: true, force: true }));\n  const firmwareStorage = new LocalFirmwareStorage({ directory: firmwareDirectory });\n  await firmwareStorage.ensureDirectory();\n  const signingKeys = generateKeyPairSync("ed25519");\n  const firmwareSigningPrivateKeyB64 = signingKeys.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");\n  const downloadSigner = new OtaDownloadSigner({ baseUrl: "https://firmware.test/api/v1", secret: randomBytes(32).toString("hex") });\n  const ota = new OtaService({ pool: db.pool, repository: new OtaRepository(db.pool), mqtt: runtime, storage: firmwareStorage, downloadUrlSigner: downloadSigner, firmwareSigningPrivateKeyB64 });\n  const unbindOta = bindOta(runtime, ota);\n  t.after(unbindOta);
+  const automation = new AutomationService({ pool: db.pool, commands });
+  const firmwareDirectory = await mkdtemp(path.join(tmpdir(), "iot-ota-test-"));
+  t.after(() => rm(firmwareDirectory, { recursive: true, force: true }));
+  const firmwareStorage = new LocalFirmwareStorage({ directory: firmwareDirectory });
+  await firmwareStorage.ensureDirectory();
+  const signingKeys = generateKeyPairSync("ed25519");
+  const firmwareSigningPrivateKeyB64 = signingKeys.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");
+  const downloadSigner = new OtaDownloadSigner({ baseUrl: "https://firmware.test/api/v1", secret: randomBytes(32).toString("hex") });
+  const ota = new OtaService({ pool: db.pool, repository: new OtaRepository(db.pool), mqtt: runtime, storage: firmwareStorage, downloadUrlSigner: downloadSigner, firmwareSigningPrivateKeyB64 });
+  const unbindOta = bindOta(runtime, ota);
+  t.after(unbindOta);
   await once(runtime, "ready", { signal: AbortSignal.timeout(5000) });
   const password = "iot-test-password-only";
   await seed(db.pool, { username: "test_admin", password });
