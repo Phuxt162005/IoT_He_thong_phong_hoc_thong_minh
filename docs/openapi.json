@@ -3115,6 +3115,142 @@
         }
       }
     },
+    "/api/v1/monitoring/snapshot": {
+      "get": {
+        "summary": "Admin reads system monitoring snapshot",
+        "description": "",
+        "operationId": "get__api_v1_monitoring_snapshot",
+        "tags": [
+          "monitoring"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/monitoring/logs": {
+      "get": {
+        "summary": "Admin searches monitoring logs",
+        "description": "",
+        "operationId": "get__api_v1_monitoring_logs",
+        "tags": [
+          "monitoring"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive, ISO with timezone."
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "service",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful result; IDs are strings and timestamps UTC ISO 8601.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validation; 401 session; 403 role; 404 missing/out of scope; 409 conflict; 413 payload/export limit; 429 rate limit; 503 dependency. No SQL, stack or credentials returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ota/download/{token}/{signature}": {
       "get": {
         "summary": "Download published firmware using signed URL",

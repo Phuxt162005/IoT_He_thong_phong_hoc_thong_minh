@@ -8,8 +8,6 @@ const time = z.iso
   .datetime({ offset: true })
   .transform((value) => new Date(value));
 
-const snapshotQuery = z.object({}).strict();
-
 const logQuery = z
   .object({
     ...pagination,
@@ -21,26 +19,28 @@ const logQuery = z
   })
   .strict();
 
-export function createMonitoringRoutes(pool, monitoring) {
-  const router = Router();
-  if (!monitoring?.repository) {
+function requireMonitoring(monitoring, capability) {
+  if (!monitoring || typeof monitoring[capability] !== "function") {
     throw new AppError(
       "MONITORING_UNAVAILABLE",
       503,
       "Monitoring service chưa được khởi tạo",
     );
   }
+}
+
+export function createMonitoringRoutes(pool, monitoring) {
+  const router = Router();
 
   router.get(
     "/monitoring/snapshot",
     authorize(pool, "monitoring:read"),
     async (_req, res) => {
+      requireMonitoring(monitoring, "getSnapshot");
+
       const data = await monitoring.getSnapshot();
 
-      res.json({
-        success: true,
-        data,
-      });
+      res.json({ success: true, data });
     },
   );
 
@@ -48,7 +48,18 @@ export function createMonitoringRoutes(pool, monitoring) {
     "/monitoring/logs",
     authorize(pool, "monitoring:read"),
     async (req, res) => {
+      requireMonitoring(monitoring, "getSnapshot");
+
+      if (typeof monitoring.repository?.getLogs !== "function") {
+        throw new AppError(
+          "MONITORING_UNAVAILABLE",
+          503,
+          "Monitoring log repository chưa được khởi tạo",
+        );
+      }
+
       const input = parse(logQuery, req.query);
+
       input.to ??= new Date();
       input.from ??= new Date(input.to.getTime() - 24 * 60 * 60 * 1000);
 
@@ -56,10 +67,11 @@ export function createMonitoringRoutes(pool, monitoring) {
         input.from >= input.to ||
         input.to - input.from > 30 * 24 * 60 * 60 * 1000
       ) {
-        const error = new Error("Khoảng thời gian truy vấn không hợp lệ");
-        error.code = "INVALID_TIME_RANGE";
-        error.status = 400;
-        throw error;
+        throw new AppError(
+          "INVALID_TIME_RANGE",
+          400,
+          "Khoảng thời gian truy vấn không hợp lệ",
+        );
       }
 
       const result = await monitoring.repository.getLogs({

@@ -28,6 +28,7 @@ const permissions = Object.freeze({
   "ota:firmware:write": ["ADMIN"],
   "ota:jobs:read": ["ADMIN", "OPERATOR", "VIEWER"],
   "ota:jobs:create": ["ADMIN"],
+  "monitoring:read": ["ADMIN"],
 });
 export function can(user, permission) {
   return permissions[permission]?.includes(user.role) ?? false;

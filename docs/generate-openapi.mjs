@@ -537,6 +537,19 @@ api(
     ],
   },
 );
+
+api("/monitoring/snapshot", "get", "Admin reads system monitoring snapshot");
+
+api("/monitoring/logs", "get", "Admin searches monitoring logs", {
+  params: [
+    ...pages,
+    ...times,
+    query("level", enumeration("DEBUG", "INFO", "WARN", "ERROR")),
+    query("service", str(100)),
+    query("search", str(200)),
+  ],
+});
+
 // OTA: URL tải firmware có chữ ký riêng, không dùng JWT người dùng.
 add(
   "/api/v1/ota/download/{token}/{signature}",
