@@ -73,7 +73,7 @@ test("getProcessedEvent từ chối khi sự kiện thuộc thiết bị khác",
 });
 
 test("getProcessedEvent không truy vấn khi eventId không tồn tại", async () => {
-  const { reposieetory, queries } = fixture(processedRow());
+  const { repository, queries } = fixture(processedRow());
 
   const result = await repository.getProcessedEvent("10", null);
 
