@@ -12,7 +12,8 @@ bool OfflineQueue::begin() {
     errorMessage = "Dung luong hang doi phai lon hon 0";
     return false;
   }
-  return recoverFiles();
+  if (!recoverFiles()) return false;
+  return repairTrailingRecord();
 }
 
 bool OfflineQueue::recoverFiles() {
@@ -48,6 +49,114 @@ bool OfflineQueue::recoverFiles() {
     return false;
   }
   file.close();
+  return true;
+}
+
+
+bool OfflineQueue::repairTrailingRecord() {
+  File source = fs.open(queuePath, FILE_READ);
+  if (!source) {
+    errorMessage = "Khong doc duoc queue de phuc hoi";
+    return false;
+  }
+
+  const size_t originalSize = source.size();
+  if (originalSize == 0) {
+    source.close();
+    return true;
+  }
+
+  if (!source.seek(originalSize - 1)) {
+    source.close();
+    errorMessage = "Khong kiem tra duoc cuoi file queue";
+    return false;
+  }
+
+  const int lastByte = source.read();
+  source.close();
+
+  if (lastByte == '\n') return true;
+
+  source = fs.open(queuePath, FILE_READ);
+  if (!source) {
+    errorMessage = "Khong mo lai duoc queue";
+    return false;
+  }
+
+  if (fs.exists(tempPath)) fs.remove(tempPath);
+
+  File target = fs.open(tempPath, FILE_WRITE);
+  if (!target) {
+    source.close();
+    errorMessage = "Khong tao duoc file phuc hoi";
+    return false;
+  }
+
+  bool ok = true;
+  size_t expectedSize = 0;
+
+  while (source.available()) {
+    String line = source.readStringUntil('\n');
+    const bool isLastLine = !source.available();
+    line.trim();
+
+    if (line.isEmpty()) continue;
+
+    if (!validateRecord(line)) {
+      // Chỉ được bỏ dòng cuối nếu nó bị ghi dở.
+      if (isLastLine) {
+        errorMessage = "";
+        break;
+      }
+
+      ok = false;
+      break;
+    }
+
+    const size_t written = target.println(line);
+    if (written != line.length() + 2) {
+      ok = false;
+      break;
+    }
+
+    expectedSize += written;
+  }
+
+  target.flush();
+  target.close();
+  source.close();
+
+  if (!ok) {
+    fs.remove(tempPath);
+    errorMessage = "Queue co ban ghi loi khong nam o cuoi file";
+    return false;
+  }
+
+  File check = fs.open(tempPath, FILE_READ);
+  if (!check || check.size() != expectedSize) {
+    if (check) check.close();
+    fs.remove(tempPath);
+    errorMessage = "Kiem tra file phuc hoi that bai";
+    return false;
+  }
+  check.close();
+
+  if (fs.exists(backupPath)) fs.remove(backupPath);
+
+  if (!fs.rename(queuePath, backupPath)) {
+    fs.remove(tempPath);
+    errorMessage = "Khong backup duoc queue";
+    return false;
+  }
+
+  if (!fs.rename(tempPath, queuePath)) {
+    fs.rename(backupPath, queuePath);
+    errorMessage = "Khong thay the duoc queue";
+    return false;
+  }
+
+  fs.remove(backupPath);
+  errorMessage = "";
   return true;
 }
 
@@ -165,10 +274,11 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
   writer.flush();
   writer.close();
 
-  if (written == 0) {
-    errorMessage = "Ghi telemetry that bai";
+  if (written != jsonRecord.length() + 2) {
+    errorMessage = "Ghi telemetry khong day du";
     return false;
   }
+
   return true;
 }
 

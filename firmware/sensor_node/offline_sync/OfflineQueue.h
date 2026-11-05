@@ -22,6 +22,7 @@ private:
   const char* backupPath = "/telemetry_queue.bak";
 
   bool recoverFiles();
+  bool repairTrailingRecord();
   bool validateRecord(const String& json, String* messageId = nullptr);
   bool rewriteWithoutMessage(const String& messageId);
 };
