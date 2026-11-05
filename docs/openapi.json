@@ -22,9 +22,7 @@
         "summary": "Process liveness",
         "description": "",
         "operationId": "get__health",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "parameters": [],
         "responses": {
           "200": {
@@ -56,9 +54,7 @@
         "summary": "Expected schema, database, MQTT subscriptions and realtime listener readiness",
         "description": "",
         "operationId": "get__ready",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "parameters": [],
         "responses": {
           "200": {
@@ -90,9 +86,7 @@
         "summary": "Login; 5 failed attempts per username/IP in 15 minutes",
         "description": "",
         "operationId": "post__api_v1_auth_login",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "parameters": [],
         "responses": {
           "200": {
@@ -134,9 +128,7 @@
         "summary": "Current user",
         "description": "",
         "operationId": "get__api_v1_auth_me",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "parameters": [],
         "responses": {
           "200": {
@@ -167,9 +159,7 @@
         "summary": "Invalidate all user tokens",
         "description": "",
         "operationId": "post__api_v1_auth_logout",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "parameters": [],
         "responses": {
           "200": {
@@ -200,9 +190,7 @@
         "summary": "Change password and invalidate all tokens",
         "description": "",
         "operationId": "post__api_v1_auth_change_password",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "parameters": [],
         "responses": {
           "200": {
@@ -243,9 +231,7 @@
         "summary": "Admin lists users",
         "description": "",
         "operationId": "get__api_v1_users",
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "parameters": [
           {
             "in": "query",
@@ -272,11 +258,7 @@
             "name": "role",
             "schema": {
               "type": "string",
-              "enum": [
-                "ADMIN",
-                "OPERATOR",
-                "VIEWER"
-              ]
+              "enum": ["ADMIN", "OPERATOR", "VIEWER"]
             }
           },
           {
@@ -284,10 +266,7 @@
             "name": "status",
             "schema": {
               "type": "string",
-              "enum": [
-                "ACTIVE",
-                "DISABLED"
-              ]
+              "enum": ["ACTIVE", "DISABLED"]
             }
           }
         ],
@@ -318,9 +297,7 @@
         "summary": "Admin creates user",
         "description": "",
         "operationId": "post__api_v1_users",
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "parameters": [],
         "responses": {
           "201": {
@@ -361,9 +338,7 @@
         "summary": "Admin reads user",
         "description": "",
         "operationId": "get__api_v1_users__id_",
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "parameters": [
           {
             "in": "path",
@@ -403,9 +378,7 @@
         "summary": "Admin changes user, preserving the last active Admin",
         "description": "",
         "operationId": "patch__api_v1_users__id_",
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "parameters": [
           {
             "in": "path",
@@ -457,9 +430,7 @@
         "summary": "Scoped rooms",
         "description": "",
         "operationId": "get__api_v1_rooms",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "query",
@@ -486,10 +457,7 @@
             "name": "status",
             "schema": {
               "type": "string",
-              "enum": [
-                "ACTIVE",
-                "INACTIVE"
-              ]
+              "enum": ["ACTIVE", "INACTIVE"]
             }
           }
         ],
@@ -520,9 +488,7 @@
         "summary": "Admin creates room",
         "description": "",
         "operationId": "post__api_v1_rooms",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [],
         "responses": {
           "201": {
@@ -563,9 +529,7 @@
         "summary": "Scoped room detail",
         "description": "",
         "operationId": "get__api_v1_rooms__id_",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -605,9 +569,7 @@
         "summary": "Admin updates room",
         "description": "",
         "operationId": "patch__api_v1_rooms__id_",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -659,9 +621,7 @@
         "summary": "Admin reads room membership",
         "description": "",
         "operationId": "get__api_v1_rooms__id__users",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -701,9 +661,7 @@
         "summary": "Admin replaces membership; changed scope invalidates tokens",
         "description": "",
         "operationId": "put__api_v1_rooms__id__users",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -755,9 +713,7 @@
         "summary": "Scoped device list",
         "description": "",
         "operationId": "get__api_v1_devices",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "query",
@@ -793,10 +749,7 @@
             "name": "device_type",
             "schema": {
               "type": "string",
-              "enum": [
-                "SENSOR_NODE",
-                "CONTROL_NODE"
-              ]
+              "enum": ["SENSOR_NODE", "CONTROL_NODE"]
             }
           },
           {
@@ -820,11 +773,7 @@
             "name": "connection_status",
             "schema": {
               "type": "string",
-              "enum": [
-                "UNKNOWN",
-                "ONLINE",
-                "OFFLINE"
-              ]
+              "enum": ["UNKNOWN", "ONLINE", "OFFLINE"]
             }
           }
         ],
@@ -855,9 +804,7 @@
         "summary": "Admin registers device",
         "description": "",
         "operationId": "post__api_v1_devices",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [],
         "responses": {
           "201": {
@@ -898,9 +845,7 @@
         "summary": "Scoped device detail",
         "description": "",
         "operationId": "get__api_v1_devices__id_",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -940,9 +885,7 @@
         "summary": "Admin updates metadata; reassignment only while REGISTERED",
         "description": "",
         "operationId": "patch__api_v1_devices__id_",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -994,9 +937,7 @@
         "summary": "Admin maintenance",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__maintenance",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1048,9 +989,7 @@
         "summary": "Admin resume",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__resume",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1102,9 +1041,7 @@
         "summary": "Admin clear-fault",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__clear_fault",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1156,9 +1093,7 @@
         "summary": "Admin recover",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__recover",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1210,9 +1145,7 @@
         "summary": "Admin decommission",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__decommission",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1264,9 +1197,7 @@
         "summary": "Admin provision",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__provision",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1328,9 +1259,7 @@
         "summary": "Admin rotate-credentials",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__rotate_credentials",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1392,9 +1321,7 @@
         "summary": "Admin revoke",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__revoke",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1456,9 +1383,7 @@
         "summary": "Admin activate",
         "description": "Revoke/decommission require confirmed:true; re-provisioning a revoked device also requires confirmation. Provision/rotate returns the secret once; 202 means broker synchronization is pending.",
         "operationId": "post__api_v1_devices__id__activate",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1510,9 +1435,7 @@
         "summary": "Scoped broker synchronization status; no secret",
         "description": "",
         "operationId": "get__api_v1_devices__id__broker_status",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1554,9 +1477,7 @@
         "summary": "Scoped immutable lifecycle history",
         "description": "",
         "operationId": "get__api_v1_devices__id__lifecycle_events",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1643,11 +1564,7 @@
             "name": "actor_type",
             "schema": {
               "type": "string",
-              "enum": [
-                "USER",
-                "DEVICE",
-                "SYSTEM"
-              ]
+              "enum": ["USER", "DEVICE", "SYSTEM"]
             }
           },
           {
@@ -1689,9 +1606,7 @@
         "summary": "Scoped command history",
         "description": "",
         "operationId": "get__api_v1_devices__id__commands",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1751,9 +1666,7 @@
         "summary": "Admin/Operator creates manual command",
         "description": "",
         "operationId": "post__api_v1_devices__id__commands",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1824,9 +1737,7 @@
         "summary": "Scoped desired/reported state and differences",
         "description": "",
         "operationId": "get__api_v1_devices__id__shadow",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1868,9 +1779,7 @@
         "summary": "Scoped desired/applied configuration and history",
         "description": "",
         "operationId": "get__api_v1_devices__id__configs",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1930,9 +1839,7 @@
         "summary": "Admin requests versioned configuration",
         "description": "",
         "operationId": "post__api_v1_devices__id__configs",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -1984,9 +1891,7 @@
         "summary": "Scoped alert history",
         "description": "",
         "operationId": "get__api_v1_alerts",
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "parameters": [
           {
             "in": "query",
@@ -2022,11 +1927,7 @@
             "name": "status",
             "schema": {
               "type": "string",
-              "enum": [
-                "OPEN",
-                "ACKNOWLEDGED",
-                "RESOLVED"
-              ]
+              "enum": ["OPEN", "ACKNOWLEDGED", "RESOLVED"]
             }
           },
           {
@@ -2034,10 +1935,7 @@
             "name": "severity",
             "schema": {
               "type": "string",
-              "enum": [
-                "WARNING",
-                "CRITICAL"
-              ]
+              "enum": ["WARNING", "CRITICAL"]
             }
           },
           {
@@ -2083,9 +1981,7 @@
         "summary": "Scoped alert detail",
         "description": "",
         "operationId": "get__api_v1_alerts__id_",
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "parameters": [
           {
             "in": "path",
@@ -2122,14 +2018,124 @@
         }
       }
     },
+
+    "/api/v1/anomalies": {
+      "get": {
+        "summary": "List anomaly detection results within user's room scope",
+        "operationId": "get__api_v1_anomalies",
+        "tags": ["anomaly-detection"],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "room_id",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_id",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "anomaly_detected",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated anomaly detection results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Standard API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/anomalies/{id}": {
+      "get": {
+        "summary": "Get anomaly detection result detail within user's room scope",
+        "operationId": "get__api_v1_anomalies__id_",
+        "tags": ["anomaly-detection"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Anomaly detection result detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Standard API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{id}/acknowledge": {
       "post": {
         "summary": "Admin/Operator acknowledges alert",
         "description": "",
         "operationId": "post__api_v1_alerts__id__acknowledge",
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "parameters": [
           {
             "in": "path",
@@ -2171,9 +2177,7 @@
         "summary": "Admin/Operator resolves alert",
         "description": "",
         "operationId": "post__api_v1_alerts__id__resolve",
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "parameters": [
           {
             "in": "path",
@@ -2225,9 +2229,7 @@
         "summary": "Scoped effective thresholds",
         "description": "",
         "operationId": "get__api_v1_rooms__id__alert_thresholds",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2267,9 +2269,7 @@
         "summary": "Admin overrides room thresholds",
         "description": "",
         "operationId": "put__api_v1_rooms__id__alert_thresholds",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2321,9 +2321,7 @@
         "summary": "Scoped automation rules",
         "description": "",
         "operationId": "get__api_v1_rooms__id__automation_rules",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2383,9 +2381,7 @@
         "summary": "Admin creates rule; lower priority number wins",
         "description": "",
         "operationId": "post__api_v1_rooms__id__automation_rules",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2437,9 +2433,7 @@
         "summary": "Admin updates/disables rule",
         "description": "",
         "operationId": "patch__api_v1_automation_rules__id_",
-        "tags": [
-          "automation-rules"
-        ],
+        "tags": ["automation-rules"],
         "parameters": [
           {
             "in": "path",
@@ -2491,9 +2485,7 @@
         "summary": "Admin/Operator changes AUTO/MANUAL mode",
         "description": "",
         "operationId": "put__api_v1_devices__id__control_mode",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -2545,9 +2537,7 @@
         "summary": "Scoped dashboard",
         "description": "",
         "operationId": "get__api_v1_dashboard",
-        "tags": [
-          "dashboard"
-        ],
+        "tags": ["dashboard"],
         "parameters": [
           {
             "in": "query",
@@ -2588,9 +2578,7 @@
         "summary": "Scoped measured-time history; default 24h, maximum 31 days",
         "description": "",
         "operationId": "get__api_v1_rooms__id__telemetry",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2679,9 +2667,7 @@
         "summary": "Scoped measured-time history; default 24h, maximum 31 days",
         "description": "",
         "operationId": "get__api_v1_devices__id__telemetry",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -2770,9 +2756,7 @@
         "summary": "Scoped latest sample per Sensor, with stale flag",
         "description": "",
         "operationId": "get__api_v1_rooms__id__telemetry_latest",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2834,9 +2818,7 @@
         "summary": "UTC hourly/daily statistics, excluding clock-skew; maximum 31 days",
         "description": "",
         "operationId": "get__api_v1_rooms__id__telemetry_stats",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2871,10 +2853,7 @@
             "name": "bucket",
             "schema": {
               "type": "string",
-              "enum": [
-                "hour",
-                "day"
-              ],
+              "enum": ["hour", "day"],
               "default": "hour"
             }
           }
@@ -2908,9 +2887,7 @@
         "summary": "Scoped CSV, maximum 5000 samples and 31 days",
         "description": "",
         "operationId": "get__api_v1_rooms__id__telemetry_export",
-        "tags": [
-          "rooms"
-        ],
+        "tags": ["rooms"],
         "parameters": [
           {
             "in": "path",
@@ -2979,9 +2956,7 @@
         "summary": "Admin searches append-only audit; default 7 days, maximum 90 days",
         "description": "",
         "operationId": "get__api_v1_audit_logs",
-        "tags": [
-          "audit-logs"
-        ],
+        "tags": ["audit-logs"],
         "parameters": [
           {
             "in": "query",
@@ -3026,11 +3001,7 @@
             "name": "actor_type",
             "schema": {
               "type": "string",
-              "enum": [
-                "USER",
-                "DEVICE",
-                "SYSTEM"
-              ]
+              "enum": ["USER", "DEVICE", "SYSTEM"]
             }
           },
           {
@@ -3074,11 +3045,7 @@
             "name": "result",
             "schema": {
               "type": "string",
-              "enum": [
-                "SUCCESS",
-                "FAILURE",
-                "DENIED"
-              ]
+              "enum": ["SUCCESS", "FAILURE", "DENIED"]
             }
           },
           {
@@ -3120,9 +3087,7 @@
         "summary": "Admin reads system monitoring snapshot",
         "description": "",
         "operationId": "get__api_v1_monitoring_snapshot",
-        "tags": [
-          "monitoring"
-        ],
+        "tags": ["monitoring"],
         "parameters": [],
         "responses": {
           "200": {
@@ -3153,9 +3118,7 @@
         "summary": "Admin searches monitoring logs",
         "description": "",
         "operationId": "get__api_v1_monitoring_logs",
-        "tags": [
-          "monitoring"
-        ],
+        "tags": ["monitoring"],
         "parameters": [
           {
             "in": "query",
@@ -3200,12 +3163,7 @@
             "name": "level",
             "schema": {
               "type": "string",
-              "enum": [
-                "DEBUG",
-                "INFO",
-                "WARN",
-                "ERROR"
-              ]
+              "enum": ["DEBUG", "INFO", "WARN", "ERROR"]
             }
           },
           {
@@ -3256,9 +3214,7 @@
         "summary": "Download published firmware using signed URL",
         "description": "Public signed download URL. Firmware must remain PUBLISHED; revoked firmware cannot be downloaded.",
         "operationId": "get__api_v1_ota_download__token___signature_",
-        "tags": [
-          "ota"
-        ],
+        "tags": ["ota"],
         "parameters": [
           {
             "in": "path",
@@ -3311,9 +3267,7 @@
         "summary": "List firmware releases",
         "description": "",
         "operationId": "get__api_v1_ota_firmware",
-        "tags": [
-          "ota"
-        ],
+        "tags": ["ota"],
         "parameters": [
           {
             "in": "query",
@@ -3340,10 +3294,7 @@
             "name": "device_type",
             "schema": {
               "type": "string",
-              "enum": [
-                "SENSOR_NODE",
-                "CONTROL_NODE"
-              ]
+              "enum": ["SENSOR_NODE", "CONTROL_NODE"]
             }
           },
           {
@@ -3360,11 +3311,7 @@
             "name": "status",
             "schema": {
               "type": "string",
-              "enum": [
-                "DRAFT",
-                "PUBLISHED",
-                "REVOKED"
-              ]
+              "enum": ["DRAFT", "PUBLISHED", "REVOKED"]
             }
           }
         ],
@@ -3395,9 +3342,7 @@
         "summary": "Upload firmware binary",
         "description": "Upload application/octet-stream. Metadata is provided through HTTP headers. The backend calculates SHA-256 and signs the digest using Ed25519.",
         "operationId": "post_api_v1_ota_firmware",
-        "tags": [
-          "ota"
-        ],
+        "tags": ["ota"],
         "parameters": [
           {
             "in": "header",
@@ -3415,10 +3360,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "SENSOR_NODE",
-                "CONTROL_NODE"
-              ]
+              "enum": ["SENSOR_NODE", "CONTROL_NODE"]
             }
           },
           {
@@ -3491,9 +3433,7 @@
         "summary": "List OTA update jobs",
         "description": "",
         "operationId": "get__api_v1_ota_jobs",
-        "tags": [
-          "ota"
-        ],
+        "tags": ["ota"],
         "parameters": [
           {
             "in": "query",
@@ -3583,9 +3523,7 @@
         "summary": "Publish firmware release",
         "description": "",
         "operationId": "post__api_v1_ota_firmware__id__publish",
-        "tags": [
-          "ota"
-        ],
+        "tags": ["ota"],
         "parameters": [
           {
             "in": "path",
@@ -3627,9 +3565,7 @@
         "summary": "Revoke firmware release",
         "description": "",
         "operationId": "post__api_v1_ota_firmware__id__revoke",
-        "tags": [
-          "ota"
-        ],
+        "tags": ["ota"],
         "parameters": [
           {
             "in": "path",
@@ -3671,9 +3607,7 @@
         "summary": "Create OTA update job",
         "description": "",
         "operationId": "post__api_v1_devices__id__ota",
-        "tags": [
-          "devices"
-        ],
+        "tags": ["devices"],
         "parameters": [
           {
             "in": "path",
@@ -3756,10 +3690,7 @@
               },
               "details": {}
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           },
           "request_id": {
@@ -3768,19 +3699,12 @@
             "maxLength": 64
           }
         },
-        "required": [
-          "success",
-          "error",
-          "request_id"
-        ],
+        "required": ["success", "error", "request_id"],
         "additionalProperties": false
       },
       "Result": {
         "type": "object",
-        "required": [
-          "success",
-          "data"
-        ],
+        "required": ["success", "data"],
         "properties": {
           "success": {
             "const": true
@@ -3807,10 +3731,7 @@
             "writeOnly": true
           }
         },
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "additionalProperties": false
       },
       "PasswordChange": {
@@ -3829,10 +3750,7 @@
             "writeOnly": true
           }
         },
-        "required": [
-          "current_password",
-          "new_password"
-        ],
+        "required": ["current_password", "new_password"],
         "additionalProperties": false
       },
       "UserCreate": {
@@ -3855,19 +3773,10 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "ADMIN",
-              "OPERATOR",
-              "VIEWER"
-            ]
+            "enum": ["ADMIN", "OPERATOR", "VIEWER"]
           }
         },
-        "required": [
-          "username",
-          "password",
-          "display_name",
-          "role"
-        ],
+        "required": ["username", "password", "display_name", "role"],
         "additionalProperties": false
       },
       "UserPatch": {
@@ -3880,18 +3789,11 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "ADMIN",
-              "OPERATOR",
-              "VIEWER"
-            ]
+            "enum": ["ADMIN", "OPERATOR", "VIEWER"]
           },
           "status": {
             "type": "string",
-            "enum": [
-              "ACTIVE",
-              "DISABLED"
-            ]
+            "enum": ["ACTIVE", "DISABLED"]
           }
         },
         "required": [],
@@ -3911,10 +3813,7 @@
             "maxLength": 100
           }
         },
-        "required": [
-          "room_code",
-          "room_name"
-        ],
+        "required": ["room_code", "room_name"],
         "additionalProperties": false
       },
       "RoomPatch": {
@@ -3927,10 +3826,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "ACTIVE",
-              "INACTIVE"
-            ]
+            "enum": ["ACTIVE", "INACTIVE"]
           }
         },
         "required": [],
@@ -3951,9 +3847,7 @@
             "uniqueItems": true
           }
         },
-        "required": [
-          "user_ids"
-        ],
+        "required": ["user_ids"],
         "additionalProperties": false
       },
       "DeviceCreate": {
@@ -3970,10 +3864,7 @@
           },
           "device_type": {
             "type": "string",
-            "enum": [
-              "SENSOR_NODE",
-              "CONTROL_NODE"
-            ]
+            "enum": ["SENSOR_NODE", "CONTROL_NODE"]
           },
           "room_id": {
             "type": "string",
@@ -3991,11 +3882,7 @@
             "maxLength": 64
           }
         },
-        "required": [
-          "device_code",
-          "device_name",
-          "device_type"
-        ],
+        "required": ["device_code", "device_name", "device_type"],
         "additionalProperties": false
       },
       "DevicePatch": {
@@ -4045,9 +3932,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "reason"
-        ],
+        "required": ["reason"],
         "additionalProperties": false
       },
       "DesiredState": {
@@ -4055,17 +3940,11 @@
         "properties": {
           "light": {
             "type": "string",
-            "enum": [
-              "ON",
-              "OFF"
-            ]
+            "enum": ["ON", "OFF"]
           },
           "fan": {
             "type": "string",
-            "enum": [
-              "ON",
-              "OFF"
-            ]
+            "enum": ["ON", "OFF"]
           }
         },
         "required": [],
@@ -4084,9 +3963,7 @@
             "maximum": 10
           }
         },
-        "required": [
-          "desired_state"
-        ],
+        "required": ["desired_state"],
         "additionalProperties": false
       },
       "ConfigCreate": {
@@ -4112,9 +3989,7 @@
             "description": "Sample interval is Sensor-only. Heartbeat interval must be <= HEARTBEAT_TIMEOUT_S / 3."
           }
         },
-        "required": [
-          "settings"
-        ],
+        "required": ["settings"],
         "additionalProperties": false
       },
       "OtaRequest": {
@@ -4125,9 +4000,7 @@
             "format": "uuid"
           }
         },
-        "required": [
-          "firmware_id"
-        ],
+        "required": ["firmware_id"],
         "additionalProperties": false
       },
       "AlertResolve": {
@@ -4139,9 +4012,7 @@
             "maxLength": 255
           }
         },
-        "required": [
-          "reason"
-        ],
+        "required": ["reason"],
         "additionalProperties": false
       },
       "Thresholds": {
@@ -4156,24 +4027,15 @@
               "properties": {
                 "sensor_type": {
                   "type": "string",
-                  "enum": [
-                    "TEMPERATURE",
-                    "HUMIDITY"
-                  ]
+                  "enum": ["TEMPERATURE", "HUMIDITY"]
                 },
                 "severity": {
                   "type": "string",
-                  "enum": [
-                    "WARNING",
-                    "CRITICAL"
-                  ]
+                  "enum": ["WARNING", "CRITICAL"]
                 },
                 "operator": {
                   "type": "string",
-                  "enum": [
-                    "GT",
-                    "GTE"
-                  ]
+                  "enum": ["GT", "GTE"]
                 },
                 "threshold_value": {
                   "type": "number"
@@ -4198,9 +4060,7 @@
             "description": "Unique sensor/severity pairs; critical >= warning and clear <= threshold. Temperature -10..60°C; humidity 0..100%."
           }
         },
-        "required": [
-          "thresholds"
-        ],
+        "required": ["thresholds"],
         "additionalProperties": false
       },
       "Condition": {
@@ -4218,9 +4078,7 @@
                 }
               }
             },
-            "required": [
-              "all"
-            ],
+            "required": ["all"],
             "additionalProperties": false
           },
           {
@@ -4235,9 +4093,7 @@
                 }
               }
             },
-            "required": [
-              "any"
-            ],
+            "required": ["any"],
             "additionalProperties": false
           },
           {
@@ -4245,32 +4101,17 @@
             "properties": {
               "metric": {
                 "type": "string",
-                "enum": [
-                  "temperature",
-                  "humidity",
-                  "lux"
-                ]
+                "enum": ["temperature", "humidity", "lux"]
               },
               "operator": {
                 "type": "string",
-                "enum": [
-                  "GT",
-                  "GTE",
-                  "LT",
-                  "LTE",
-                  "EQ",
-                  "NE"
-                ]
+                "enum": ["GT", "GTE", "LT", "LTE", "EQ", "NE"]
               },
               "value": {
                 "type": "number"
               }
             },
-            "required": [
-              "metric",
-              "operator",
-              "value"
-            ],
+            "required": ["metric", "operator", "value"],
             "additionalProperties": false
           },
           {
@@ -4281,20 +4122,13 @@
               },
               "operator": {
                 "type": "string",
-                "enum": [
-                  "EQ",
-                  "NE"
-                ]
+                "enum": ["EQ", "NE"]
               },
               "value": {
                 "type": "boolean"
               }
             },
-            "required": [
-              "metric",
-              "operator",
-              "value"
-            ],
+            "required": ["metric", "operator", "value"],
             "additionalProperties": false
           }
         ]
@@ -4314,17 +4148,11 @@
           },
           "actuator": {
             "type": "string",
-            "enum": [
-              "LIGHT",
-              "FAN"
-            ]
+            "enum": ["LIGHT", "FAN"]
           },
           "action": {
             "type": "string",
-            "enum": [
-              "ON",
-              "OFF"
-            ]
+            "enum": ["ON", "OFF"]
           },
           "condition": {
             "$ref": "#/components/schemas/Condition"
@@ -4376,17 +4204,11 @@
           },
           "actuator": {
             "type": "string",
-            "enum": [
-              "LIGHT",
-              "FAN"
-            ]
+            "enum": ["LIGHT", "FAN"]
           },
           "action": {
             "type": "string",
-            "enum": [
-              "ON",
-              "OFF"
-            ]
+            "enum": ["ON", "OFF"]
           },
           "condition": {
             "$ref": "#/components/schemas/Condition"
@@ -4419,10 +4241,7 @@
         "properties": {
           "control_mode": {
             "type": "string",
-            "enum": [
-              "AUTO",
-              "MANUAL"
-            ]
+            "enum": ["AUTO", "MANUAL"]
           },
           "reason": {
             "type": "string",
@@ -4430,10 +4249,7 @@
             "maxLength": 255
           }
         },
-        "required": [
-          "control_mode",
-          "reason"
-        ],
+        "required": ["control_mode", "reason"],
         "additionalProperties": false
       }
     }
