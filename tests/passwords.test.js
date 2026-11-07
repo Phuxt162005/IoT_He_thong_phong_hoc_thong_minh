@@ -12,3 +12,11 @@ test("password hashes have random salts and compare safely", async () => {
   assert.equal(await verifyPassword(password, "scrypt-v1$bad$bad"), false);
   await assert.rejects(() => hashPassword("short"), TypeError);
 });
+
+test("password length accepts 8 through 128 characters and rejects values outside the range", async () => {
+  for (const length of [8, 128]) {
+    const password = "a".repeat(length);
+    assert.equal(await verifyPassword(password, await hashPassword(password)), true);
+  }
+  for (const length of [7, 129]) await assert.rejects(() => hashPassword("a".repeat(length)), TypeError);
+});
