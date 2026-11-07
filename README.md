@@ -66,7 +66,7 @@ Chạy lại `npm run db:migrate` sau mỗi lần cập nhật mã có migration
 | POST `/api/v1/auth/login` | JSON `{username,password}`; trả `access_token`, `expires_in`, thông tin người dùng an toàn. |
 | GET `/api/v1/auth/me` | Header `Authorization: Bearer <access_token>`; kiểm tra chữ ký/hạn token, trạng thái user và token version trong DB. |
 | POST `/api/v1/auth/logout` | Có Bearer token; vô hiệu **tất cả phiên** của tài khoản bằng token version. |
-| POST `/api/v1/auth/change-password` | Có Bearer token; JSON `{current_password,new_password}`; mật khẩu mới dài 12–128 ký tự, khác mật khẩu cũ; đăng nhập lại sau khi đổi. |
+| POST `/api/v1/auth/change-password` | Có Bearer token; JSON `{current_password,new_password}`; mật khẩu mới dài 8–128 ký tự, khác mật khẩu cũ; đăng nhập lại sau khi đổi. |
 
 Sau 5 lần đăng nhập sai trong 15 phút theo cặp IP/username, server trả 429 cho tới hết cửa sổ. Bộ đếm lưu trong PostgreSQL nên giữ qua restart với cùng JWT_SECRET. Mặc định không tin X-Forwarded-For; khi triển khai qua reverse proxy cần cấu hình trust proxy theo đúng mạng proxy, tránh cho client tự khai IP. Mật khẩu được băm bằng [scrypt của Node.js](https://nodejs.org/api/crypto.html#cryptoscryptpassword-salt-keylen-options-callback); JWT dùng [jose](https://github.com/panva/jose) và chỉ chấp nhận HS256 với issuer/audience cố định. Không lưu token vào URL hoặc log.
 

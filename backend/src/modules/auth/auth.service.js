@@ -28,6 +28,30 @@ export class AuthService {
       .setIssuedAt().setExpirationTime(`${this.jwtExpiresIn}s`).sign(this.key);
   }
 
+  async register({ username, password, display_name }, { ip, requestId } = {}) {
+    // Giới hạn theo IP, dùng namespace riêng để không ảnh hưởng bộ đếm đăng nhập.
+    const key = createHmac("sha256", this.key).update(JSON.stringify(["register", ip ?? "unknown"])).digest("hex");
+    const attempt = (await this.pool.query(`INSERT INTO login_attempts(login_key,failures) VALUES($1,1)
+      ON CONFLICT(login_key) DO UPDATE SET
+      failures=CASE WHEN login_attempts.window_started > now()-interval '15 minutes' THEN login_attempts.failures+1 ELSE 1 END,
+      window_started=CASE WHEN login_attempts.window_started > now()-interval '15 minutes' THEN login_attempts.window_started ELSE now() END
+      RETURNING failures`, [key])).rows[0];
+    if (attempt.failures > 5) throw new AppError("REGISTER_RATE_LIMITED", 429, "Đăng ký quá nhiều lần. Vui lòng thử lại sau 15 phút");
+    const hash = await hashPassword(password);
+    try {
+      return await withTransaction(this.pool, async (client) => {
+        // Quyền tự đăng ký luôn là VIEWER, không nhận role/status từ trình duyệt.
+        const user = (await client.query(`INSERT INTO users(username,password_hash,display_name,role_id)
+          SELECT $1,$2,$3,role_id FROM roles WHERE role_name='VIEWER' RETURNING user_id`, [username, hash, display_name])).rows[0];
+        await writeAudit(client, { action: "USER_REGISTER", targetType: "USER", targetId: user.user_id, requestId, details: { role: "VIEWER" } });
+        return publicUser((await client.query(`${userSelect} WHERE u.user_id=$1`, [user.user_id])).rows[0]);
+      });
+    } catch (error) {
+      if (error.code === "23505") throw new AppError("USERNAME_TAKEN", 409, "Tên đăng nhập đã được sử dụng");
+      throw error;
+    }
+  }
+
   async authenticate(authorization) {
     const match = typeof authorization === "string" && /^Bearer ([A-Za-z0-9_.-]{1,4096})$/.exec(authorization);
     if (!match) throw unauthorized();

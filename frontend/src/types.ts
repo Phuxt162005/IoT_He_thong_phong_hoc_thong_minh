@@ -1,6 +1,11 @@
 export type Role = 'ADMIN' | 'OPERATOR' | 'VIEWER';
 export type Status = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
 export type User = { id: string; username: string; display_name: string; role: Role; status: 'ACTIVE' | 'DISABLED'; };
+export type RegisterInput = { username: string; password: string; display_name: string };
+export type CreateUserInput = RegisterInput & { role: 'OPERATOR' | 'VIEWER' };
+export type UpdateUserInput = { display_name: string; role: 'OPERATOR' | 'VIEWER'; status: User['status'] };
+export type UserListQuery = { page: number; page_size: number; role?: Role; status?: User['status'] };
+export type UserPage = { items: User[]; total: number };
 export type Room = { id: string; room_code: string; room_name: string; status: 'ACTIVE' | 'INACTIVE'; device_count?: number; };
 export type Device = { id: string; device_code: string; device_type: 'SENSOR_NODE' | 'CONTROL_NODE'; room_id: string; room_name?: string; lifecycle_status: string; connection_status: Status; firmware_version?: string; last_seen?: string; wifi_rssi_dbm?: number; free_heap_bytes?: number; uptime_seconds?: number; maintenance_reason?: string; };
 export type Alert = { id: string; alert_type: string; severity: 'WARNING' | 'CRITICAL'; status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED'; room_name?: string; device_code?: string; value?: number; occurrence_count: number; created_at: string; };
