@@ -262,11 +262,6 @@ bool ActuatorManager::sendAck(
   ack.fanState = getFanState();
   ack.lightState = getLightState();
 
-  if (_ackCount >= ACK_QUEUE_SIZE) {
-    Serial.println("[Actuator] Tu choi command: ACK queue is full.");
-    return true;
-  }
-
   if (!enqueueAck(ack)) {
     Serial.println("[Actuator] Khong the xep ACK vao hang doi.");
     return false;
@@ -410,6 +405,14 @@ bool ActuatorManager::handleMessage(
   if (sessId != _session.getSessionId()) {
     Serial.println("[Actuator] Sai session_id.");
     return true;
+  }
+
+  // Không nhận lệnh mới nếu không còn chỗ lưu ACK.
+  if (_ackCount >= ACK_QUEUE_SIZE) {
+      Serial.println(
+          "[Actuator] Tu choi command: ACK queue is full."
+      );
+      return true;
   }
 
   // Kiểm tra toàn bộ desired_state trước khi điều khiển relay.
