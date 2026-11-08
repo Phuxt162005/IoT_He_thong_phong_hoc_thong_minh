@@ -24,7 +24,9 @@
     "test:monitoring-logging": "node --test tests/monitoring-logging.test.js",
     "test:anomaly-detection": "node --test tests/anomaly-detection*.test.js",
     "test": "node --test tests/*.test.js",
-    "test:ota": "node --test tests/integration/ota.test.js"
+    "test:ota": "node --test tests/integration/ota.test.js",
+    "test:firmware-phase1": "node --test tests/integration/phase1-firmware-session.test.js",
+    "dev:cli": "node deployment/scripts/dev-cli.mjs"
   },
   "engines": {
     "node": ">=20"

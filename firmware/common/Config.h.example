@@ -1,0 +1,28 @@
+#pragma once
+
+// ==============================================================================
+// Cấu hình Wi-Fi
+// ==============================================================================
+#define WIFI_SSID           "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD       "YOUR_WIFI_PASSWORD"
+
+// ==============================================================================
+// Cấu hình MQTT Broker
+// ==============================================================================
+#define MQTT_HOST           "192.168.1.100"   // IP của máy tính chạy Mosquitto Broker trong mạng LAN
+#define MQTT_PORT           1884              // Cổng MQTT (1884 cho local dev docker, hoặc 1883/8883)
+
+// ==============================================================================
+// Thông tin Định danh & Xác thực Thiết bị (Lấy sau khi bấm "Provision" trên Dashboard)
+// ==============================================================================
+#define DEVICE_ID           "SN-A101-01"      // device_code đã tạo (VD: SN-A101-01 cho Sensor, CN-A101-01 cho Control)
+#define ROOM_ID             "A101"            // room_code của phòng học
+#define MQTT_USERNAME       "SN-A101-01"      // Trùng với DEVICE_ID
+#define MQTT_PASSWORD       "YOUR_DEVICE_SECRET" // Secret nhận được 1 lần duy nhất lúc Provision
+
+// ==============================================================================
+// Cấu hình Thông số vận hành
+// ==============================================================================
+#define FIRMWARE_VERSION    "1.0.0"
+#define HEARTBEAT_INTERVAL_S 10               // Chu kỳ gửi Heartbeat (giây)
+#define SAMPLE_INTERVAL_S    5                // Chu kỳ đọc cảm biến (giây) - Dành cho Sensor Node

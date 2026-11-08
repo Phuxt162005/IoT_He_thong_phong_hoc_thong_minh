@@ -60,7 +60,7 @@ services:
       - firmwaredata:/app/storage/firmware
     profiles: [app]
     environment: *runtime-env
-    ports: ["127.0.0.1:${BACKEND_PORT:-3000}:3000"]
+    ports: ["0.0.0.0:${BACKEND_PORT:-3000}:3000"]
     depends_on:
       backend-init: { condition: service_completed_successfully }
     restart: unless-stopped
@@ -107,7 +107,7 @@ services:
     entrypoint: ["/bin/sh", "/mosquitto/config/start.sh"]
     environment:
       MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?Set MQTT_ADMIN_PASSWORD}
-    ports: ["127.0.0.1:${MQTT_PORT:-1884}:1883"]
+    ports: ["0.0.0.0:${MQTT_PORT:-1884}:1883"]
     volumes:
       - ./mosquitto:/mosquitto/config:ro
       - mqttdata:/mosquitto/data
