@@ -66,8 +66,23 @@ private:
   String _recentCommandIds[DEDUP_SIZE];
   size_t _dedupIndex = 0;
 
-  String _pendingAckPayload;
+  static const size_t ACK_QUEUE_SIZE = 8;
+
+  struct PendingAck {
+    String commandId;
+    uint32_t version;
+    bool success;
+    String errorCode;
+    String fanState;
+    String lightState;
+  };
+
+  PendingAck _ackQueue[ACK_QUEUE_SIZE];
+  size_t _ackHead = 0;
+  size_t _ackCount = 0;
   uint32_t _lastAckAttemptMs = 0;
+
+  bool enqueueAck(const PendingAck& ack);
 
   bool isCommandProcessed(const String& cmdId);
   void markCommandProcessed(const String& cmdId);

@@ -233,16 +233,17 @@ bool ActuatorManager::saveCommandMetadata(
   return saved == metadata;
 }
 
-bool ActuatorManager::publishAck(const String& payload) {
-  if (!_mqtt.connected()) {
+bool ActuatorManager::enqueueAck(const PendingAck& ack) {
+  if (_ackCount >= ACK_QUEUE_SIZE) {
+    Serial.println("[Actuator] ERROR: ACK queue is full.");
     return false;
   }
 
-  return _mqtt.publish(
-    _ackTopic.c_str(),
-    payload.c_str(),
-    false
-  );
+  size_t tail = (_ackHead + _ackCount) % ACK_QUEUE_SIZE;
+  _ackQueue[tail] = ack;
+  _ackCount++;
+
+  return true;
 }
 
 bool ActuatorManager::sendAck(
@@ -251,59 +252,25 @@ bool ActuatorManager::sendAck(
   bool success,
   const String& errorCode
 ) {
-  StaticJsonDocument<512> doc;
+  PendingAck ack;
 
-  doc["command_id"] = commandId;
-  doc["device_id"] = _deviceId;
-  doc["room_id"] = _roomId;
-  doc["session_id"] = _session.getSessionId();
-  doc["shadow_version"] = version;
-  doc["status"] = success ? "SUCCESS" : "FAILED";
-  doc["timestamp"] = _session.getNowMs();
+  ack.commandId = commandId;
+  ack.version = version;
+  ack.success = success;
+  ack.errorCode = errorCode;
+  ack.fanState = getFanState();
+  ack.lightState = getLightState();
 
-  JsonObject reported = doc.createNestedObject("reported_state");
-
-  reported["fan"] = getFanState();
-  reported["light"] = getLightState();
-
-  if (!success && !errorCode.isEmpty()) {
-    doc["error_code"] = errorCode;
-  }
-
-  String payload;
-
-  if (serializeJson(doc, payload) == 0) {
-    Serial.println("[Actuator] Loi tao ACK JSON.");
+  if (!enqueueAck(ack)) {
+    Serial.println("[Actuator] Khong the xep ACK vao hang doi.");
     return false;
   }
 
-  bool published = publishAck(payload);
-
-  if (published) {
-    Serial.printf(
-      "[Actuator] ACK %s: command=%s, version=%u\n",
-      success ? "SUCCESS" : "FAILED",
-      commandId.c_str(),
-      version
-    );
-
-    _pendingAckPayload = "";
-    return true;
-  }
-
-  // Giữ ACK để thử gửi lại trong loop().
-  _pendingAckPayload = payload;
-  _lastAckAttemptMs = millis();
-
-  Serial.println(
-    "[Actuator] ACK chua gui duoc. Se thu lai."
-  );
-
-  return false;
+  return true;
 }
 
 void ActuatorManager::loop() {
-  if (_pendingAckPayload.isEmpty() || !_mqtt.connected()) {
+  if (_ackCount == 0 || !_mqtt.connected()) {
     return;
   }
 
@@ -313,12 +280,55 @@ void ActuatorManager::loop() {
     return;
   }
 
+  // Không gửi ACK với timestamp bằng 0.
+  uint64_t timestamp = _session.getNowMs();
+
+  if (timestamp == 0) {
+    return;
+  }
+
+  PendingAck& ack = _ackQueue[_ackHead];
+
+  StaticJsonDocument<512> doc;
+
+  doc["command_id"] = ack.commandId;
+  doc["device_id"] = _deviceId;
+  doc["room_id"] = _roomId;
+  doc["session_id"] = _session.getSessionId();
+  doc["shadow_version"] = ack.version;
+  doc["status"] = ack.success ? "SUCCESS" : "FAILED";
+  doc["timestamp"] = timestamp;
+
+  JsonObject reported = doc.createNestedObject("reported_state");
+  reported["fan"] = ack.fanState;
+  reported["light"] = ack.lightState;
+
+  if (!ack.success && !ack.errorCode.isEmpty()) {
+    doc["error_code"] = ack.errorCode;
+  }
+
+  String payload;
+
+  if (serializeJson(doc, payload) == 0) {
+    return;
+  }
+
   _lastAckAttemptMs = now;
 
-  if (publishAck(_pendingAckPayload)) {
-    Serial.println("[Actuator] Da gui lai ACK thanh cong.");
-    _pendingAckPayload = "";
+  if (!_mqtt.publish(_ackTopic.c_str(), payload.c_str(), false)) {
+    Serial.println("[Actuator] Gui ACK that bai, se thu lai.");
+    return;
   }
+
+  Serial.printf(
+    "[Actuator] ACK %s da gui: %s\n",
+    ack.success ? "SUCCESS" : "FAILED",
+    ack.commandId.c_str()
+  );
+
+  // Chỉ xóa ACK đầu hàng đợi khi publish thành công.
+  _ackHead = (_ackHead + 1) % ACK_QUEUE_SIZE;
+  _ackCount--;
 }
 
 bool ActuatorManager::handleMessage(
@@ -505,7 +515,7 @@ bool ActuatorManager::handleMessage(
 
     sendAck(
       cmdId,
-      _shadowVersion,
+      version,
       false,
       "PERSISTENCE_FAILURE"
     );
