@@ -47,4 +47,43 @@ docker compose --env-file .env -f deployment/compose.yml --profile app up -d --b
 
 Sau đó cần đăng nhập bằng `ADMIN_USERNAME` và `ADMIN_PASSWORD` trong file `.env` ở thư mục gốc. Cảm biến không thể chỉ cắm là tự xuất hiện: lần đầu phải tạo phòng, đăng ký `device_code`, gán thiết bị vào phòng và provision credential trong màn hình “Thiết bị”. Sau khi firmware ESP32 kết nối MQTT và publish heartbeat/telemetry đúng topic, dữ liệu sẽ tự chảy vào Dashboard qua REST và WebSocket.
 
-Mock giữ cùng các kiểu dữ liệu chính của API (`rooms`, `devices`, `telemetry/latest`, `alerts`, `commands`, `users`, `audit-logs`). Khi tích hợp backend, các response list có thể bọc `meta` theo hợp đồng.
+Danh sách lấy số trang, tổng bản ghi và khoảng thời gian từ `meta` của backend. Bộ chọn phòng, thiết bị và thành viên tải đủ các trang, kể cả khi có hơn 100 bản ghi. Chế độ mock dùng chung dữ liệu trong bộ nhớ cho các màn hình và không gửi HTTP/WebSocket đến backend thật. Lệnh mock không nhận ACK sẽ timeout; trạng thái phần cứng không tự đổi thành thành công.
+
+## Các màn hình đã kết nối API
+
+| Màn hình | Chức năng |
+|---|---|
+| Tổng quan | Số đo mới nhất, cảnh báo dữ liệu cũ, thống kê 24 giờ, trạng thái thiết bị, shadow và lịch sử lệnh |
+| Phòng học | Tạo/sửa, đổi trạng thái, gán Operator/Viewer, xem chi tiết thiết bị trong phòng |
+| Thiết bị | Đăng ký khi chưa có phòng, sửa/gán phòng, provision, kích hoạt, xoay/thu hồi credential, bảo trì/khôi phục/ngừng sử dụng có xác nhận |
+| Chi tiết thiết bị | Heartbeat/RSSI/heap/uptime, credential đầy đủ, đồng bộ broker, lịch sử vòng đời và cấu hình mong muốn/đã áp dụng theo ACK |
+| Telemetry | Phân trang, lọc phòng/thiết bị/thời gian, thống kê giờ/ngày, hiện diện, CSV, múi giờ máy người dùng |
+| Cảnh báo | Lọc, xem chi tiết, xác nhận, đóng với lý do; Admin sửa ngưỡng, các vai trò khác xem ngưỡng |
+| Điều khiển | Trạng thái báo về, AUTO/MANUAL, gửi lại cùng Idempotency-Key, theo dõi đúng command_id, lịch sử cả đèn và quạt; Viewer chỉ xem |
+| Tự động hóa | Xem quy tắc; Admin tạo/sửa/bật/tắt, điều kiện AND/OR lồng nhau |
+| Bất thường | Hiển thị findings, giá trị 0, baseline, thời gian đo/phân tích và chi tiết |
+| OTA | Xem firmware và job theo phạm vi phòng; Admin upload/phát hành/thu hồi/tạo yêu cầu cập nhật, theo dõi tiến trình và lỗi |
+| Audit / Monitoring | Admin lọc nhật ký, xem metadata, tình trạng hệ thống, bộ đếm và chẩn đoán |
+
+WebSocket làm mới những nhóm dữ liệu liên quan, gộp các sự kiện liên tiếp để hạn chế gọi API. Lệnh điều khiển nhận ACK được xử lý ngay theo mã lệnh; các job OTA đang chạy được kiểm tra lại mỗi 15 giây. Có thể dùng nút cập nhật trên màn hình để đọc lại ngay.
+
+OTA gửi metadata tiếng Việt bằng header `x-metadata-encoding: percent-utf8`; backend vẫn nhận metadata ASCII từ client cũ. Không cần migration database mới. Chi tiết thay đổi và kiểm chứng ở [frontend-backend-completion.md](../docs/frontend-backend-completion.md).
+
+## Kiểm thử giao diện tích hợp
+
+Chạy từ thư mục gốc, sau khi khởi động PostgreSQL/MQTT thử nghiệm và cấu hình `.env.test` theo [hướng dẫn vận hành](../docs/backend-operations.md). Các ca này tạo database riêng và không dùng dữ liệu ứng dụng đang chạy. Cần Chrome; có thể đặt `BROWSER_BIN` nếu Chrome nằm ở vị trí khác.
+
+```powershell
+npm test
+npm run mqtt:bootstrap:test
+npm run test:integration
+npm --prefix frontend run build -- --outDir ../.local/frontend-completion-build
+node --test tests/frontend-completion.browser.mjs
+
+$env:VITE_USE_MOCK='true'
+npm --prefix frontend run build -- --outDir ../.local/frontend-completion-mock
+Remove-Item Env:VITE_USE_MOCK
+node --test tests/frontend-mock.browser.mjs
+```
+
+Hai bộ kiểm thử trình duyệt dùng cổng 5181/5182 và Chrome CDP 9229/9230. Chúng kiểm tra thao tác form, phân trang, phân quyền, lỗi API và chế độ mock không gọi backend thật. Kết quả MQTT trong bộ kiểm thử do client mô phỏng gửi; việc nạp firmware/đóng relay trên ESP32 thật vẫn cần kiểm thử với phần cứng.

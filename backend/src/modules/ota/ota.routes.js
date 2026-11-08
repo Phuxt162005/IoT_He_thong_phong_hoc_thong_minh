@@ -72,12 +72,26 @@ export function createOtaRoutes(
     available,
     express.raw({ type: "application/octet-stream", limit: maxFirmwareBytes }),
     async (req, res) => {
+      const textHeader = (name) => {
+        const value = req.get(name);
+        if (!value || req.get("x-metadata-encoding") !== "percent-utf8")
+          return value;
+        try {
+          return decodeURIComponent(value);
+        } catch {
+          throw new AppError(
+            "INVALID_METADATA_ENCODING",
+            400,
+            "Metadata firmware mã hóa không hợp lệ",
+          );
+        }
+      };
       const metadata = parse(firmwareHeaders, {
-        version: req.get("x-firmware-version"),
+        version: textHeader("x-firmware-version"),
         device_type: req.get("x-device-type"),
-        hardware_target: req.get("x-hardware-target"),
-        file_name: req.get("x-firmware-file-name"),
-        release_notes: req.get("x-release-notes") || undefined,
+        hardware_target: textHeader("x-hardware-target"),
+        file_name: textHeader("x-firmware-file-name"),
+        release_notes: textHeader("x-release-notes") || undefined,
       });
 
       const result = await ota.registerFirmware(

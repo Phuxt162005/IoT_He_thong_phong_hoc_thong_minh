@@ -4,7 +4,7 @@ import { withTransaction } from "../../database/pool.js";
 import { writeAudit } from "../../database/audit.js";
 import { recordLifecycle, transitionDevice } from "./device-lifecycle.js";
 
-export const deviceSelect = `SELECT d.device_id,d.device_code,d.device_name,d.device_type,d.room_id,d.lifecycle_status,d.connection_status,d.broker_sync_status,d.hardware_version,d.firmware_version,d.last_seen,d.last_heartbeat_at,d.last_rssi_dbm,d.last_free_heap_bytes,d.last_uptime_seconds,d.created_at,d.updated_at,r.room_code,r.status AS room_status FROM devices d LEFT JOIN rooms r ON r.room_id=d.room_id`;
+export const deviceSelect = `SELECT d.device_id,d.device_code,d.device_name,d.device_type,d.room_id,d.lifecycle_status,d.connection_status,d.control_mode,d.broker_sync_status,d.hardware_version,d.firmware_version,d.last_seen,d.last_heartbeat_at,d.last_rssi_dbm,d.last_free_heap_bytes,d.last_uptime_seconds,d.created_at,d.updated_at,r.room_code,r.status AS room_status FROM devices d LEFT JOIN rooms r ON r.room_id=d.room_id`;
 const scopeSql = "($1::boolean OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.room_id=d.room_id AND ur.user_id=$2))";
 export async function requireDeviceScope(client, user, id) {
   return requireFound((await client.query(`${deviceSelect} WHERE ${scopeSql} AND d.device_id=$3`, [user.role === "ADMIN", user.user_id, id])).rows[0], "Không tìm thấy thiết bị trong phạm vi truy cập");
