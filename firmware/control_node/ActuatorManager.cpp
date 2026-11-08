@@ -262,6 +262,11 @@ bool ActuatorManager::sendAck(
   ack.fanState = getFanState();
   ack.lightState = getLightState();
 
+  if (_ackCount >= ACK_QUEUE_SIZE) {
+    Serial.println("[Actuator] Tu choi command: ACK queue is full.");
+    return true;
+  }
+
   if (!enqueueAck(ack)) {
     Serial.println("[Actuator] Khong the xep ACK vao hang doi.");
     return false;
@@ -277,9 +282,9 @@ void ActuatorManager::loop() {
 
   uint32_t now = millis();
 
-  if (now - _lastAckAttemptMs < 2000) {
+if (_lastAckAttemptMs != 0 && now - _lastAckAttemptMs < 500) {
     return;
-  }
+}
 
   // Không gửi ACK với timestamp bằng 0.
   uint64_t timestamp = _session.getNowMs();
@@ -314,11 +319,10 @@ void ActuatorManager::loop() {
     return;
   }
 
-  _lastAckAttemptMs = now;
-
   if (!_mqtt.publish(_ackTopic.c_str(), payload.c_str(), false)) {
-    Serial.println("[Actuator] Gui ACK that bai, se thu lai.");
-    return;
+      _lastAckAttemptMs = now;
+      Serial.println("[Actuator] Gui ACK that bai, se thu lai.");
+      return;
   }
 
   Serial.printf(
