@@ -106,6 +106,7 @@ void setup() {
 void loop() {
   // Điều phối luồng duy trì kết nối, đồng bộ NTP và gửi heartbeat tự động
   sessionManager.loop();
+  actuatorManager.loop();
 
   // In thông tin chẩn đoán ra Serial Monitor mỗi 5 giây
   static uint32_t lastPrint = 0;

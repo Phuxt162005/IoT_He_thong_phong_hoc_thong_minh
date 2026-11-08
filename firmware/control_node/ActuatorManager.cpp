@@ -1,4 +1,3 @@
-
 #include "ActuatorManager.h"
 #include <ArduinoJson.h>
 #include <cstring>
@@ -18,68 +17,140 @@ ActuatorManager::ActuatorManager(
     _pinFan(pinFan),
     _pinLight(pinLight),
     _activeLow(activeLow) {
-  _commandTopic = "smartclassroom/room/" + _roomId + "/device/" + _deviceId + "/command";
-  _ackTopic = "smartclassroom/room/" + _roomId + "/device/" + _deviceId + "/ack";
-  _reportedTopic = "smartclassroom/room/" + _roomId + "/device/" + _deviceId + "/reported";
+
+  _commandTopic = "smartclassroom/room/" + _roomId +
+                  "/device/" + _deviceId + "/command";
+
+  _ackTopic = "smartclassroom/room/" + _roomId +
+              "/device/" + _deviceId + "/ack";
+
+  _reportedTopic = "smartclassroom/room/" + _roomId +
+                   "/device/" + _deviceId + "/reported";
 }
 
 void ActuatorManager::writeHardware(uint8_t pin, bool on) {
-  digitalWrite(pin, _activeLow ? (on ? LOW : HIGH) : (on ? HIGH : LOW));
+  digitalWrite(
+    pin,
+    _activeLow ? (on ? LOW : HIGH) : (on ? HIGH : LOW)
+  );
+}
+
+void ActuatorManager::forceAllOff() {
+  _fanOn = false;
+  _lightOn = false;
+
+  writeHardware(_pinFan, false);
+  writeHardware(_pinLight, false);
 }
 
 void ActuatorManager::begin() {
-  // Đưa GPIO về trạng thái OFF ngay khi khởi tạo.
+  // Đưa relay về OFF ngay khi khởi động.
   digitalWrite(_pinFan, _activeLow ? HIGH : LOW);
   pinMode(_pinFan, OUTPUT);
-  digitalWrite(_pinFan, _activeLow ? HIGH : LOW);
+  writeHardware(_pinFan, false);
 
   digitalWrite(_pinLight, _activeLow ? HIGH : LOW);
   pinMode(_pinLight, OUTPUT);
-  digitalWrite(_pinLight, _activeLow ? HIGH : LOW);
-
-  // Mở NVS và khôi phục version/command ID, không khôi phục trạng thái ON.
-  _prefsReady = _prefs.begin("dev_act", false);
-
-  if (_prefsReady) {
-    _shadowVersion = _prefs.getUInt("shadow_ver", 1);
-    _lastProcessedCommandId = _prefs.getString("last_cmd_id", "");
-  } else {
-    _shadowVersion = 1;
-    _lastProcessedCommandId = "";
-    Serial.println("[Actuator] WARNING: Khong mo duoc NVS Preferences");
-  }
-
-  // Chính sách an toàn: relay luôn OFF sau khi khởi động.
-  _fanOn = false;
-  _lightOn = false;
-  writeHardware(_pinFan, false);
   writeHardware(_pinLight, false);
 
+  forceAllOff();
+
+  // Mở NVS.
+  _prefsReady = _prefs.begin("dev_act", false);
+
+  if (!_prefsReady) {
+    _storageFault = true;
+
+    Serial.println(
+      "[Actuator] ERROR: Khong mo duoc NVS. Khoa dieu khien relay."
+    );
+
+    return;
+  }
+
+  // Ưu tiên đọc bản ghi metadata mới.
+  String metadata = _prefs.getString("cmd_meta", "");
+
+  if (!metadata.isEmpty()) {
+    StaticJsonDocument<192> doc;
+
+    DeserializationError err = deserializeJson(doc, metadata);
+
+    if (err ||
+        !doc["shadow_version"].is<uint32_t>() ||
+        !doc["command_id"].is<const char*>()) {
+
+      _storageFault = true;
+
+      Serial.println(
+        "[Actuator] ERROR: Metadata NVS khong hop le."
+      );
+
+      return;
+    }
+
+    _shadowVersion = doc["shadow_version"].as<uint32_t>();
+    _lastProcessedCommandId = doc["command_id"].as<String>();
+
+    if (_shadowVersion == 0 || _shadowVersion > 2147483647UL) {
+      _storageFault = true;
+
+      Serial.println(
+        "[Actuator] ERROR: Shadow version trong NVS khong hop le."
+      );
+
+      return;
+    }
+  } else {
+    // Tương thích dữ liệu từ phiên bản firmware cũ.
+    _shadowVersion = _prefs.getUInt("shadow_ver", 1);
+    _lastProcessedCommandId = _prefs.getString("last_cmd_id", "");
+
+    if (_shadowVersion == 0 || _shadowVersion > 2147483647UL) {
+      _storageFault = true;
+
+      Serial.println(
+        "[Actuator] ERROR: Shadow version cu khong hop le."
+      );
+
+      return;
+    }
+  }
+
+  // Không khôi phục trạng thái ON từ NVS.
+  forceAllOff();
+
   Serial.printf(
-    "[Actuator] Khoi tao relay: FAN=OFF, LIGHT=OFF, ShadowVer=%u\n",
+    "[Actuator] Khoi tao: FAN=OFF, LIGHT=OFF, ShadowVer=%u\n",
     _shadowVersion
   );
 }
 
 bool ActuatorManager::subscribe() {
-  if (!_mqtt.connected()) return false;
+  if (!_mqtt.connected() || _storageFault) {
+    return false;
+  }
 
   bool ok = _mqtt.subscribe(_commandTopic.c_str(), 1);
 
   if (ok) {
     Serial.println("[Actuator] Subscribed: " + _commandTopic);
   } else {
-    Serial.println("[Actuator] Subscribe that bai: " + _commandTopic);
+    Serial.println("[Actuator] Subscribe that bai.");
   }
 
   return ok;
 }
 
 bool ActuatorManager::isCommandProcessed(const String& cmdId) {
-  if (cmdId == _lastProcessedCommandId) return true;
+  if (!cmdId.isEmpty() && cmdId == _lastProcessedCommandId) {
+    return true;
+  }
 
   for (size_t i = 0; i < DEDUP_SIZE; i++) {
-    if (_recentCommandIds[i] == cmdId) return true;
+    if (_recentCommandIds[i] == cmdId && !cmdId.isEmpty()) {
+      return true;
+    }
   }
 
   return false;
@@ -112,24 +183,66 @@ void ActuatorManager::setFan(bool on) {
   _fanOn = on;
   writeHardware(_pinFan, on);
 
-  if (_prefsReady) {
-    _prefs.putBool("fan_on", _fanOn);
-  }
-
-  Serial.printf("[Relay] QUAT (GPIO %d) -> %s\n",
-    _pinFan, on ? "BAT (ON)" : "TAT (OFF)");
+  Serial.printf(
+    "[Relay] QUAT (GPIO %d) -> %s\n",
+    _pinFan,
+    on ? "BAT (ON)" : "TAT (OFF)"
+  );
 }
 
 void ActuatorManager::setLight(bool on) {
   _lightOn = on;
   writeHardware(_pinLight, on);
 
-  if (_prefsReady) {
-    _prefs.putBool("light_on", _lightOn);
+  Serial.printf(
+    "[Relay] DEN (GPIO %d) -> %s\n",
+    _pinLight,
+    on ? "BAT (ON)" : "TAT (OFF)"
+  );
+}
+
+// Lưu version và command ID chung trong một khóa NVS.
+bool ActuatorManager::saveCommandMetadata(
+  uint32_t version,
+  const String& commandId
+) {
+  if (!_prefsReady || commandId.isEmpty()) {
+    return false;
   }
 
-  Serial.printf("[Relay] DEN (GPIO %d) -> %s\n",
-    _pinLight, on ? "BAT (ON)" : "TAT (OFF)");
+  StaticJsonDocument<192> doc;
+
+  doc["shadow_version"] = version;
+  doc["command_id"] = commandId;
+
+  String metadata;
+
+  if (serializeJson(doc, metadata) == 0) {
+    return false;
+  }
+
+  size_t written = _prefs.putString("cmd_meta", metadata);
+
+  if (written != metadata.length()) {
+    return false;
+  }
+
+  // Đọc lại để xác minh dữ liệu đã được ghi.
+  String saved = _prefs.getString("cmd_meta", "");
+
+  return saved == metadata;
+}
+
+bool ActuatorManager::publishAck(const String& payload) {
+  if (!_mqtt.connected()) {
+    return false;
+  }
+
+  return _mqtt.publish(
+    _ackTopic.c_str(),
+    payload.c_str(),
+    false
+  );
 }
 
 bool ActuatorManager::sendAck(
@@ -138,12 +251,8 @@ bool ActuatorManager::sendAck(
   bool success,
   const String& errorCode
 ) {
-  if (!_mqtt.connected()) {
-    Serial.println("[Actuator] Khong the gui ACK: MQTT disconnected");
-    return false;
-  }
-
   StaticJsonDocument<512> doc;
+
   doc["command_id"] = commandId;
   doc["device_id"] = _deviceId;
   doc["room_id"] = _roomId;
@@ -153,6 +262,7 @@ bool ActuatorManager::sendAck(
   doc["timestamp"] = _session.getNowMs();
 
   JsonObject reported = doc.createNestedObject("reported_state");
+
   reported["fan"] = getFanState();
   reported["light"] = getLightState();
 
@@ -161,19 +271,54 @@ bool ActuatorManager::sendAck(
   }
 
   String payload;
-  serializeJson(doc, payload);
 
-  bool published = _mqtt.publish(_ackTopic.c_str(), payload.c_str(), false);
-
-  if (published) {
-    Serial.printf("[Actuator] ACK %s da publish cho command %s, ver %u\n",
-      success ? "SUCCESS" : "FAILED", commandId.c_str(), version);
-  } else {
-    Serial.printf("[Actuator] ACK publish THAT BAI cho command %s\n",
-      commandId.c_str());
+  if (serializeJson(doc, payload) == 0) {
+    Serial.println("[Actuator] Loi tao ACK JSON.");
+    return false;
   }
 
-  return published;
+  bool published = publishAck(payload);
+
+  if (published) {
+    Serial.printf(
+      "[Actuator] ACK %s: command=%s, version=%u\n",
+      success ? "SUCCESS" : "FAILED",
+      commandId.c_str(),
+      version
+    );
+
+    _pendingAckPayload = "";
+    return true;
+  }
+
+  // Giữ ACK để thử gửi lại trong loop().
+  _pendingAckPayload = payload;
+  _lastAckAttemptMs = millis();
+
+  Serial.println(
+    "[Actuator] ACK chua gui duoc. Se thu lai."
+  );
+
+  return false;
+}
+
+void ActuatorManager::loop() {
+  if (_pendingAckPayload.isEmpty() || !_mqtt.connected()) {
+    return;
+  }
+
+  uint32_t now = millis();
+
+  if (now - _lastAckAttemptMs < 2000) {
+    return;
+  }
+
+  _lastAckAttemptMs = now;
+
+  if (publishAck(_pendingAckPayload)) {
+    Serial.println("[Actuator] Da gui lai ACK thanh cong.");
+    _pendingAckPayload = "";
+  }
 }
 
 bool ActuatorManager::handleMessage(
@@ -181,19 +326,31 @@ bool ActuatorManager::handleMessage(
   const uint8_t* payload,
   size_t length
 ) {
-  if (!topic || String(topic) != _commandTopic || !payload || length == 0) {
+  if (!topic ||
+      String(topic) != _commandTopic ||
+      !payload ||
+      length == 0) {
     return false;
+  }
+
+  if (_storageFault || !_prefsReady) {
+    Serial.println(
+      "[Actuator] Tu choi command: NVS khong san sang."
+    );
+
+    return true;
   }
 
   StaticJsonDocument<768> doc;
+
   DeserializationError err = deserializeJson(doc, payload, length);
 
   if (err) {
-    Serial.println("[Actuator] Loi giai ma JSON payload /command");
-    return false;
+    Serial.println("[Actuator] JSON command khong hop le.");
+    return true;
   }
 
-  // Kiểm tra kiểu dữ liệu và trường bắt buộc.
+  // Kiểm tra trường bắt buộc.
   if (!doc["command_id"].is<const char*>() ||
       !doc["device_id"].is<const char*>() ||
       !doc["room_id"].is<const char*>() ||
@@ -201,8 +358,9 @@ bool ActuatorManager::handleMessage(
       !doc["shadow_version"].is<uint32_t>() ||
       !doc["expires_at"].is<uint64_t>() ||
       !doc["desired_state"].is<JsonObject>()) {
-    Serial.println("[Actuator] Payload command sai cau truc hoac kieu du lieu");
-    return false;
+
+    Serial.println("[Actuator] Command sai cau truc.");
+    return true;
   }
 
   String cmdId = doc["command_id"].as<String>();
@@ -210,30 +368,39 @@ bool ActuatorManager::handleMessage(
   String rmId = doc["room_id"].as<String>();
   String sessId = doc["session_id"].as<String>();
 
-  uint32_t shadowVer = doc["shadow_version"].as<uint32_t>();
+  uint32_t version = doc["shadow_version"].as<uint32_t>();
   uint64_t expiresAt = doc["expires_at"].as<uint64_t>();
 
   JsonObject desired = doc["desired_state"].as<JsonObject>();
 
-  if (cmdId.isEmpty() || devId.isEmpty() || rmId.isEmpty() || sessId.isEmpty() ||
-      shadowVer == 0 || desired.isNull() || desired.size() == 0) {
-    Serial.println("[Actuator] Command thieu gia tri bat buoc");
-    return false;
+  if (cmdId.isEmpty() ||
+      devId.isEmpty() ||
+      rmId.isEmpty() ||
+      sessId.isEmpty() ||
+      version == 0 ||
+      version > 2147483647UL ||
+      expiresAt == 0 ||
+      desired.isNull() ||
+      desired.size() == 0) {
+
+    Serial.println("[Actuator] Command thieu hoac sai gia tri.");
+    return true;
   }
 
   if (devId != _deviceId || rmId != _roomId) {
-    Serial.println("[Actuator] device_id hoac room_id khong khop");
-    return false;
+    Serial.println("[Actuator] Sai device_id hoac room_id.");
+    return true;
   }
 
   if (sessId != _session.getSessionId()) {
-    Serial.println("[Actuator] session_id khong khop");
-    return false;
+    Serial.println("[Actuator] Sai session_id.");
+    return true;
   }
 
-  // Chỉ chấp nhận fan/light và giá trị ON/OFF.
+  // Kiểm tra toàn bộ desired_state trước khi điều khiển relay.
   bool hasFan = false;
   bool hasLight = false;
+
   bool fanTarget = false;
   bool lightTarget = false;
 
@@ -241,83 +408,118 @@ bool ActuatorManager::handleMessage(
     const char* key = item.key().c_str();
 
     if (!item.value().is<const char*>()) {
-      Serial.println("[Actuator] Gia tri desired_state phai la chuoi");
-      sendAck(cmdId, shadowVer, false, "INVALID_DESIRED_STATE");
+      sendAck(cmdId, version, false, "INVALID_DESIRED_STATE");
       return true;
     }
 
     const char* value = item.value().as<const char*>();
 
     if (strcmp(key, "fan") == 0) {
-      if (strcmp(value, "ON") != 0 && strcmp(value, "OFF") != 0) {
-        sendAck(cmdId, shadowVer, false, "INVALID_DESIRED_STATE");
+      if (strcmp(value, "ON") != 0 &&
+          strcmp(value, "OFF") != 0) {
+
+        sendAck(cmdId, version, false, "INVALID_DESIRED_STATE");
         return true;
       }
+
       hasFan = true;
       fanTarget = strcmp(value, "ON") == 0;
+
     } else if (strcmp(key, "light") == 0) {
-      if (strcmp(value, "ON") != 0 && strcmp(value, "OFF") != 0) {
-        sendAck(cmdId, shadowVer, false, "INVALID_DESIRED_STATE");
+      if (strcmp(value, "ON") != 0 &&
+          strcmp(value, "OFF") != 0) {
+
+        sendAck(cmdId, version, false, "INVALID_DESIRED_STATE");
         return true;
       }
+
       hasLight = true;
       lightTarget = strcmp(value, "ON") == 0;
+
     } else {
-      Serial.println("[Actuator] Thuoc tinh desired_state khong duoc ho tro");
-      sendAck(cmdId, shadowVer, false, "INVALID_DESIRED_STATE");
+      sendAck(cmdId, version, false, "INVALID_DESIRED_STATE");
       return true;
     }
   }
 
   if (!hasFan && !hasLight) {
-    sendAck(cmdId, shadowVer, false, "INVALID_DESIRED_STATE");
+    sendAck(cmdId, version, false, "INVALID_DESIRED_STATE");
     return true;
   }
 
-  // Kiểm tra thời hạn lệnh.
+  // Không thực thi nếu chưa đồng bộ thời gian.
   uint64_t nowMs = _session.getNowMs();
-  if (nowMs > 0 && expiresAt > 0 && nowMs > expiresAt) {
-    sendAck(cmdId, shadowVer, false, "COMMAND_EXPIRED");
-    return true;
-  }
 
-  // Duplicate phải được xác định trước khi từ chối version cũ.
-  if (isCommandProcessed(cmdId) && shadowVer == _shadowVersion) {
-    Serial.println("[Actuator] Command duplicate, gui lai ACK SUCCESS");
-    sendAck(cmdId, shadowVer, true);
-    return true;
-  }
-
-  // Không cho phép version cũ hoặc version trùng với ID khác thực thi.
-  if (shadowVer <= _shadowVersion) {
-    Serial.printf(
-      "[Actuator] Tu choi stale command: incoming=%u, current=%u\n",
-      shadowVer, _shadowVersion
+  if (nowMs == 0) {
+    Serial.println(
+      "[Actuator] Tu choi command: NTP chua dong bo."
     );
-    sendAck(cmdId, shadowVer, false, "STALE_SHADOW_VERSION");
+
+    sendAck(cmdId, version, false, "TIME_NOT_SYNCED");
     return true;
   }
 
-  Serial.println("[Actuator] ===== NHAN DUOC LENH HOP LE =====");
+  if (nowMs > expiresAt) {
+    sendAck(cmdId, version, false, "COMMAND_EXPIRED");
+    return true;
+  }
 
-  // Chỉ thay đổi relay sau khi toàn bộ desired_state đã được xác thực.
+  // Xử lý duplicate.
+  if (isCommandProcessed(cmdId)) {
+    if (version != _shadowVersion) {
+      sendAck(cmdId, version, false, "STALE_SHADOW_VERSION");
+      return true;
+    }
+
+    // Sau reboot relay mặc định OFF.
+    // Nếu duplicate yêu cầu ON thì áp dụng lại trạng thái mong muốn.
+    if (hasFan) setFan(fanTarget);
+    if (hasLight) setLight(lightTarget);
+
+    sendAck(cmdId, version, true);
+    return true;
+  }
+
+  // Từ chối version cũ hoặc version trùng nhưng ID khác.
+  if (version <= _shadowVersion) {
+    sendAck(cmdId, version, false, "STALE_SHADOW_VERSION");
+    return true;
+  }
+
+  Serial.println(
+    "[Actuator] ===== COMMAND HOP LE ====="
+  );
+
+  // Thực thi relay.
   if (hasFan) setFan(fanTarget);
   if (hasLight) setLight(lightTarget);
 
-  _shadowVersion = shadowVer;
-  _lastProcessedCommandId = cmdId;
-  markCommandProcessed(cmdId);
+  // Lưu metadata sau khi điều khiển.
+  if (!saveCommandMetadata(version, cmdId)) {
+    Serial.println(
+      "[Actuator] ERROR: Khong luu duoc metadata. Tat relay."
+    );
 
-  // Lưu version và ID để chống xử lý lại sau khi ESP32 khởi động lại.
-  if (_prefsReady) {
-    size_t versionBytes = _prefs.putUInt("shadow_ver", _shadowVersion);
-    size_t idBytes = _prefs.putString("last_cmd_id", _lastProcessedCommandId);
+    forceAllOff();
+    _storageFault = true;
 
-    if (versionBytes == 0 || idBytes == 0) {
-      Serial.println("[Actuator] WARNING: Khong luu duoc command metadata vao NVS");
-    }
+    sendAck(
+      cmdId,
+      _shadowVersion,
+      false,
+      "PERSISTENCE_FAILURE"
+    );
+
+    return true;
   }
 
-  sendAck(cmdId, shadowVer, true);
+  // Chỉ cập nhật version trong RAM sau khi NVS xác nhận.
+  _shadowVersion = version;
+  _lastProcessedCommandId = cmdId;
+
+  markCommandProcessed(cmdId);
+
+  sendAck(cmdId, version, true);
+
   return true;
 }
