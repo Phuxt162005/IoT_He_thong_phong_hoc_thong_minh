@@ -3,11 +3,6 @@
 #include <math.h>
 #include <string.h>
 
-  const char* queuePath = "/telemetry_queue.jsonl";
-  const char* tempPath = "/telemetry_queue.tmp";
-  const char* backupPath = "/telemetry_queue.bak";
-  const char* corruptPath = "/telemetry_queue.corrupt";
-
 OfflineQueue::OfflineQueue(fs::FS& filesystem, size_t maxRecords)
   : fs(filesystem), capacity(maxRecords) {}
 
@@ -22,6 +17,7 @@ bool OfflineQueue::begin() {
   if (!recoverFiles()) return false;
   return repairTrailingRecord();
 }
+
 
 bool OfflineQueue::recoverFiles() {
   auto isUsableQueue = [&](const char* path) -> bool {
@@ -49,23 +45,26 @@ bool OfflineQueue::recoverFiles() {
     return valid;
   };
 
-  bool mainExists = fs.exists(queuePath);
-  bool backupExists = fs.exists(backupPath);
-  bool tempExists = fs.exists(tempPath);
+  const bool mainExists = fs.exists(queuePath);
+  const bool backupExists = fs.exists(backupPath);
+  const bool tempExists = fs.exists(tempPath);
+  const bool corruptExists = fs.exists(corruptPath);
 
   const bool mainValid = mainExists && isUsableQueue(queuePath);
   const bool backupValid = backupExists && isUsableQueue(backupPath);
   const bool tempValid = tempExists && isUsableQueue(tempPath);
 
-  // 1. Queue chính hợp lệ: đây là trạng thái đã commit.
+  // Main hợp lệ: đây là bản queue đã được thay thế thành công.
   if (mainValid) {
+    // Không cần temp sau khi main đã hợp lệ.
     if (tempExists && !fs.remove(tempPath)) {
       errorMessage = "Khong xoa duoc file tam";
       return false;
     }
 
+    // Backup chỉ được xóa sau khi main đã được xác minh.
     if (backupExists && !fs.remove(backupPath)) {
-      errorMessage = "Queue chinh hop le nhung khong xoa duoc backup";
+      errorMessage = "Khong xoa duoc backup cu";
       return false;
     }
 
@@ -73,12 +72,12 @@ bool OfflineQueue::recoverFiles() {
     return true;
   }
 
-  // 2. Queue chính lỗi, backup hợp lệ.
-  // Giữ nguyên queue lỗi trước khi khôi phục backup.
+  // Main lỗi hoặc không tồn tại, backup hợp lệ.
   if (backupValid) {
     if (mainExists) {
-      if (fs.exists(corruptPath)) {
-        errorMessage = "File corrupt da ton tai; khong ghi de du lieu";
+      // Không ghi đè bản corrupt cũ.
+      if (corruptExists) {
+        errorMessage = "File corrupt da ton tai; can xu ly thu cong";
         return false;
       }
 
@@ -88,10 +87,15 @@ bool OfflineQueue::recoverFiles() {
       }
     }
 
+    // Khôi phục backup.
     if (!fs.rename(backupPath, queuePath)) {
-      // Thử đưa queue lỗi trở lại vị trí cũ nếu khôi phục thất bại.
-      if (fs.exists(corruptPath) && !fs.exists(queuePath)) {
-        fs.rename(corruptPath, queuePath);
+      // Rollback và kiểm tra kết quả.
+      if (mainExists) {
+        if (!fs.rename(corruptPath, queuePath)) {
+          errorMessage =
+            "Khoi phuc backup that bai va rollback queue hong that bai";
+          return false;
+        }
       }
 
       errorMessage = "Khong khoi phuc duoc backup";
@@ -99,14 +103,14 @@ bool OfflineQueue::recoverFiles() {
     }
 
     if (!isUsableQueue(queuePath)) {
-      errorMessage = "Queue backup sau phuc hoi khong hop le";
+      errorMessage = "Queue sau khoi phuc khong hop le";
       return false;
     }
 
-    // File tạm là kết quả viết lại chưa commit.
-    // Backup cũ đã được phục hồi nên có thể bỏ file tạm.
+    // Backup đã phục hồi thành main.
+    // Temp là bản ghi đang trong quá trình thay thế chưa commit.
     if (tempExists && !fs.remove(tempPath)) {
-      errorMessage = "Phuc hoi backup thanh cong nhung khong xoa duoc temp";
+      errorMessage = "Khong xoa duoc temp sau khi khoi phuc backup";
       return false;
     }
 
@@ -114,15 +118,16 @@ bool OfflineQueue::recoverFiles() {
     return true;
   }
 
-  // 3. Không có backup hợp lệ nhưng temp hợp lệ.
+  // Không có main, không có backup hợp lệ:
+  // chỉ dùng temp nếu temp hợp lệ.
   if (!mainExists && tempValid) {
     if (!fs.rename(tempPath, queuePath)) {
-      errorMessage = "Khong khoi phuc duoc file tam";
+      errorMessage = "Khong khoi phuc duoc temp";
       return false;
     }
 
     if (!isUsableQueue(queuePath)) {
-      errorMessage = "File tam sau phuc hoi khong hop le";
+      errorMessage = "Temp sau khoi phuc khong hop le";
       return false;
     }
 
@@ -130,11 +135,10 @@ bool OfflineQueue::recoverFiles() {
     return true;
   }
 
-  // 4. Main lỗi, không có backup hợp lệ, temp hợp lệ.
-  // Bảo toàn main lỗi trước khi dùng temp.
+  // Main lỗi, temp hợp lệ, không có backup hợp lệ.
   if (mainExists && !mainValid && tempValid) {
-    if (fs.exists(corruptPath)) {
-      errorMessage = "File corrupt da ton tai; khong ghi de du lieu";
+    if (corruptExists) {
+      errorMessage = "File corrupt da ton tai; khong ghi de";
       return false;
     }
 
@@ -144,13 +148,18 @@ bool OfflineQueue::recoverFiles() {
     }
 
     if (!fs.rename(tempPath, queuePath)) {
-      fs.rename(corruptPath, queuePath);
-      errorMessage = "Khong khoi phuc duoc file tam";
+      if (!fs.rename(corruptPath, queuePath)) {
+        errorMessage =
+          "Khoi phuc temp va rollback deu that bai";
+        return false;
+      }
+
+      errorMessage = "Khong khoi phuc duoc temp";
       return false;
     }
 
     if (!isUsableQueue(queuePath)) {
-      errorMessage = "Queue phuc hoi tu temp khong hop le";
+      errorMessage = "Queue khoi phuc tu temp khong hop le";
       return false;
     }
 
@@ -158,19 +167,19 @@ bool OfflineQueue::recoverFiles() {
     return true;
   }
 
-  // 5. Có file dữ liệu nhưng không có bản hợp lệ.
-  // Không tự tạo queue mới vì có thể che giấu dữ liệu bị lỗi.
+  // Có file nhưng không có bản queue hợp lệ.
+  // Không tạo queue mới để tránh che giấu dữ liệu cũ.
   if (mainExists || backupExists || tempExists) {
     errorMessage =
       "Khong co queue hop le; giu nguyen cac file de bao toan du lieu";
     return false;
   }
 
-  // 6. Chỉ tạo queue mới khi chưa có dữ liệu nào.
+  // Chỉ tạo queue khi chưa tồn tại bất kỳ file dữ liệu nào.
   File file = fs.open(queuePath, FILE_WRITE);
 
   if (!file) {
-    errorMessage = "Khong tao duoc file hang doi";
+    errorMessage = "Khong tao duoc file queue";
     return false;
   }
 
@@ -652,31 +661,6 @@ bool OfflineQueue::validateRecord(
 }
 
 
-size_t OfflineQueue::count() {
-  errorMessage = "";
-  File file = fs.open(queuePath, FILE_READ);
-  if (!file) {
-    errorMessage = "Khong doc duoc hang doi";
-    return 0;
-  }
-
-  size_t total = 0;
-  while (file.available()) {
-    String line = file.readStringUntil('\n');
-    line.trim();
-    if (line.isEmpty()) continue;
-
-    if (!validateRecord(line)) {
-      file.close();
-      return 0;
-    }
-    ++total;
-  }
-
-  file.close();
-  return total;
-}
-
 bool OfflineQueue::isFull() {
   const size_t current = count();
   if (!errorMessage.isEmpty()) return true;
@@ -797,9 +781,42 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
 }
 
 
+size_t OfflineQueue::count() {
+  errorMessage = "";
+
+  File file = fs.open(queuePath, FILE_READ);
+
+  if (!file) {
+    errorMessage = "Khong doc duoc hang doi";
+    return 0;
+  }
+
+  size_t total = 0;
+
+  while (file.available()) {
+    String line = file.readStringUntil('\n');
+    line.trim();
+
+    if (line.isEmpty()) continue;
+
+    if (!validateRecord(line)) {
+      file.close();
+      return 0;
+    }
+
+    ++total;
+  }
+
+  file.close();
+  return total;
+}
+
 bool OfflineQueue::peek(String& jsonRecord) {
   errorMessage = "";
+  jsonRecord = "";
+
   File file = fs.open(queuePath, FILE_READ);
+
   if (!file) {
     errorMessage = "Khong doc duoc hang doi";
     return false;
@@ -808,6 +825,7 @@ bool OfflineQueue::peek(String& jsonRecord) {
   while (file.available()) {
     String line = file.readStringUntil('\n');
     line.trim();
+
     if (line.isEmpty()) continue;
 
     if (!validateRecord(line)) {
@@ -823,7 +841,6 @@ bool OfflineQueue::peek(String& jsonRecord) {
   file.close();
   return false;
 }
-
 
 bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
   errorMessage = "";
