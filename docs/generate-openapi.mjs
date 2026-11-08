@@ -30,7 +30,7 @@ const reason = {
 };
 const user = {
   username: { type: "string", pattern: "^[A-Za-z0-9_.-]{3,64}$" },
-  password: { ...str(128), minLength: 12, writeOnly: true },
+  password: { ...str(128), minLength: 8, writeOnly: true },
   display_name: str(100),
   role,
 };
@@ -92,9 +92,11 @@ const schemas = {
     username: str(64),
     password: { ...str(128), writeOnly: true },
   }),
+  Register: object({ username: user.username, password: user.password, display_name: user.display_name }),
+  PasswordReset: object({ new_password: user.password }),
   PasswordChange: object({
     current_password: { ...str(128), writeOnly: true },
-    new_password: { ...str(128), minLength: 12, writeOnly: true },
+    new_password: { ...str(128), minLength: 8, writeOnly: true },
   }),
   UserCreate: object(user),
   UserPatch: {
@@ -311,6 +313,7 @@ api(
   { body: "Login", public: true },
 );
 api("/auth/me", "get", "Current user");
+api("/auth/register", "post", "Register as Viewer; at most 5 attempts per IP in 15 minutes", { body: "Register", public: true, status: "201" });
 api("/auth/logout", "post", "Invalidate all user tokens");
 api(
   "/auth/change-password",
@@ -330,6 +333,7 @@ api("/users", "post", "Admin creates user", {
   status: "201",
 });
 api("/users/{id}", "get", "Admin reads user");
+api("/users/{id}/reset-password", "post", "Admin resets Operator/Viewer password and invalidates their tokens", { body: "PasswordReset" });
 api(
   "/users/{id}",
   "patch",
@@ -538,6 +542,8 @@ api(
   },
 );
 
+api("/anomalies", "get", "List anomaly results within room scope", { params: [...pages, query("room_id", id), query("device_id", id), query("anomaly_detected", enumeration("true", "false"))] });
+api("/anomalies/{id}", "get", "Read anomaly result within room scope");
 api("/monitoring/snapshot", "get", "Admin reads system monitoring snapshot");
 
 api("/monitoring/logs", "get", "Admin searches monitoring logs", {

@@ -45,4 +45,17 @@ export class UsersService {
       return publicUser((await client.query(`${userSelect} WHERE u.user_id=$1`, [id])).rows[0]);
     });
   }
+
+  async resetPassword(actor, id, { new_password }, requestId) {
+    const hash = await hashPassword(new_password);
+    return withTransaction(this.pool, async (client) => {
+      await client.query("SELECT pg_advisory_xact_lock(172942,404)");
+      await lockActor(client, actor, "users:write");
+      const user = requireFound((await client.query(`${userSelect} WHERE u.user_id=$1 FOR UPDATE OF u`, [id])).rows[0]);
+      if (!["OPERATOR", "VIEWER"].includes(user.role)) throw new AppError("FORBIDDEN", 403, "Chỉ đặt lại mật khẩu cho tài khoản Operator hoặc Viewer");
+      await client.query("UPDATE users SET password_hash=$1,token_version=token_version+1,updated_at=now() WHERE user_id=$2", [hash, id]);
+      await writeAudit(client, { actorType: "USER", actorId: actor.user_id, action: "USER_PASSWORD_RESET", targetType: "USER", targetId: id, requestId });
+      return { password_reset: true, login_required: true };
+    });
+  }
 }
