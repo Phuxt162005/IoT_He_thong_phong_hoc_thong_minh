@@ -12,3 +12,8 @@ deployment/backups/
 *.pem
 *.p12
 __pycache__/
+
+# Firmware secrets & configs
+**/Config.h
+!**/Config.h.example
+
