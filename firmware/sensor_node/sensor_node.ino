@@ -149,7 +149,17 @@ void loop() {
 
     if (sensorDrivers.readSample(currentSample)) {
       // Dua mau do vao hang doi dong bo MQTT (co mang thi ban ngay, mat mang thi luu LittleFS)
-      syncManager.enqueueSample(currentSample);
+      if (!syncManager.enqueueSample(currentSample)) {
+        Serial.println(
+          "[OfflineQueue] KHONG LUU DUOC TELEMETRY: " +
+          syncManager.lastError()
+        );
+      } else {
+        Serial.printf(
+          "[OfflineQueue] Da tiep nhan telemetry. Queue=%u\n",
+          (unsigned int)syncManager.queuedCount()
+        );
+      }
 
       Serial.printf("[Sensor] Doc mau: T=%.1f C | H=%.1f %% | Lux=%u | Occ=%s | Queue=%u\n",
         currentSample.temperatureC,

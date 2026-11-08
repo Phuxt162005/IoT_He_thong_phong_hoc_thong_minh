@@ -1,5 +1,7 @@
 #include "OfflineQueue.h"
 #include <ArduinoJson.h>
+#include <math.h>
+#include <string.h>
 
 OfflineQueue::OfflineQueue(fs::FS& filesystem, size_t maxRecords)
   : fs(filesystem), capacity(maxRecords) {}
@@ -261,12 +263,83 @@ bool OfflineQueue::repairTrailingRecord() {
   return true;
 }
 
+
+static bool isValidIdentifierValue(const char* value) {
+  if (!value || !*value || strlen(value) > 40) return false;
+
+  for (size_t i = 0; value[i] != '\0'; ++i) {
+    const char c = value[i];
+    if (!((c >= 'A' && c <= 'Z') ||
+          (c >= 'a' && c <= 'z') ||
+          (c >= '0' && c <= '9') ||
+          c == '_' || c == '-')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Chấp nhận chuỗi rỗng hoặc ISO-8601 có timezone.
+// Ví dụ: 2026-11-09T10:30:00Z, 2026-11-09T10:30:00.123+07:00
+static bool isValidLegacyTimestamp(const char* value) {
+  if (!value) return false;
+  if (*value == '\0') return true;
+
+  const size_t len = strlen(value);
+  if (len < 20 || len > 35) return false;
+
+  auto digit = [](char c) {
+    return c >= '0' && c <= '9';
+  };
+
+  for (size_t i = 0; i < 4; ++i)
+    if (!digit(value[i])) return false;
+
+  if (value[4] != '-' ||
+      !digit(value[5]) || !digit(value[6]) ||
+      value[7] != '-' ||
+      !digit(value[8]) || !digit(value[9]) ||
+      value[10] != 'T' ||
+      !digit(value[11]) || !digit(value[12]) ||
+      value[13] != ':' ||
+      !digit(value[14]) || !digit(value[15]) ||
+      value[16] != ':' ||
+      !digit(value[17]) || !digit(value[18])) {
+    return false;
+  }
+
+  size_t pos = 19;
+
+  if (pos < len && value[pos] == '.') {
+    ++pos;
+    const size_t fractionStart = pos;
+
+    while (pos < len && digit(value[pos])) ++pos;
+
+    if (pos == fractionStart) return false;
+  }
+
+  if (pos < len && value[pos] == 'Z')
+    return pos + 1 == len;
+
+  if (pos + 6 != len ||
+      (value[pos] != '+' && value[pos] != '-') ||
+      !digit(value[pos + 1]) ||
+      !digit(value[pos + 2]) ||
+      value[pos + 3] != ':' ||
+      !digit(value[pos + 4]) ||
+      !digit(value[pos + 5])) {
+    return false;
+  }
+
+  return true;
+}
+
 bool OfflineQueue::validateRecord(
   const String& json,
   String* messageId
 ) {
   StaticJsonDocument<2048> doc;
-
   DeserializationError err = deserializeJson(doc, json);
 
   if (err || !doc.is<JsonObject>()) {
@@ -274,29 +347,9 @@ bool OfflineQueue::validateRecord(
     return false;
   }
 
-  auto validIdentifier = [](const char* value) -> bool {
-    if (!value || !*value || strlen(value) > 40) {
-      return false;
-    }
-
-    for (size_t i = 0; value[i] != '\0'; ++i) {
-      const char c = value[i];
-
-      if (!((c >= 'A' && c <= 'Z') ||
-            (c >= 'a' && c <= 'z') ||
-            (c >= '0' && c <= '9') ||
-            c == '_' || c == '-')) {
-        return false;
-      }
-    }
-
-    return true;
-  };
-
   const bool isCanonical = doc.containsKey("msg_id");
   const bool isLegacy = doc.containsKey("eventId");
 
-  // Không chấp nhận thiếu hoặc trộn hai định dạng.
   if (isCanonical == isLegacy) {
     errorMessage = "Payload thieu hoac trung dinh dang";
     return false;
@@ -305,11 +358,10 @@ bool OfflineQueue::validateRecord(
   const char* id = nullptr;
 
   if (isCanonical) {
-    // Payload chuẩn không được chứa trường legacy.
-    if (doc.containsKey("messageType") ||
+    if (doc.size() != 5 ||
+        doc.containsKey("messageType") ||
         doc.containsKey("deviceId") ||
-        doc.containsKey("roomCode") ||
-        doc.size() != 5) {
+        doc.containsKey("roomCode")) {
       errorMessage = "Payload chuan chua truong khong hop le";
       return false;
     }
@@ -323,11 +375,14 @@ bool OfflineQueue::validateRecord(
       return false;
     }
 
-    id = doc["msg_id"];
+    id = doc["msg_id"].as<const char*>();
 
-    if (!validIdentifier(doc["device_id"]) ||
-        !validIdentifier(doc["room_id"]) ||
-        !id || !*id || strlen(id) > 64) {
+    const char* deviceId = doc["device_id"].as<const char*>();
+    const char* roomId = doc["room_id"].as<const char*>();
+
+    if (!id || !*id || strlen(id) > 64 ||
+        !isValidIdentifierValue(deviceId) ||
+        !isValidIdentifierValue(roomId)) {
       errorMessage = "Payload chuan sai dinh danh";
       return false;
     }
@@ -344,39 +399,65 @@ bool OfflineQueue::validateRecord(
     if (data.size() != 4 ||
         !data["temperature"].is<float>() ||
         !data["humidity"].is<float>() ||
-        !data["lux"].is<uint16_t>() ||
+        !data["lux"].is<float>() ||
         !data["occupancy"].is<bool>()) {
       errorMessage = "Du lieu telemetry chuan sai cau truc";
       return false;
     }
 
-    const float temperature = data["temperature"].as<float>();
-    const float humidity = data["humidity"].as<float>();
-    const uint16_t lux = data["lux"].as<uint16_t>();
+    const double temperature = data["temperature"].as<double>();
+    const double humidity = data["humidity"].as<double>();
+    const double lux = data["lux"].as<double>();
 
     if (!isfinite(temperature) ||
-        temperature < -10.0f ||
-        temperature > 60.0f ||
+        temperature < -10.0 || temperature > 60.0 ||
         !isfinite(humidity) ||
-        humidity < 0.0f ||
-        humidity > 100.0f ||
-        lux > 65535) {
+        humidity < 0.0 || humidity > 100.0 ||
+        !isfinite(lux) ||
+        lux < 0.0 || lux > 65535.0 ||
+        floor(lux) != lux) {
       errorMessage = "Gia tri telemetry chuan vuot gioi han";
       return false;
     }
 
   } else {
-    // Payload legacy không được chứa trường chuẩn.
-    if (doc.containsKey("msg_id") ||
+    // Legacy có 7 trường bắt buộc và tối đa 2 trường tùy chọn:
+    // timestamp, occupancy.
+    if (doc.size() < 7 || doc.size() > 9 ||
+        doc.containsKey("msg_id") ||
         doc.containsKey("device_id") ||
         doc.containsKey("room_id") ||
-        doc.containsKey("data") ||
-        doc.size() < 7 ||
-        doc.size() > 8) {
+        doc.containsKey("data")) {
       errorMessage = "Payload legacy chua truong khong hop le";
       return false;
     }
+    const char* allowedKeys[] = {
+      "messageType",
+      "eventId",
+      "deviceId",
+      "roomCode",
+      "timestamp",
+      "temperatureC",
+      "humidityPercent",
+      "illuminanceLux",
+      "occupancy"
+    };
 
+    for (JsonPair kv : doc.as<JsonObject>()) {
+      bool allowed = false;
+
+      for (const char* key : allowedKeys) {
+        if (strcmp(kv.key().c_str(), key) == 0) {
+          allowed = true;
+          break;
+        }
+      }
+
+      if (!allowed) {
+        errorMessage = "Payload legacy chua truong la";
+        return false;
+      }
+    }
     if (!doc["messageType"].is<const char*>() ||
         !doc["eventId"].is<const char*>() ||
         !doc["deviceId"].is<const char*>() ||
@@ -388,33 +469,31 @@ bool OfflineQueue::validateRecord(
       return false;
     }
 
-    if (String(doc["messageType"].as<const char*>()) != "telemetry") {
+    if (strcmp(doc["messageType"].as<const char*>(),
+               "telemetry") != 0) {
       errorMessage = "messageType legacy khong hop le";
       return false;
     }
 
-    id = doc["eventId"];
+    id = doc["eventId"].as<const char*>();
 
     if (!id || !*id || strlen(id) > 64 ||
-        !validIdentifier(doc["deviceId"]) ||
-        !validIdentifier(doc["roomCode"])) {
+        !isValidIdentifierValue(doc["deviceId"].as<const char*>()) ||
+        !isValidIdentifierValue(doc["roomCode"].as<const char*>())) {
       errorMessage = "Payload legacy sai dinh danh";
       return false;
     }
 
-    const float temperature = doc["temperatureC"].as<float>();
-    const float humidity = doc["humidityPercent"].as<float>();
-    const float lux = doc["illuminanceLux"].as<float>();
+    const double temperature = doc["temperatureC"].as<double>();
+    const double humidity = doc["humidityPercent"].as<double>();
+    const double lux = doc["illuminanceLux"].as<double>();
 
     if (!isfinite(temperature) ||
-        temperature < -10.0f ||
-        temperature > 60.0f ||
+        temperature < -10.0 || temperature > 60.0 ||
         !isfinite(humidity) ||
-        humidity < 0.0f ||
-        humidity > 100.0f ||
+        humidity < 0.0 || humidity > 100.0 ||
         !isfinite(lux) ||
-        lux < 0.0f ||
-        lux > 65535.0f) {
+        lux < 0.0 || lux > 65535.0) {
       errorMessage = "Gia tri telemetry legacy vuot gioi han";
       return false;
     }
@@ -425,10 +504,13 @@ bool OfflineQueue::validateRecord(
       return false;
     }
 
-    if (doc.containsKey("timestamp") &&
-        !doc["timestamp"].is<const char*>()) {
-      errorMessage = "Timestamp legacy sai kieu du lieu";
-      return false;
+    if (doc.containsKey("timestamp")) {
+      if (!doc["timestamp"].is<const char*>() ||
+          !isValidLegacyTimestamp(
+            doc["timestamp"].as<const char*>())) {
+        errorMessage = "Timestamp legacy khong hop le";
+        return false;
+      }
     }
   }
 
@@ -439,6 +521,7 @@ bool OfflineQueue::validateRecord(
   errorMessage = "";
   return true;
 }
+
 
 size_t OfflineQueue::count() {
   errorMessage = "";
