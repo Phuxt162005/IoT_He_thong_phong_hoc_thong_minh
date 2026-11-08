@@ -97,7 +97,11 @@ export class DeviceConfigService {
     const state = (await this.pool.query("SELECT * FROM device_settings WHERE device_id=$1", [id])).rows[0];
     const total = Number((await this.pool.query("SELECT count(*) FROM device_configs WHERE device_id=$1", [id])).rows[0].count);
     const history = (await this.pool.query("SELECT * FROM device_configs WHERE device_id=$1 ORDER BY version DESC LIMIT $2 OFFSET $3", [id, page_size, (page - 1) * page_size])).rows.map(view);
-    return { data: { state, history }, meta: { page, page_size, total } };
+    const limits = {
+      sample_interval_seconds: { min: 1, max: 300 },
+      heartbeat_interval_seconds: { min: 1, max: Math.min(60, Math.floor(this.heartbeatTimeoutSeconds / 3)) },
+    };
+    return { data: { state, history, limits }, meta: { page, page_size, total } };
   }
   async handle(envelope) {
     if (envelope.kind !== "config/ack") return;

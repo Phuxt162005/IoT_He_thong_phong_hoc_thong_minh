@@ -127,7 +127,11 @@ test(
     await f.pool.query(
       "INSERT INTO monitoring_logs(logged_at,level,service,message,metadata) VALUES(now(),'INFO','frontend-test','Browser monitoring message','{}')",
     );
-    const config = { ...f.config, corsOrigins: ["http://127.0.0.1:5181"] };
+    const config = {
+      ...f.config,
+      telemetryFreshnessSeconds: 3,
+      corsOrigins: ["http://127.0.0.1:5181"],
+    };
     apiServer = createApp({
       config,
       logger: f.logger,
@@ -235,6 +239,7 @@ test(
     const pending = new Map(),
       exceptions = [],
       requests = [];
+    let dropCommandResponse = false;
     const send = (method, params = {}) =>
       new Promise((resolve, reject) => {
         const id = ++sequence;
@@ -286,6 +291,15 @@ test(
           status: response.status,
           body: text,
         });
+        if (
+          dropCommandResponse &&
+          request.method === "POST" &&
+          url.pathname.endsWith("/commands")
+        ) {
+          dropCommandResponse = false;
+          await send("Fetch.failRequest", { requestId, errorReason: "Failed" });
+          return;
+        }
         await send("Fetch.fulfillRequest", {
           requestId,
           responseCode: response.status,
@@ -374,10 +388,14 @@ test(
         `(()=>{const input=document.querySelector(${JSON.stringify(selector)});if(!input)throw new Error('Select missing');input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
       );
     };
-    const click = async (text, root = "document") =>
-      evaluate(
+    const click = async (text, root = "document") => {
+      await until(
+        `Array.from(${root}.querySelectorAll('button')).some(button=>button.textContent.trim()===${JSON.stringify(text)}&&!button.disabled)`,
+      );
+      return evaluate(
         `(()=>{const button=Array.from(${root}.querySelectorAll('button')).find(button=>button.textContent.trim()===${JSON.stringify(text)});if(!button)throw new Error('Button missing: '+${JSON.stringify(text)});button.click();})()`,
       );
+    };
     const form = () =>
       evaluate('document.querySelector("dialog form").requestSubmit()');
     const checked = (selector) =>
@@ -389,6 +407,24 @@ test(
     );
     await until('Boolean(document.querySelector(".socket-status.connected"))');
     t.diagnostic("Dashboard and authenticated WebSocket loaded real data");
+    assert.equal(
+      await evaluate(
+        'document.body.innerText.includes("Dữ liệu cảm biến đã cũ")',
+      ),
+      false,
+    );
+    await until(
+      'document.body.innerText.includes("Dữ liệu cảm biến đã cũ")',
+      8000,
+    );
+    const stale = await fetch(
+      `${apiBase}/api/v1/dashboard?room_id=${f.room.room_id}`,
+      { headers: { Authorization: `Bearer ${f.token}` } },
+    ).then((response) => response.json());
+    assert.equal(stale.data.latest_telemetry[0].stale, true);
+    t.diagnostic(
+      "Dashboard ages cached samples without waiting for another MQTT event",
+    );
     await navigate("/rooms");
     await until('Boolean(document.querySelector("table"))');
     await click("+ Thêm phòng");
@@ -558,6 +594,17 @@ test(
       "document.querySelector('[name=target_device_id]')?.options.length>1",
     );
     await select("[name=target_device_id]", control.device.device_id);
+    for (let depth = 0; depth < 4; depth++) {
+      await until(
+        `Array.from(document.querySelectorAll('fieldset.condition-builder > select')[${depth}]?.options || []).some(option=>option.value==='all')`,
+      );
+      await evaluate(
+        `(()=>{const input=document.querySelectorAll('fieldset.condition-builder > select')[${depth}];input.value='all';input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+      );
+    }
+    await until(
+      'document.querySelectorAll("fieldset.condition-builder").length===5',
+    );
     await form();
     await saved();
     await until('document.body.innerText.includes("UI temperature rule")');
@@ -597,9 +644,48 @@ test(
       'document.querySelector(".notice")?.innerText.includes("SUCCESS")',
     );
     t.diagnostic("Control waits for its own command ID and real MQTT ACK");
+    await until(
+      'Boolean(document.querySelector(".control-grid button:not(:disabled)"))',
+    );
+    dropCommandResponse = true;
+    await click("Bật", 'document.querySelector(".control-grid")');
+    await until(
+      'Array.from(document.querySelectorAll("button")).some(button=>button.textContent.trim()==="Gửi lại cùng yêu cầu")',
+    );
+    const commandCountBeforeExpiry = Number(
+      (await f.pool.query("SELECT count(*) FROM commands")).rows[0].count,
+    );
+    await evaluate(
+      `(()=>{const native=performance.now.bind(performance);Object.defineProperty(performance,'now',{configurable:true,value:()=>native()+56000});Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='Gửi lại cùng yêu cầu').click();Object.defineProperty(performance,'now',{configurable:true,value:native});})()`,
+    );
+    await until(
+      'document.querySelector(".notice")?.innerText.includes("hết thời hạn")',
+    );
+    assert.equal(
+      Number(
+        (await f.pool.query("SELECT count(*) FROM commands")).rows[0].count,
+      ),
+      commandCountBeforeExpiry,
+    );
+    t.diagnostic(
+      "A lost response cannot be retried after the safe idempotency window or create another command",
+    );
     await navigate("/devices/" + sensor.device.device_id);
     await until('document.body.innerText.includes("Đổi cấu hình")');
     await click("Đổi cấu hình");
+    assert.equal(
+      await evaluate(
+        'document.querySelector("[name=heartbeat_interval_seconds]").max',
+      ),
+      "10",
+    );
+    await fill("[name=heartbeat_interval_seconds]", "11");
+    assert.equal(
+      await evaluate(
+        'document.querySelector("[name=heartbeat_interval_seconds]").checkValidity()',
+      ),
+      false,
+    );
     await fill("[name=sample_interval_seconds]", "8");
     await fill("[name=heartbeat_interval_seconds]", "5");
     await form();
@@ -641,7 +727,8 @@ test(
     await fill("[name=version]", "2.0-ui");
     await select("[name=device_type]", "SENSOR_NODE");
     await fill("[name=hardware_target]", "ESP32");
-    await fill("[name=release_notes]", "Bản kiểm thử tiếng Việt");
+    const releaseNotes = "ấ".repeat(2000);
+    await fill("[name=release_notes]", releaseNotes);
     await evaluate(
       `(()=>{const transfer=new DataTransfer();transfer.items.add(new File(['firmware-ui-test'],'firmware.bin',{type:'application/octet-stream'}));const input=document.querySelector('input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
     );
@@ -661,7 +748,7 @@ test(
         "SELECT * FROM firmware_releases WHERE version='2.0-ui'",
       )
     ).rows[0];
-    assert.equal(release.release_notes, "Bản kiểm thử tiếng Việt");
+    assert.equal(release.release_notes, releaseNotes);
     await click("Cập nhật thiết bị");
     await until(
       'document.querySelector("[name=firmware_id]")?.options.length>1',
@@ -709,6 +796,77 @@ test(
     );
     t.diagnostic(
       "Pagination, room selectors beyond 100 records, and device detail beyond the first page work",
+    );
+    await navigate(`/devices/${device.device_id}`);
+    await until(
+      'document.querySelector("h2")?.textContent.includes("Thiết bị chưa gán")',
+    );
+    assert.equal(
+      await evaluate(
+        'Array.from(document.querySelectorAll("button")).some(button=>button.textContent.trim()==="Sửa thông tin")',
+      ),
+      false,
+    );
+    assert.equal(
+      (
+        await f.request(`/rooms/${f.room.room_id}`, {
+          method: "PATCH",
+          token: f.token,
+          body: { status: "INACTIVE" },
+        })
+      ).status,
+      200,
+    );
+    await navigate("/control");
+    await until('document.body.innerText.includes("Phòng đã ngừng hoạt động")');
+    assert.equal(
+      await evaluate(
+        'Boolean(document.querySelector(".control-grid button:not(:disabled)"))',
+      ),
+      false,
+    );
+    assert.equal(
+      (
+        await f.request(`/rooms/${f.room.room_id}`, {
+          method: "PATCH",
+          token: f.token,
+          body: { status: "ACTIVE" },
+        })
+      ).status,
+      200,
+    );
+    clearInterval(heartbeatTimer);
+    assert.equal(
+      (await f.action(control.device.device_id, "revoke", { confirmed: true }))
+        .status,
+      200,
+    );
+    await navigate(`/devices/${control.device.device_id}`);
+    await until(
+      'Array.from(document.querySelectorAll("a")).some(link=>link.getAttribute("href")?.startsWith("/control?"))',
+    );
+    await evaluate(
+      'Array.from(document.querySelectorAll("a")).find(link=>link.getAttribute("href")?.startsWith("/control?")).click()',
+    );
+    await until(
+      'Boolean(document.querySelector("tbody tr"))&&document.body.innerText.includes("Lịch sử lệnh")',
+    );
+    assert.equal(
+      await evaluate('document.querySelectorAll("select")[1].value'),
+      control.device.device_id,
+    );
+    assert.equal(
+      await evaluate(
+        'Boolean(document.querySelector(".control-grid button:not(:disabled)"))',
+      ),
+      false,
+    );
+    t.diagnostic(
+      "Retired devices cannot be edited, inactive rooms cannot be controlled, and revoked command history stays readable",
+    );
+    await navigate(`/devices/${lastDevice.device_id}`);
+    await until(
+      'document.querySelector("h2")?.textContent.includes("Pagination Device 25")',
     );
     const screenshot = await send("Page.captureScreenshot", { format: "png" });
     writeFileSync(

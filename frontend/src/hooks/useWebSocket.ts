@@ -9,7 +9,7 @@ const affected: Record<string, string[]> = {
     "telemetry",
     "telemetry-stats",
   ],
-  "device.status_changed": ["devices", "shadow", "monitoring"],
+  "device.status_changed": ["devices", "shadow", "monitoring", "dashboard"],
   "device.lifecycle_changed": ["devices", "lifecycle", "broker", "dashboard"],
   "device.mode_changed": ["devices", "shadow"],
   "command.updated": ["commands", "shadow"],

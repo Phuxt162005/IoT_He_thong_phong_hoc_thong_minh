@@ -62,7 +62,7 @@ function ConditionBuilder({
         }
       >
         <option value="leaf">So sánh chỉ số</option>
-        {depth < 3 && (
+        {depth < 4 && (
           <>
             <option value="all">Tất cả điều kiện (AND)</option>
             <option value="any">Ít nhất một điều kiện (OR)</option>

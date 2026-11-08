@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from "../store/auth";
 import type { Envelope } from "./resources";
 import type { Params } from "./resource-types";
+import { mockTelemetryStats } from "./mock-telemetry";
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
 const rooms: Row[] = sampleRooms.map((room) => ({ ...room, room_id: room.id }));
@@ -57,7 +58,7 @@ const desired = new Map<string, Row>(),
 const lifecycleEvents: Row[] = [];
 const idempotentCommands = new Map<
   string,
-  { request: string; response: unknown }
+  { request: string; response: unknown; expiresAt: number }
 >();
 for (const device of devices.filter(
   (row) => row.device_type === "CONTROL_NODE",
@@ -99,6 +100,12 @@ function getDevice(id: string) {
   const device = devices.find((row) => row.device_id === id);
   if (!device || !scope(device.room_id))
     fail("Không tìm thấy thiết bị trong phạm vi truy cập.");
+  device.room_status = rooms.find(
+    (room) => room.room_id === device.room_id,
+  )?.status;
+  device.room_code = rooms.find(
+    (room) => room.room_id === device.room_id,
+  )?.room_code;
   return device;
 }
 function record(action: string, target: string) {
@@ -241,17 +248,7 @@ export async function mockResource(
         );
       if (path.endsWith("/latest")) return paginate(samples.slice(0, 1), query);
       if (path.endsWith("/stats"))
-        return result(
-          samples.map((row) => ({
-            bucket_at: row.recorded_at,
-            sample_count: 1,
-            temperature_avg: row.temperature,
-            humidity_avg: row.humidity,
-            lux_avg: row.lux,
-            occupied_samples: row.occupancy === true ? 1 : 0,
-            occupancy_known_samples: row.occupancy == null ? 0 : 1,
-          })),
-        );
+        return result(mockTelemetryStats(samples, query));
       return paginate(samples, query);
     }
     if (method === "POST") {
@@ -308,7 +305,13 @@ export async function mockResource(
         return result(device);
       }
       return paginate(
-        devices.filter((row) => scope(row.room_id)),
+        devices
+          .filter((row) => scope(row.room_id))
+          .map((row) => ({
+            ...row,
+            room_status: rooms.find((room) => room.room_id === row.room_id)
+              ?.status,
+          })),
         query,
       );
     }
@@ -342,7 +345,7 @@ export async function mockResource(
           ...body,
         });
         const cached = key ? idempotentCommands.get(key) : undefined;
-        if (cached) {
+        if (cached && cached.expiresAt > Date.now()) {
           if (cached.request !== request)
             fail("Mã yêu cầu đã được dùng cho nội dung khác.");
           return result({ ...(cached.response as Row), cached: true });
@@ -366,7 +369,12 @@ export async function mockResource(
         desired.set(id, { ...desired.get(id), ...(body.desired_state as Row) });
         record("COMMAND_CREATE", "COMMAND");
         const response = { command, cached: false, shadow: {} };
-        if (key) idempotentCommands.set(key, { request, response });
+        if (key)
+          idempotentCommands.set(key, {
+            request,
+            response,
+            expiresAt: Date.now() + 60000,
+          });
         return result(response);
       }
       return paginate(
@@ -383,15 +391,23 @@ export async function mockResource(
         desired_version: 1,
         applied_version: 1,
         desired_settings: {
-          sample_interval_seconds: 10,
+          ...(device.device_type === "SENSOR_NODE"
+            ? { sample_interval_seconds: 10 }
+            : {}),
           heartbeat_interval_seconds: 10,
         },
         applied_settings: {
-          sample_interval_seconds: 10,
+          ...(device.device_type === "SENSOR_NODE"
+            ? { sample_interval_seconds: 10 }
+            : {}),
           heartbeat_interval_seconds: 10,
         },
       };
       if (method === "POST") {
+        if (
+          Number((body.settings as Row)?.heartbeat_interval_seconds || 0) > 10
+        )
+          fail("Chu kỳ heartbeat tối đa 10 giây.");
         state.desired_version = Number(state.desired_version) + 1;
         state.desired_settings = {
           ...(state.desired_settings as Row),
@@ -411,7 +427,14 @@ export async function mockResource(
       const paged = paginate(configs.get(id) || [], query);
       return {
         ...paged,
-        data: { state: structuredClone(state), history: paged.data },
+        data: {
+          state: structuredClone(state),
+          history: paged.data,
+          limits: {
+            sample_interval_seconds: { min: 1, max: 300 },
+            heartbeat_interval_seconds: { min: 1, max: 10 },
+          },
+        },
       };
     }
     if (action === "lifecycle-events")
@@ -587,7 +610,13 @@ export async function mockResource(
       unresolved_alert_counts: [],
       latest_telemetry: samples
         .slice(-1)
-        .map((row) => ({ ...row, stale: false })),
+        .map((row) => ({
+          ...row,
+          stale: Date.now() - Date.parse(String(row.recorded_at)) > 30000,
+          fresh_until: new Date(
+            Date.parse(String(row.recorded_at)) + 30000,
+          ).toISOString(),
+        })),
       generated_at: now(),
     });
   }

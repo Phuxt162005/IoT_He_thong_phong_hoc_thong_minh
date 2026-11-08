@@ -99,18 +99,24 @@ export async function upload(file: File, metadata: Record<string, string>) {
     await api.post("/ota/firmware", file, {
       headers: {
         "Content-Type": "application/octet-stream",
-        "x-firmware-version": encodeURIComponent(metadata.version),
+        "x-firmware-version": encodeMetadata(metadata.version),
         "x-device-type": metadata.device_type,
-        "x-hardware-target": encodeURIComponent(metadata.hardware_target),
-        "x-metadata-encoding": "percent-utf8",
-        "x-firmware-file-name": encodeURIComponent(file.name),
+        "x-hardware-target": encodeMetadata(metadata.hardware_target),
+        "x-metadata-encoding": "base64-utf8",
+        "x-firmware-file-name": encodeMetadata(file.name),
         "x-release-notes": metadata.release_notes
-          ? encodeURIComponent(metadata.release_notes)
+          ? encodeMetadata(metadata.release_notes)
           : undefined,
       },
       timeout: 60000,
     })
   ).data.data;
+}
+function encodeMetadata(value: string) {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(value))
+    binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 export async function exportTelemetry(room: string, params: Params) {
   if (isMock) {

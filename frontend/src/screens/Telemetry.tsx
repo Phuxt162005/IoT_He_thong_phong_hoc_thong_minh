@@ -144,7 +144,7 @@ export function TelemetryPage() {
             ["temperature", "Nhiệt độ (°C)"],
             ["humidity", "Độ ẩm (%)"],
             ["lux", "Ánh sáng (lux)"],
-            ["occupancy", "Hiện diện (0/1)"],
+            ["occupancy", stats ? "Tỷ lệ có người (%)" : "Hiện diện (0/1)"],
           ].map(([value, label]) => ({ value, label }))}
           onChange={(v) => setMetric(v || "temperature")}
         />
@@ -284,6 +284,16 @@ export function TelemetryPage() {
                 : "Biểu đồ các mẫu trên trang đang xem."}{" "}
               Thời gian hiển thị theo múi giờ máy của bạn.
             </p>
+            {stats && statistics.data && (
+              <p className="muted small telemetry-summary">
+                {statistics.data.reduce(
+                  (sum, row) => sum + Number(row.sample_count || 0),
+                  0,
+                )}{" "}
+                mẫu · {statistics.data.length} nhóm{" "}
+                {bucket === "day" ? "ngày" : "giờ"}.
+              </p>
+            )}
             {statistics.error && stats ? (
               <ErrorBox error={statistics.error} />
             ) : chart.length ? (
@@ -291,11 +301,29 @@ export function TelemetryPage() {
                 <ResponsiveContainer>
                   <AreaChart data={chart}>
                     <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
+                    <YAxis
+                      domain={
+                        metric === "occupancy"
+                          ? [0, stats ? 100 : 1]
+                          : ["auto", "auto"]
+                      }
+                    />
+                    <Tooltip
+                      formatter={(value: number) =>
+                        metric === "occupancy" && stats
+                          ? `${value.toFixed(1)}%`
+                          : value
+                      }
+                    />
                     <Area
                       dataKey="value"
-                      name={metric}
+                      name={
+                        metric === "occupancy"
+                          ? stats
+                            ? "Tỷ lệ có người (%)"
+                            : "Hiện diện (0/1)"
+                          : metric
+                      }
                       stroke="#10b981"
                       fill="#10b98122"
                       connectNulls={false}

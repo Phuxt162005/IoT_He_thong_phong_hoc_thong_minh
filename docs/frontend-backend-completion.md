@@ -2,6 +2,8 @@
 
 Nhánh: `feat/frontend-backend-completion`.
 
+Các trường hợp biên phát hiện sau đợt này được xử lý trên nhánh `fix/frontend-backend-contract-edge-cases`; xem [bản sửa bổ sung](frontend-backend-edge-cases.md).
+
 ## Phạm vi đã xử lý
 
 | Nhóm thiếu hoặc lệch hợp đồng | Thay đổi |
