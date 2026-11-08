@@ -234,6 +234,80 @@ async function cmdCommand(deviceCode, fanState, lightState) {
   }
 }
 
+async function cmdConfig(deviceCode, ...configArgs) {
+  if (!deviceCode) {
+    console.log("Cú pháp: npm run dev:cli config <DEVICE_CODE> [sample_seconds] [heartbeat_seconds]");
+    console.log("Ví dụ : npm run dev:cli config SN-A101-01 3 5");
+    return;
+  }
+  const token = await login();
+  const device = await findDeviceByCode(token, deviceCode);
+  if (!device) {
+    console.error(`Không tìm thấy thiết bị có mã ${deviceCode}`);
+    return;
+  }
+
+  const settings = {};
+
+  for (let i = 0; i < configArgs.length; i++) {
+    const arg = configArgs[i];
+    if (arg === "--sample" || arg === "-s" || arg === "sample") {
+      settings.sample_interval_seconds = parseInt(configArgs[++i], 10);
+    } else if (arg === "--heartbeat" || arg === "-h" || arg === "heartbeat" || arg === "hb") {
+      settings.heartbeat_interval_seconds = parseInt(configArgs[++i], 10);
+    } else if (arg.startsWith("sample=")) {
+      settings.sample_interval_seconds = parseInt(arg.split("=")[1], 10);
+    } else if (arg.startsWith("heartbeat=") || arg.startsWith("hb=")) {
+      settings.heartbeat_interval_seconds = parseInt(arg.split("=")[1], 10);
+    } else if (/^\d+$/.test(arg)) {
+      const val = parseInt(arg, 10);
+      if (device.device_type === "CONTROL_NODE") {
+        settings.heartbeat_interval_seconds = val;
+      } else {
+        if (!settings.sample_interval_seconds) {
+          settings.sample_interval_seconds = val;
+        } else if (!settings.heartbeat_interval_seconds) {
+          settings.heartbeat_interval_seconds = val;
+        }
+      }
+    }
+  }
+
+  if (device.device_type === "CONTROL_NODE" && settings.sample_interval_seconds) {
+    console.warn("⚠️ Lưu ý: Control Node không có cảm biến nên không nhận sample_interval_seconds. Đang tự động bỏ qua...");
+    delete settings.sample_interval_seconds;
+  }
+
+  if (Object.keys(settings).length === 0) {
+    console.error("Vui lòng chỉ định ít nhất 1 thông số cấu hình!");
+    console.log("Ví dụ: npm run dev:cli config SN-A101-01 3 5 (đọc 3s, nhịp tim 5s)");
+    return;
+  }
+
+  console.log(`Đang gửi yêu cầu cấu hình mới tới ${deviceCode} (${device.device_type}):`, settings);
+  try {
+    const res = await request(token, `/devices/${device.device_id}/configs`, "POST", { settings });
+    console.log(` -> Yêu cầu cấu hình đã gửi (Config ID: ${res.config_id}, Version: ${res.version}, Trạng thái: ${res.status})`);
+    console.log("Đang chờ thiết bị phản hồi ACK...");
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const cur = await request(token, `/devices/${device.device_id}/configs`);
+      if (cur.state?.applied_version >= res.version) {
+        console.log(`🎉 Thành công! Thiết bị đã áp dụng cấu hình Version ${cur.state.applied_version}:`, cur.state.applied_settings);
+        return;
+      }
+    }
+    console.log("Chưa nhận được ACK từ thiết bị (có thể thiết bị đang bận hoặc offline).");
+  } catch (err) {
+    console.error(`Gửi cấu hình thất bại: ${err.message}`);
+    if (err.code === "UNSAFE_HEARTBEAT_INTERVAL") {
+      console.log("💡 Gợi ý: Backend quy định chu kỳ heartbeat <= 10 giây (không quá 1/3 timeout 30s của server) để tránh bị coi là offline.");
+    } else if (err.code === "DEVICE_NOT_READY") {
+      console.log("💡 Gợi ý: Thiết bị phải đang ONLINE và gửi heartbeat trong 30 giây gần nhất mới nhận cấu hình.");
+    }
+  }
+}
+
 async function cmdList() {
   const token = await login();
   const devices = await request(token, `/devices?page_size=100`);
@@ -272,6 +346,9 @@ switch (cmd) {
     break;
   case "command":
     cmdCommand(args[0], args[1], args[2]);
+    break;
+  case "config":
+    cmdConfig(args[0], ...args.slice(1));
     break;
   default:
     console.log(`

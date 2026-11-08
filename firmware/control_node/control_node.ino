@@ -2,6 +2,8 @@
 #include <PubSubClient.h>
 #include "Config.h"
 #include "NodeSessionManager.h"
+#include "RemoteConfigManager.h"
+#include "ActuatorManager.h"
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -16,47 +18,77 @@ NodeSessionManager sessionManager(
   HEARTBEAT_INTERVAL_S
 );
 
-// Trạng thái quạt và đèn ban đầu (khi mới cấp nguồn)
-String currentFanState = "OFF";
-String currentLightState = "OFF";
-uint32_t currentShadowVersion = 1;
+RemoteConfigManager configManager(
+  mqttClient,
+  sessionManager,
+  DEVICE_ID,
+  ROOM_ID,
+  false,                 // isSensorNode = false (Control Node)
+  0,                     // sample interval = 0
+  HEARTBEAT_INTERVAL_S   // default heartbeat interval
+);
 
-// Hook bổ sung reported_state và shadow_version vào bản tin /status ONLINE
+ActuatorManager actuatorManager(
+  mqttClient,
+  sessionManager,
+  DEVICE_ID,
+  ROOM_ID,
+  PIN_RELAY_FAN,
+  PIN_RELAY_LIGHT,
+  RELAY_ACTIVE_LOW
+);
+
+// Hook đồng bộ trạng thái thực tế của relay vào bản tin /status ONLINE
 String getExtraStatus(const String& sessionId) {
-  return "{\"reported_state\":{\"fan\":\"" + currentFanState + "\",\"light\":\"" + currentLightState + "\"},\"shadow_version\":" + String(currentShadowVersion) + "}";
+  return actuatorManager.getReportedStatusJson();
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  // 1. Kiểm tra và xử lý lệnh điều khiển Relay /command
+  if (actuatorManager.handleMessage(topic, payload, length)) {
+    return;
+  }
+
+  // 2. Kiểm tra và xử lý cấu hình từ xa /config
+  if (configManager.handleMessage(topic, payload, length)) {
+    return;
+  }
 }
 
 void onMqttConnected(const String& sessionId) {
   Serial.println("[MQTT] Connected successfully! Session ID: " + sessionId);
+  // Đăng ký topic nhận lệnh điều khiển quạt & đèn
+  actuatorManager.subscribe();
+  // Đăng ký topic nhận cấu hình từ xa
+  configManager.subscribe();
+}
+
+void onConfigChanged(uint32_t sampleInterval, uint32_t heartbeatInterval) {
+  Serial.printf("[EVENT] Cau hinh tu xa da thay doi: Heartbeat=%us\n", heartbeatInterval);
 }
 
 void setup() {
+  // 1. Khởi tạo và chốt ngắt Relay NGAY LẬP TỨC ở đầu setup() để chống nháy/bật ngoài ý muốn
+  actuatorManager.begin();
+
   Serial.begin(115200);
-  delay(1000);
+  delay(200);
   Serial.println("\n========================================================");
-  Serial.println(" SMART CLASSROOM CONTROL NODE - PHASE 1: SESSION & HEARTBEAT");
+  Serial.println(" SMART CLASSROOM CONTROL NODE - ACTUATOR & COMMAND ACK");
   Serial.println("========================================================");
 
-  // Khởi tạo trạng thái Relay K1 (GPIO 25 - Quạt) và K2 (GPIO 26 - Đèn)
-  // Ghi trước mức logic tắt để chống hiện tượng nháy relay lúc vừa cấp điện
-  #if RELAY_ACTIVE_LOW
-    digitalWrite(PIN_RELAY_FAN, HIGH);
-    digitalWrite(PIN_RELAY_LIGHT, HIGH);
-  #else
-    digitalWrite(PIN_RELAY_FAN, LOW);
-    digitalWrite(PIN_RELAY_LIGHT, LOW);
-  #endif
-  pinMode(PIN_RELAY_FAN, OUTPUT);
-  pinMode(PIN_RELAY_LIGHT, OUTPUT);
-  Serial.println("[Relay] Initialized GPIO 25 (FAN) and GPIO 26 (LIGHT) to OFF.");
+  // Khởi tạo Preferences NVS cho cấu hình
+  configManager.begin();
+  configManager.setOnConfigChangedCallback(onConfigChanged);
 
   // Khởi tạo kết nối Wi-Fi
   Serial.printf("[Wi-Fi] Connecting to SSID: %s...\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // Cấu hình broker MQTT
+  // Cấu hình broker MQTT và callback
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  mqttClient.setCallback(mqttCallback);
 
   // Cấu hình Session Manager
   sessionManager.setOnConnectedCallback(onMqttConnected);
@@ -77,14 +109,16 @@ void loop() {
   static uint32_t lastPrint = 0;
   if (millis() - lastPrint >= 5000) {
     lastPrint = millis();
-    Serial.printf("[Chẩn đoán] Wi-Fi: %s | NTP: %s | MQTT: %s | Session: %s | Fan: %s | Light: %s\n",
+    Serial.printf("[Chẩn đoán] Wi-Fi: %s | NTP: %s | MQTT: %s | Session: %s | HB: %us | CfgVer: %u | ShadowVer: %u | Fan: %s | Light: %s\n",
       sessionManager.isWifiConnected() ? "ONLINE" : "OFFLINE",
       sessionManager.isTimeSynced() ? "SYNCED" : "SYNCING",
       sessionManager.isMqttConnected() ? "CONNECTED" : "DISCONNECTED",
       sessionManager.getSessionId().c_str(),
-      currentFanState.c_str(),
-      currentLightState.c_str()
+      configManager.getHeartbeatInterval(),
+      configManager.getAppliedVersion(),
+      actuatorManager.getShadowVersion(),
+      actuatorManager.getFanState().c_str(),
+      actuatorManager.getLightState().c_str()
     );
   }
 }
-
