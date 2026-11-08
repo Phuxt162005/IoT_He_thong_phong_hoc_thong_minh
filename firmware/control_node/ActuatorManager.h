@@ -1,4 +1,6 @@
+
 #pragma once
+
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <Preferences.h>
@@ -42,10 +44,16 @@ private:
   String _reportedTopic;
 
   Preferences _prefs;
+  bool _prefsReady = false;
+
   bool _fanOn = false;
   bool _lightOn = false;
   uint32_t _shadowVersion = 1;
 
+  // Lưu ID lệnh gần nhất trong NVS để nhận diện duplicate sau reboot.
+  String _lastProcessedCommandId;
+
+  // Bộ nhớ đệm RAM để nhận diện các lệnh lặp trong phiên hiện tại.
   static const size_t DEDUP_SIZE = 16;
   String _recentCommandIds[DEDUP_SIZE];
   size_t _dedupIndex = 0;
@@ -53,7 +61,8 @@ private:
   bool isCommandProcessed(const String& cmdId);
   void markCommandProcessed(const String& cmdId);
   void writeHardware(uint8_t pin, bool on);
-  void sendAck(
+
+  bool sendAck(
     const String& commandId,
     uint32_t version,
     bool success,
