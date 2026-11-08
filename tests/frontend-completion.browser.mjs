@@ -240,6 +240,7 @@ test(
       exceptions = [],
       requests = [];
     let dropCommandResponse = false;
+    let emptyRooms = false;
     const send = (method, params = {}) =>
       new Promise((resolve, reject) => {
         const id = ++sequence;
@@ -279,11 +280,26 @@ test(
               ),
             )
           : request.postData;
-        const response = await fetch(apiBase + url.pathname + url.search, {
-          method: request.method,
-          headers,
-          body,
-        });
+        const response =
+          emptyRooms &&
+          request.method === "GET" &&
+          url.pathname === "/api/v1/rooms"
+            ? new Response(
+                JSON.stringify({
+                  success: true,
+                  data: [],
+                  meta: { page: 1, page_size: 100, total: 0 },
+                }),
+                {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                },
+              )
+            : await fetch(apiBase + url.pathname + url.search, {
+                method: request.method,
+                headers,
+                body,
+              });
         const text = await response.text();
         requests.push({
           path: url.pathname + url.search,
@@ -407,6 +423,22 @@ test(
     );
     await until('Boolean(document.querySelector(".socket-status.connected"))');
     t.diagnostic("Dashboard and authenticated WebSocket loaded real data");
+    await until(
+      'document.querySelectorAll(".actuator-grid .actuator-tile").length===2',
+    );
+    assert.equal(
+      await evaluate(
+        'document.querySelector(".actuator-grid [data-actuator=light]").getAttribute("aria-label")',
+      ),
+      "Đèn: Đã tắt",
+    );
+    const actuatorScreenshot = await send("Page.captureScreenshot", {
+      format: "png",
+    });
+    writeFileSync(
+      ".local/actuator-dashboard.png",
+      Buffer.from(actuatorScreenshot.data, "base64"),
+    );
     assert.equal(
       await evaluate(
         'document.body.innerText.includes("Dữ liệu cảm biến đã cũ")',
@@ -864,6 +896,60 @@ test(
     t.diagnostic(
       "Retired devices cannot be edited, inactive rooms cannot be controlled, and revoked command history stays readable",
     );
+    await navigate("/dashboard");
+    await until(
+      'document.querySelector(".actuator-grid [data-actuator=light]")?.textContent.includes("Bật lần cuối")',
+    );
+    assert.equal(
+      await evaluate(
+        'document.querySelector(".actuator-grid [data-actuator=light]").classList.contains("is-on")',
+      ),
+      false,
+      "Offline devices must not look like live running actuators",
+    );
+    emptyRooms = true;
+    await navigate("/dashboard");
+    await until('document.body.innerText.includes("Chưa có phòng học")');
+    assert.equal(
+      await evaluate('Boolean(document.querySelector(".metric-grid"))'),
+      false,
+    );
+    assert.equal(
+      await evaluate(
+        'document.querySelectorAll(".actuator-grid [data-state=UNKNOWN]").length',
+      ),
+      2,
+    );
+    const emptyDesktop = await send("Page.captureScreenshot", {
+      format: "png",
+    });
+    writeFileSync(
+      ".local/actuator-empty-desktop.png",
+      Buffer.from(emptyDesktop.data, "base64"),
+    );
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await delay(300);
+    const emptyMobile = await send("Page.captureScreenshot", { format: "png" });
+    writeFileSync(
+      ".local/actuator-empty-mobile.png",
+      Buffer.from(emptyMobile.data, "base64"),
+    );
+    assert.ok(
+      await evaluate("document.documentElement.scrollWidth<=innerWidth"),
+      "Empty dashboard fits a mobile viewport",
+    );
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: 1440,
+      height: 1000,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    emptyRooms = false;
     await navigate(`/devices/${lastDevice.device_id}`);
     await until(
       'document.querySelector("h2")?.textContent.includes("Pagination Device 25")',

@@ -20,6 +20,8 @@ import { useApi, useDevices, usePage, useRooms } from "../hooks/useApi";
 import { useClock } from "../hooks/useClock";
 import { Card, Empty, Loading, StatusBadge } from "../components/ui";
 import { Choice, ErrorBox, Title } from "../components/workspace-ui";
+import { ActuatorStatus } from "../components/actuator-status";
+import { useAuthStore } from "../store/auth";
 type Snapshot = {
   rooms_count: number;
   device_counts: {
@@ -32,6 +34,7 @@ type Snapshot = {
   generated_at: string;
 };
 export function DashboardPage() {
+  const admin = useAuthStore((state) => state.user?.role === "ADMIN");
   const rooms = useRooms();
   const [selected, setSelected] = useState("");
   const room =
@@ -102,6 +105,7 @@ export function DashboardPage() {
         action={
           <Choice
             label="Phòng học"
+            disabled={!rooms.data?.length}
             value={room}
             empty="Chọn phòng"
             options={
@@ -121,7 +125,26 @@ export function DashboardPage() {
       ) : rooms.error ? (
         <ErrorBox error={rooms.error} retry={() => void rooms.refetch()} />
       ) : !room ? (
-        <Empty text="Chưa được gán phòng hoặc chưa có phòng học." />
+        <div className="two-col">
+          <Card>
+            <Empty
+              text={admin ? "Chưa có phòng học" : "Bạn chưa được gán phòng học"}
+            />
+            <p className="muted small">
+              {admin
+                ? "Thêm phòng học, đăng ký thiết bị và kết nối phần cứng để bắt đầu nhận dữ liệu."
+                : "Liên hệ quản trị viên để được cấp quyền truy cập phòng học."}
+            </p>
+            {admin && <Link to="/rooms">Tạo phòng học →</Link>}
+          </Card>
+          <Card>
+            <h3>Trạng thái thiết bị</h3>
+            <div className="actuator-grid">
+              <ActuatorStatus type="light" available={false} />
+              <ActuatorStatus type="fan" available={false} />
+            </div>
+          </Card>
+        </div>
       ) : (
         <>
           {query.error && (
@@ -218,15 +241,21 @@ export function DashboardPage() {
                   ))
               )}
               {shadow.error && <ErrorBox error={shadow.error} />}
-              <div className="state-row">
-                Đèn{" "}
-                <StatusBadge
-                  status={shadow.data?.reported_state?.light || "UNKNOWN"}
-                />{" "}
-                Quạt{" "}
-                <StatusBadge
-                  status={shadow.data?.reported_state?.fan || "UNKNOWN"}
-                />
+              <div className="actuator-grid">
+                {(["light", "fan"] as const).map((type) => (
+                  <ActuatorStatus
+                    key={type}
+                    type={type}
+                    state={shadow.data?.reported_state?.[type]}
+                    online={
+                      control?.connection_status === "ONLINE" &&
+                      !["REVOKED", "DECOMMISSIONED"].includes(
+                        control.lifecycle_status,
+                      )
+                    }
+                    available={Boolean(control)}
+                  />
+                ))}
               </div>
             </Card>
           </div>

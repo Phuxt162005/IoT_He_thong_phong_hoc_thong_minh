@@ -7,7 +7,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { commandText, dateText, page, write } from "../lib/resources";
 import type { CommandRecord, ShadowRecord } from "../lib/resource-types";
 import { useApi, useDevices, usePage, useRooms } from "../hooks/useApi";
-import { Card, StatusBadge } from "../components/ui";
+import { StatusBadge } from "../components/ui";
+import {
+  ActuatorStatus,
+  actuatorStateName,
+} from "../components/actuator-status";
 import {
   Choice,
   Editor,
@@ -293,12 +297,22 @@ export function ControlPage() {
         {(["light", "fan"] as const).map((actuator) => {
           const state = shadow.data?.reported_state?.[actuator] || "UNKNOWN";
           return (
-            <Card key={actuator}>
-              <h3>{actuator === "light" ? "Đèn" : "Quạt"}</h3>
-              <StatusBadge status={state} />
+            <ActuatorStatus
+              key={actuator}
+              type={actuator}
+              state={state}
+              online={
+                device?.connection_status === "ONLINE" &&
+                !["REVOKED", "DECOMMISSIONED"].includes(device.lifecycle_status)
+              }
+              available={Boolean(device)}
+            >
               <p className="muted small">
-                Mong muốn: {shadow.data?.desired_state?.[actuator] || "UNKNOWN"}{" "}
-                · báo về {dateText(shadow.data?.last_reported_at)}
+                Yêu cầu gần nhất:{" "}
+                {actuatorStateName(shadow.data?.desired_state?.[actuator])}
+                <span className="block">
+                  Cập nhật: {dateText(shadow.data?.last_reported_at)}
+                </span>
               </p>
               {canControl && (
                 <button
@@ -323,7 +337,7 @@ export function ControlPage() {
                   {state === "ON" ? "Tắt" : "Bật"}
                 </button>
               )}
-            </Card>
+            </ActuatorStatus>
           );
         })}
       </div>
