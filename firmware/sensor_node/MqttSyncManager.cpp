@@ -190,29 +190,38 @@ bool MqttSyncManager::validateAck(
   const String& pendingRecord,
   String& messageId
 ) {
+  errorMessage = "";
+
   StaticJsonDocument<512> ack;
   StaticJsonDocument<2048> pending;
 
-  if (deserializeJson(ack, payload) ||
-      deserializeJson(pending, pendingRecord) ||
+  DeserializationError ackError = deserializeJson(ack, payload);
+  DeserializationError pendingError =
+    deserializeJson(pending, pendingRecord);
+
+  if (ackError || pendingError ||
       !ack.is<JsonObject>() ||
       !pending.is<JsonObject>()) {
     errorMessage = "ACK hoac telemetry JSON khong hop le";
     return false;
   }
 
-  if (!ack["status"].is<const char*>() ||
-      strcmp(ack["status"].as<const char*>(), "STORED") != 0) {
-    errorMessage = "ACK khong co trang thai STORED hop le";
-    return false;
-  }
-
   const bool pendingCanonical = pending.containsKey("msg_id");
+  const bool pendingLegacy = pending.containsKey("eventId");
+
   const bool ackCanonical = ack.containsKey("msg_id");
   const bool ackLegacy = ack.containsKey("eventId");
 
-  if (ackCanonical == ackLegacy) {
-    errorMessage = "ACK thieu hoac trung dinh dang";
+  if (pendingCanonical == pendingLegacy ||
+      ackCanonical == ackLegacy ||
+      pendingCanonical != ackCanonical) {
+    errorMessage = "Dinh dang ACK khong khop telemetry dang cho";
+    return false;
+  }
+
+  if (!ack["status"].is<const char*>() ||
+      strcmp(ack["status"].as<const char*>(), "STORED") != 0) {
+    errorMessage = "ACK khong co trang thai STORED";
     return false;
   }
 
@@ -220,44 +229,143 @@ bool MqttSyncManager::validateAck(
     ? pending["msg_id"].as<const char*>()
     : pending["eventId"].as<const char*>();
 
-  if (!pendingId || !*pendingId) {
-    errorMessage = "Telemetry trong queue thieu ID";
+  if (!pendingId || !*pendingId || strlen(pendingId) > 64) {
+    errorMessage = "Telemetry trong queue thieu ID hop le";
     return false;
   }
 
   if (pendingCanonical) {
-    if (!ackCanonical || ack.size() != 6 ||
-        !ack["msg_id"].is<const char*>() ||
+    const char* allowedKeys[] = {
+      "msg_id",
+      "device_id",
+      "room_id",
+      "status",
+      "duplicate",
+      "timestamp"
+    };
+
+    if (ack.size() != 6) {
+      errorMessage = "ACK chuan sai so luong truong";
+      return false;
+    }
+
+    for (JsonPair kv : ack.as<JsonObject>()) {
+      bool allowed = false;
+
+      for (const char* key : allowedKeys) {
+        if (strcmp(kv.key().c_str(), key) == 0) {
+          allowed = true;
+          break;
+        }
+      }
+
+      if (!allowed) {
+        errorMessage = "ACK chuan chua truong la";
+        return false;
+      }
+    }
+
+    if (!ack["msg_id"].is<const char*>() ||
         !ack["device_id"].is<const char*>() ||
         !ack["room_id"].is<const char*>() ||
         !ack["status"].is<const char*>() ||
         !ack["duplicate"].is<bool>() ||
         !ack["timestamp"].is<uint64_t>()) {
-      errorMessage = "ACK chuan sai cau truc";
+      errorMessage = "ACK chuan sai kieu du lieu";
       return false;
     }
 
-    if (strcmp(ack["msg_id"].as<const char*>(), pendingId) != 0 ||
-        strcmp(ack["device_id"].as<const char*>(), deviceId.c_str()) != 0 ||
-        strcmp(ack["room_id"].as<const char*>(), roomId.c_str()) != 0) {
+    const char* ackId = ack["msg_id"].as<const char*>();
+    const char* ackDevice = ack["device_id"].as<const char*>();
+    const char* ackRoom = ack["room_id"].as<const char*>();
+
+    if (!ackId || !ackDevice || !ackRoom ||
+        strcmp(ackId, pendingId) != 0 ||
+        strcmp(ackDevice, deviceId.c_str()) != 0 ||
+        strcmp(ackRoom, roomId.c_str()) != 0) {
       errorMessage = "ACK chuan khong khop telemetry";
       return false;
     }
 
-  } else {
-    if (!ackLegacy || ack.size() != 5 ||
-        !ack["messageType"].is<const char*>() ||
-        !ack["eventId"].is<const char*>() ||
-        !ack["duplicate"].is<bool>() ||
-        !ack["timestamp"].is<const char*>()) {
-      errorMessage = "ACK legacy sai cau truc";
+    // Đối chiếu thêm định danh trong chính bản ghi đang chờ.
+    if (!pending["device_id"].is<const char*>() ||
+        !pending["room_id"].is<const char*>()) {
+      errorMessage = "Telemetry chuan thieu device_id/room_id";
       return false;
     }
 
-    if (strcmp(ack["messageType"].as<const char*>(),
-               "telemetry_ack") != 0 ||
-        strcmp(ack["eventId"].as<const char*>(), pendingId) != 0) {
+    if (strcmp(
+          pending["device_id"].as<const char*>(),
+          deviceId.c_str()) != 0 ||
+        strcmp(
+          pending["room_id"].as<const char*>(),
+          roomId.c_str()) != 0) {
+      errorMessage = "Telemetry trong queue khong thuoc node hien tai";
+      return false;
+    }
+
+  } else {
+    const char* allowedKeys[] = {
+      "messageType",
+      "eventId",
+      "status",
+      "duplicate",
+      "timestamp"
+    };
+
+    if (ack.size() != 5) {
+      errorMessage = "ACK legacy sai so luong truong";
+      return false;
+    }
+
+    for (JsonPair kv : ack.as<JsonObject>()) {
+      bool allowed = false;
+
+      for (const char* key : allowedKeys) {
+        if (strcmp(kv.key().c_str(), key) == 0) {
+          allowed = true;
+          break;
+        }
+      }
+
+      if (!allowed) {
+        errorMessage = "ACK legacy chua truong la";
+        return false;
+      }
+    }
+
+    if (!ack["messageType"].is<const char*>() ||
+        !ack["eventId"].is<const char*>() ||
+        !ack["status"].is<const char*>() ||
+        !ack["duplicate"].is<bool>() ||
+        !ack["timestamp"].is<const char*>()) {
+      errorMessage = "ACK legacy sai kieu du lieu";
+      return false;
+    }
+
+    if (strcmp(
+          ack["messageType"].as<const char*>(),
+          "telemetry_ack") != 0 ||
+        strcmp(
+          ack["eventId"].as<const char*>(),
+          pendingId) != 0) {
       errorMessage = "ACK legacy khong khop telemetry";
+      return false;
+    }
+
+    if (!pending["deviceId"].is<const char*>() ||
+        !pending["roomCode"].is<const char*>()) {
+      errorMessage = "Telemetry legacy thieu deviceId/roomCode";
+      return false;
+    }
+
+    if (strcmp(
+          pending["deviceId"].as<const char*>(),
+          deviceId.c_str()) != 0 ||
+        strcmp(
+          pending["roomCode"].as<const char*>(),
+          roomId.c_str()) != 0) {
+      errorMessage = "Telemetry legacy khong thuoc node hien tai";
       return false;
     }
   }
@@ -267,44 +375,43 @@ bool MqttSyncManager::validateAck(
   return true;
 }
 
-
 void MqttSyncManager::handleMessage(
   char* topic,
   byte* payload,
   unsigned int length
 ) {
   if (!topic || !payload || length == 0) return;
+
   if (String(topic) != ackTopic) return;
+
+  // ACK hợp lệ rất nhỏ; giới hạn để tránh cấp phát String quá lớn.
+  if (length > 512) {
+    errorMessage = "ACK vuot qua kich thuoc cho phep";
+    return;
+  }
 
   String ackPayload;
   ackPayload.reserve(length + 1);
 
   for (unsigned int i = 0; i < length; ++i) {
-    ackPayload += (char)payload[i];
+    ackPayload += static_cast<char>(payload[i]);
   }
 
   String pendingRecord;
 
   if (!queue.peek(pendingRecord)) {
-    if (!queue.lastError().isEmpty()) {
-      errorMessage = queue.lastError();
-    } else {
-      errorMessage = "Nhan ACK nhung queue rong";
-    }
+    errorMessage = !queue.lastError().isEmpty()
+      ? queue.lastError()
+      : "Nhan ACK nhung queue rong";
     return;
   }
 
   String messageId;
 
-  if (!validateAck(
-        ackPayload,
-        pendingRecord,
-        messageId
-      )) {
+  if (!validateAck(ackPayload, pendingRecord, messageId)) {
     return;
   }
 
-  // Chỉ xóa bản ghi đầu tiên sau ACK STORED hợp lệ.
   if (!queue.acknowledge(messageId)) {
     errorMessage = queue.lastError();
     return;
@@ -312,13 +419,9 @@ void MqttSyncManager::handleMessage(
 
   awaitingAck = false;
   retryScheduled = false;
-
   retryCount = 0;
   retryIntervalMs = 3000;
-
-  // Cho phép gửi bản ghi kế tiếp ngay ở vòng loop sau.
   nextPublishAt = millis();
-
   errorMessage = "";
 }
 

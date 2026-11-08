@@ -18,29 +18,13 @@ bool OfflineQueue::begin() {
   return repairTrailingRecord();
 }
 
+
 bool OfflineQueue::recoverFiles() {
-  auto isUsableQueue = [&](const char* path, bool allowIncompleteTail) -> bool {
+  auto isUsableQueue = [&](const char* path) -> bool {
     if (!fs.exists(path)) return false;
 
     File file = fs.open(path, FILE_READ);
     if (!file) return false;
-
-    const size_t fileSize = file.size();
-    bool endsWithNewline = true;
-
-    if (fileSize > 0) {
-      if (!file.seek(fileSize - 1)) {
-        file.close();
-        return false;
-      }
-
-      endsWithNewline = file.read() == '\n';
-
-      if (!file.seek(0)) {
-        file.close();
-        return false;
-      }
-    }
 
     bool valid = true;
 
@@ -51,15 +35,6 @@ bool OfflineQueue::recoverFiles() {
       if (line.isEmpty()) continue;
 
       if (!validateRecord(line)) {
-        const bool finalLine = !file.available();
-
-        if (allowIncompleteTail &&
-            finalLine &&
-            !endsWithNewline) {
-          errorMessage = "";
-          break;
-        }
-
         valid = false;
         break;
       }
@@ -67,7 +42,6 @@ bool OfflineQueue::recoverFiles() {
 
     file.close();
     errorMessage = "";
-
     return valid;
   };
 
@@ -75,74 +49,92 @@ bool OfflineQueue::recoverFiles() {
   const bool backupExists = fs.exists(backupPath);
   const bool tempExists = fs.exists(tempPath);
 
-  // 1. Ưu tiên queue chính nếu tất cả bản ghi đều hợp lệ.
-  if (isUsableQueue(queuePath, false)) {
+  // Trường hợp 1: Queue chính hợp lệ.
+  if (mainExists && isUsableQueue(queuePath)) {
+    // Queue chính đã hoàn chỉnh nên temp không còn cần thiết.
     if (tempExists && !fs.remove(tempPath)) {
       errorMessage = "Khong xoa duoc file tam";
       return false;
     }
 
+    // Chỉ xóa backup sau khi xác nhận queue chính hợp lệ.
     if (backupExists && !fs.remove(backupPath)) {
-      errorMessage = "Khong xoa duoc file backup";
+      errorMessage = "Queue chinh hop le nhung khong xoa duoc backup cu";
       return false;
     }
 
+    errorMessage = "";
     return true;
   }
 
-  // 2. Queue chính hỏng: ưu tiên backup.
-  if (isUsableQueue(backupPath, false)) {
-    if (mainExists && !fs.remove(queuePath)) {
-      errorMessage = "Khong xoa duoc queue hong";
-      return false;
+  // Trường hợp 2: Queue chính không hợp lệ hoặc không tồn tại.
+  // Backup là bản ưu tiên phục hồi.
+  if (backupExists && isUsableQueue(backupPath)) {
+    // Không xóa backup trước khi phục hồi thành công.
+    if (mainExists) {
+      if (tempExists) {
+        errorMessage = "Ton tai ca main hong, backup va temp; tu choi ghi de";
+        return false;
+      }
+
+      // Giữ lại main hỏng dưới tên temp để tránh xóa dữ liệu gốc.
+      if (!fs.rename(queuePath, tempPath)) {
+        errorMessage = "Khong the cach ly queue hong";
+        return false;
+      }
     }
 
     if (!fs.rename(backupPath, queuePath)) {
+      // Nếu đã chuyển main sang temp thì thử khôi phục lại.
+      if (fs.exists(tempPath) && !fs.exists(queuePath)) {
+        fs.rename(tempPath, queuePath);
+      }
+
       errorMessage = "Khong khoi phuc duoc backup";
       return false;
     }
 
-    if (tempExists && !fs.remove(tempPath)) {
-      errorMessage = "Khong xoa duoc file tam";
+    // Queue phục hồi đã tồn tại. Kiểm tra lại trước khi xóa temp.
+    if (!isUsableQueue(queuePath)) {
+      errorMessage = "Backup sau khi phuc hoi khong hop le";
       return false;
     }
 
+    // Temp có thể là queue cũ bị lỗi. Không xóa nếu chưa xác định
+    // đó là bản tạm có thể bỏ.
+    if (fs.exists(tempPath) && !fs.remove(tempPath)) {
+      errorMessage = "Phuc hoi thanh cong nhung khong xoa duoc temp";
+      return false;
+    }
+
+    errorMessage = "";
     return true;
   }
 
-  // 3. Chỉ sử dụng file tạm nếu main và backup không hợp lệ.
-  if (isUsableQueue(tempPath, false)) {
-    if (mainExists && !fs.remove(queuePath)) {
-      errorMessage = "Khong xoa duoc queue hong";
-      return false;
-    }
-
+  // Trường hợp 3: Chỉ dùng temp nếu không có main và backup hợp lệ.
+  if (!mainExists && tempExists && isUsableQueue(tempPath)) {
     if (!fs.rename(tempPath, queuePath)) {
       errorMessage = "Khong khoi phuc duoc file tam";
       return false;
     }
 
-    if (backupExists && !fs.remove(backupPath)) {
-      errorMessage = "Khong xoa duoc backup cu";
+    if (!isUsableQueue(queuePath)) {
+      errorMessage = "File tam sau khi phuc hoi khong hop le";
       return false;
     }
 
+    errorMessage = "";
     return true;
   }
 
-  // 4. Nếu chỉ còn queue chính với dòng cuối ghi dở,
-  // giữ lại để repairTrailingRecord() xử lý.
-  if (mainExists && isUsableQueue(queuePath, true)) {
-    return true;
-  }
-
-  // 5. Không tự tạo queue mới khi còn file dữ liệu bị lỗi.
+  // Có bất kỳ artifact nào nhưng không có bản hợp lệ:
+  // không tự tạo queue mới vì có nguy cơ ghi đè dữ liệu cũ.
   if (mainExists || backupExists || tempExists) {
-    errorMessage = "Tat ca file queue deu hong, tu choi khoi tao lai";
+    errorMessage = "Khong co queue hop le; giu nguyen cac file de bao toan du lieu";
     return false;
   }
 
-  // 6. Chỉ tạo mới khi chưa từng có dữ liệu.
+  // Chỉ tạo queue mới khi chưa có bất kỳ file dữ liệu nào.
   File file = fs.open(queuePath, FILE_WRITE);
 
   if (!file) {
@@ -150,13 +142,36 @@ bool OfflineQueue::recoverFiles() {
     return false;
   }
 
+  file.flush();
   file.close();
-  errorMessage = "";
 
+  if (!fs.exists(queuePath)) {
+    errorMessage = "File hang doi khong ton tai sau khi tao";
+    return false;
+  }
+
+  File verify = fs.open(queuePath, FILE_READ);
+  if (!verify) {
+    errorMessage = "Khong kiem tra duoc file hang doi moi";
+    return false;
+  }
+
+  const bool empty = verify.size() == 0;
+  verify.close();
+
+  if (!empty) {
+    errorMessage = "File hang doi moi khong rong bat thuong";
+    return false;
+  }
+
+  errorMessage = "";
   return true;
 }
 
+
 bool OfflineQueue::repairTrailingRecord() {
+  errorMessage = "";
+
   File source = fs.open(queuePath, FILE_READ);
   if (!source) {
     errorMessage = "Khong doc duoc queue de phuc hoi";
@@ -164,6 +179,7 @@ bool OfflineQueue::repairTrailingRecord() {
   }
 
   const size_t originalSize = source.size();
+
   if (originalSize == 0) {
     source.close();
     return true;
@@ -176,93 +192,82 @@ bool OfflineQueue::repairTrailingRecord() {
   }
 
   const int lastByte = source.read();
-  source.close();
 
-  if (lastByte == '\n') return true;
-
-  source = fs.open(queuePath, FILE_READ);
-  if (!source) {
-    errorMessage = "Khong mo lai duoc queue";
-    return false;
-  }
-
-  if (fs.exists(tempPath)) fs.remove(tempPath);
-
-  File target = fs.open(tempPath, FILE_WRITE);
-  if (!target) {
+  if (lastByte < 0) {
     source.close();
-    errorMessage = "Khong tao duoc file phuc hoi";
+    errorMessage = "Khong doc duoc byte cuoi queue";
     return false;
   }
 
-  bool ok = true;
-  size_t expectedSize = 0;
+  if (lastByte == '\n') {
+    source.close();
+    return true;
+  }
 
+  // Đọc lại dòng cuối. Không được tự ý loại bỏ dòng không hợp lệ.
+  if (!source.seek(0)) {
+    source.close();
+    errorMessage = "Khong dua con tro queue ve dau file";
+    return false;
+  }
+
+  String lastLine;
   while (source.available()) {
-    String line = source.readStringUntil('\n');
-    const bool isLastLine = !source.available();
-    line.trim();
-
-    if (line.isEmpty()) continue;
-
-    if (!validateRecord(line)) {
-      // Chỉ được bỏ dòng cuối nếu nó bị ghi dở.
-      if (isLastLine) {
-        errorMessage = "";
-        break;
-      }
-
-      ok = false;
-      break;
-    }
-
-    const size_t written = target.println(line);
-    if (written != line.length() + 2) {
-      ok = false;
-      break;
-    }
-
-    expectedSize += written;
+    lastLine = source.readStringUntil('\n');
   }
 
-  target.flush();
-  target.close();
   source.close();
+  lastLine.trim();
 
-  if (!ok) {
-    fs.remove(tempPath);
-    errorMessage = "Queue co ban ghi loi khong nam o cuoi file";
+  if (lastLine.isEmpty() || !validateRecord(lastLine)) {
+    errorMessage =
+      "Dong cuoi queue khong hop le; giu nguyen file de bao toan du lieu";
     return false;
   }
 
-  File check = fs.open(tempPath, FILE_READ);
-  if (!check || check.size() != expectedSize) {
-    if (check) check.close();
-    fs.remove(tempPath);
-    errorMessage = "Kiem tra file phuc hoi that bai";
-    return false;
-  }
-  check.close();
+  // Dòng cuối hợp lệ nhưng thiếu newline: chỉ bổ sung newline.
+  File appendFile = fs.open(queuePath, FILE_APPEND);
 
-  if (fs.exists(backupPath)) fs.remove(backupPath);
-
-  if (!fs.rename(queuePath, backupPath)) {
-    fs.remove(tempPath);
-    errorMessage = "Khong backup duoc queue";
+  if (!appendFile) {
+    errorMessage = "Khong mo duoc queue de bo sung newline";
     return false;
   }
 
-  if (!fs.rename(tempPath, queuePath)) {
-    fs.rename(backupPath, queuePath);
-    errorMessage = "Khong thay the duoc queue";
+  const size_t written = appendFile.print('\n');
+  appendFile.flush();
+  appendFile.close();
+
+  if (written != 1) {
+    errorMessage = "Khong ghi duoc newline cuoi queue";
     return false;
   }
 
-  fs.remove(backupPath);
+  // Xác minh lại byte cuối sau khi ghi.
+  File verify = fs.open(queuePath, FILE_READ);
+
+  if (!verify) {
+    errorMessage = "Khong mo duoc queue de xac minh";
+    return false;
+  }
+
+  const size_t newSize = verify.size();
+  bool validEnding = false;
+
+  if (newSize == originalSize + 1 &&
+      verify.seek(newSize - 1)) {
+    validEnding = verify.read() == '\n';
+  }
+
+  verify.close();
+
+  if (!validEnding) {
+    errorMessage = "Xac minh newline sau phuc hoi that bai";
+    return false;
+  }
+
   errorMessage = "";
   return true;
 }
-
 
 static bool isValidIdentifierValue(const char* value) {
   if (!value || !*value || strlen(value) > 40) return false;
@@ -281,6 +286,7 @@ static bool isValidIdentifierValue(const char* value) {
 
 // Chấp nhận chuỗi rỗng hoặc ISO-8601 có timezone.
 // Ví dụ: 2026-11-09T10:30:00Z, 2026-11-09T10:30:00.123+07:00
+
 static bool isValidLegacyTimestamp(const char* value) {
   if (!value) return false;
   if (*value == '\0') return true;
@@ -288,40 +294,75 @@ static bool isValidLegacyTimestamp(const char* value) {
   const size_t len = strlen(value);
   if (len < 20 || len > 35) return false;
 
-  auto digit = [](char c) {
+  auto digit = [](char c) -> bool {
     return c >= '0' && c <= '9';
   };
 
-  for (size_t i = 0; i < 4; ++i)
-    if (!digit(value[i])) return false;
+  auto number = [&](size_t pos, size_t count) -> int {
+    int result = 0;
+    for (size_t i = 0; i < count; ++i) {
+      if (!digit(value[pos + i])) return -1;
+      result = result * 10 + (value[pos + i] - '0');
+    }
+    return result;
+  };
 
-  if (value[4] != '-' ||
-      !digit(value[5]) || !digit(value[6]) ||
+  const int year = number(0, 4);
+  const int month = number(5, 2);
+  const int day = number(8, 2);
+  const int hour = number(11, 2);
+  const int minute = number(14, 2);
+  const int second = number(17, 2);
+
+  if (year < 1 ||
+      value[4] != '-' ||
+      month < 1 || month > 12 ||
       value[7] != '-' ||
-      !digit(value[8]) || !digit(value[9]) ||
       value[10] != 'T' ||
-      !digit(value[11]) || !digit(value[12]) ||
+      day < 1 ||
       value[13] != ':' ||
-      !digit(value[14]) || !digit(value[15]) ||
+      hour < 0 || hour > 23 ||
       value[16] != ':' ||
-      !digit(value[17]) || !digit(value[18])) {
+      minute < 0 || minute > 59 ||
+      second < 0 || second > 59) {
     return false;
   }
 
+  const bool leapYear =
+    (year % 4 == 0 && year % 100 != 0) ||
+    (year % 400 == 0);
+
+  const int daysInMonth[] = {
+    31, leapYear ? 29 : 28, 31, 30, 31, 30,
+    31, 31, 30, 31, 30, 31
+  };
+
+  if (day > daysInMonth[month - 1]) return false;
+
   size_t pos = 19;
 
+  // Phần thập phân của giây.
   if (pos < len && value[pos] == '.') {
     ++pos;
     const size_t fractionStart = pos;
 
-    while (pos < len && digit(value[pos])) ++pos;
+    while (pos < len && digit(value[pos])) {
+      ++pos;
+    }
 
-    if (pos == fractionStart) return false;
+    const size_t fractionLength = pos - fractionStart;
+
+    if (fractionLength == 0 || fractionLength > 9) {
+      return false;
+    }
   }
 
-  if (pos < len && value[pos] == 'Z')
+  // UTC.
+  if (pos < len && value[pos] == 'Z') {
     return pos + 1 == len;
+  }
 
+  // Offset dạng +HH:MM hoặc -HH:MM.
   if (pos + 6 != len ||
       (value[pos] != '+' && value[pos] != '-') ||
       !digit(value[pos + 1]) ||
@@ -332,8 +373,22 @@ static bool isValidLegacyTimestamp(const char* value) {
     return false;
   }
 
+  const int offsetHour = number(pos + 1, 2);
+  const int offsetMinute = number(pos + 4, 2);
+
+  if (offsetHour < 0 || offsetHour > 14 ||
+      offsetMinute < 0 || offsetMinute > 59) {
+    return false;
+  }
+
+  // ISO-8601 giới hạn offset tối đa ±14:00.
+  if (offsetHour == 14 && offsetMinute != 0) {
+    return false;
+  }
+
   return true;
 }
+
 
 bool OfflineQueue::validateRecord(
   const String& json,
@@ -364,6 +419,30 @@ bool OfflineQueue::validateRecord(
         doc.containsKey("roomCode")) {
       errorMessage = "Payload chuan chua truong khong hop le";
       return false;
+    }
+
+    const char* canonicalKeys[] = {
+      "msg_id",
+      "device_id",
+      "room_id",
+      "timestamp",
+      "data"
+    };
+
+    for (JsonPair kv : doc.as<JsonObject>()) {
+      bool allowed = false;
+
+      for (const char* key : canonicalKeys) {
+        if (strcmp(kv.key().c_str(), key) == 0) {
+          allowed = true;
+          break;
+        }
+      }
+
+      if (!allowed) {
+        errorMessage = "Payload chuan chua truong la";
+        return false;
+      }
     }
 
     if (!doc["msg_id"].is<const char*>() ||
@@ -403,6 +482,29 @@ bool OfflineQueue::validateRecord(
         !data["occupancy"].is<bool>()) {
       errorMessage = "Du lieu telemetry chuan sai cau truc";
       return false;
+    }
+
+    const char* dataKeys[] = {
+      "temperature",
+      "humidity",
+      "lux",
+      "occupancy"
+    };
+
+    for (JsonPair kv : data) {
+      bool allowed = false;
+
+      for (const char* key : dataKeys) {
+        if (strcmp(kv.key().c_str(), key) == 0) {
+          allowed = true;
+          break;
+        }
+      }
+
+      if (!allowed) {
+        errorMessage = "Data telemetry chua truong la";
+        return false;
+      }
     }
 
     const double temperature = data["temperature"].as<double>();
@@ -554,19 +656,29 @@ bool OfflineQueue::isFull() {
   return current >= capacity;
 }
 
+
 bool OfflineQueue::enqueue(const String& jsonRecord) {
   errorMessage = "";
+
   String incomingId;
-  if (!validateRecord(jsonRecord, &incomingId)) return false;
+
+  if (!validateRecord(jsonRecord, &incomingId)) {
+    return false;
+  }
 
   const size_t current = count();
-  if (!errorMessage.isEmpty()) return false;
+
+  if (!errorMessage.isEmpty()) {
+    return false;
+  }
+
   if (current >= capacity) {
     errorMessage = "Hang doi day; khong ghi de du lieu cu";
     return false;
   }
 
   File reader = fs.open(queuePath, FILE_READ);
+
   if (!reader) {
     errorMessage = "Khong doc duoc hang doi";
     return false;
@@ -575,22 +687,28 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
   while (reader.available()) {
     String line = reader.readStringUntil('\n');
     line.trim();
+
     if (line.isEmpty()) continue;
 
     String existingId;
+
     if (!validateRecord(line, &existingId)) {
       reader.close();
       return false;
     }
+
     if (existingId == incomingId) {
       reader.close();
       errorMessage = "msg_id da ton tai trong hang doi";
       return false;
     }
   }
+
+  const size_t oldSize = reader.size();
   reader.close();
 
   File writer = fs.open(queuePath, FILE_APPEND);
+
   if (!writer) {
     errorMessage = "Khong mo duoc file de ghi";
     return false;
@@ -605,8 +723,50 @@ bool OfflineQueue::enqueue(const String& jsonRecord) {
     return false;
   }
 
+  // Kiểm tra kích thước file sau khi ghi.
+  File verify = fs.open(queuePath, FILE_READ);
+
+  if (!verify) {
+    errorMessage = "Khong mo duoc queue sau khi ghi";
+    return false;
+  }
+
+  const size_t newSize = verify.size();
+
+  if (newSize != oldSize + written) {
+    verify.close();
+    errorMessage = "Kich thuoc queue sau khi ghi khong khop";
+    return false;
+  }
+
+  // Đọc và xác thực bản ghi cuối.
+  if (newSize < written ||
+      !verify.seek(newSize - written)) {
+    verify.close();
+    errorMessage = "Khong doc duoc ban ghi vua ghi";
+    return false;
+  }
+
+  String storedRecord = verify.readStringUntil('\n');
+  storedRecord.trim();
+  verify.close();
+
+  String storedId;
+
+  if (!validateRecord(storedRecord, &storedId)) {
+    errorMessage = "Ban ghi vua ghi khong hop le";
+    return false;
+  }
+
+  if (storedId != incomingId) {
+    errorMessage = "ID ban ghi sau khi ghi khong khop";
+    return false;
+  }
+
+  errorMessage = "";
   return true;
 }
+
 
 bool OfflineQueue::peek(String& jsonRecord) {
   errorMessage = "";
@@ -635,18 +795,34 @@ bool OfflineQueue::peek(String& jsonRecord) {
   return false;
 }
 
+
 bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
   errorMessage = "";
+
+  if (messageId.isEmpty()) {
+    errorMessage = "msg_id can xoa rong";
+    return false;
+  }
 
   File source = fs.open(queuePath, FILE_READ);
 
   if (!source) {
-    errorMessage = "Khong doc duoc hang doi goc";
+    errorMessage = "Khong doc duoc queue goc";
     return false;
   }
 
-  if (fs.exists(tempPath)) {
-    fs.remove(tempPath);
+  // Không ghi đè backup còn tồn tại.
+  // Backup cũ phải được xử lý ở bước recovery.
+  if (fs.exists(backupPath)) {
+    source.close();
+    errorMessage = "Backup da ton tai; tu choi thay the queue";
+    return false;
+  }
+
+  if (fs.exists(tempPath) && !fs.remove(tempPath)) {
+    source.close();
+    errorMessage = "Khong xoa duoc file tam cu";
+    return false;
   }
 
   File target = fs.open(tempPath, FILE_WRITE);
@@ -675,6 +851,13 @@ bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
     }
 
     if (currentId == messageId) {
+      if (found) {
+        // ID trùng trong queue là trạng thái không an toàn.
+        ok = false;
+        errorMessage = "Queue co ID trung lap";
+        break;
+      }
+
       found = true;
       continue;
     }
@@ -694,54 +877,105 @@ bool OfflineQueue::rewriteWithoutMessage(const String& messageId) {
   source.close();
 
   if (!ok || !found) {
-    fs.remove(tempPath);
+    if (fs.exists(tempPath) && !fs.remove(tempPath)) {
+      errorMessage = "Tao file tam that bai va khong xoa duoc file tam";
+      return false;
+    }
 
-    errorMessage = !ok
-      ? "Hang doi loi hoac ghi file tam that bai"
-      : "Khong tim thay msg_id can xac nhan";
+    if (errorMessage.isEmpty()) {
+      errorMessage = !found
+        ? "Khong tim thay msg_id can xac nhan"
+        : "Doc queue hoac ghi file tam that bai";
+    }
 
     return false;
   }
 
-  // Kiểm tra kích thước file tạm trước khi thay thế.
+  // Kiểm tra file tạm về kích thước và từng bản ghi.
   File check = fs.open(tempPath, FILE_READ);
 
-  if (!check || check.size() != expectedSize) {
-    if (check) check.close();
-
-    fs.remove(tempPath);
-    errorMessage = "Kiem tra file tam that bai";
-
+  if (!check) {
+    errorMessage = "Khong mo duoc file tam de kiem tra";
     return false;
+  }
+
+  bool tempValid = check.size() == expectedSize;
+
+  while (tempValid && check.available()) {
+    String line = check.readStringUntil('\n');
+    line.trim();
+
+    if (!line.isEmpty() && !validateRecord(line)) {
+      tempValid = false;
+    }
   }
 
   check.close();
 
-  // Backup queue hiện tại.
-  if (fs.exists(backupPath)) {
-    fs.remove(backupPath);
-  }
-
-  if (!fs.rename(queuePath, backupPath)) {
-    fs.remove(tempPath);
-    errorMessage = "Khong tao duoc backup";
+  if (!tempValid) {
+    errorMessage = "File tam khong hop le; giu nguyen queue goc";
     return false;
   }
 
-  // Đưa file tạm thành queue chính.
+  // Đưa queue gốc sang backup.
+  if (!fs.rename(queuePath, backupPath)) {
+    errorMessage = "Khong the chuyen queue goc sang backup";
+    return false;
+  }
+
+  // Chuyển file tạm thành queue chính.
   if (!fs.rename(tempPath, queuePath)) {
+    // Rollback: đưa backup trở lại queue chính.
     if (!fs.rename(backupPath, queuePath)) {
-      errorMessage = "Khong thay the duoc queue va khong khoi phuc duoc backup";
+      errorMessage =
+        "Thay the queue that bai; backup van duoc giu de phuc hoi";
     } else {
-      errorMessage = "Khong thay the duoc hang doi";
+      errorMessage = "Thay the queue that bai; da rollback queue goc";
     }
 
-    fs.remove(tempPath);
     return false;
   }
 
-  // Chỉ xóa backup sau khi queue mới đã thay thế thành công.
-  fs.remove(backupPath);
+  // Xác minh queue mới sau khi đổi tên.
+  File finalQueue = fs.open(queuePath, FILE_READ);
+
+  if (!finalQueue) {
+    errorMessage = "Queue moi khong mo duoc sau khi thay the";
+    return false;
+  }
+
+  bool finalValid = true;
+  size_t finalSize = 0;
+
+  while (finalQueue.available()) {
+    String line = finalQueue.readStringUntil('\n');
+    line.trim();
+
+    if (line.isEmpty()) continue;
+
+    finalSize += line.length() + 2;
+
+    if (!validateRecord(line)) {
+      finalValid = false;
+      break;
+    }
+  }
+
+  finalQueue.close();
+
+  if (!finalValid || finalSize != expectedSize) {
+    // Giữ nguyên queue mới lỗi và backup cũ để không mất dữ liệu.
+    errorMessage =
+      "Queue moi khong hop le; giu backup de phuc hoi";
+    return false;
+  }
+
+  // Chỉ xóa backup sau khi queue mới đã được xác minh.
+  if (!fs.remove(backupPath)) {
+    errorMessage =
+      "Queue moi hop le nhung khong xoa duoc backup cu";
+    return false;
+  }
 
   errorMessage = "";
   return true;
