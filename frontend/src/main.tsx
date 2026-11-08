@@ -7,6 +7,7 @@ import { ErrorState, Loading } from './components/ui';
 import { useAuthStore } from './store/auth';
 import { apiService } from './lib/api';
 import { Login, Register, ChangePassword, Dashboard, Rooms, RoomDetail, Devices, Alerts, Users, Detail, Telemetry, Control, Automation, Audit } from './pages';
+import { AlertsLive, AnomaliesLive, AuditLive, AutomationLive, DevicesLive, MonitoringLive, OtaLive, RoomsLive, TelemetryLive } from './pages-extra';
 import './styles.css';
 
 function Guard({ roles }: { roles?: string[] }) {
@@ -29,17 +30,20 @@ function App() {
     <Route element={<Guard />}><Route element={<Layout />}>
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/account" element={<ChangePassword />} />
-      <Route path="/rooms" element={<Rooms />} />
+      <Route path="/rooms" element={<RoomsLive />} />
       <Route path="/rooms/:id" element={<RoomDetail />} />
-      <Route path="/devices" element={<Devices />} />
+      <Route path="/devices" element={<DevicesLive />} />
       <Route path="/devices/:id" element={<Detail />} />
-      <Route path="/telemetry" element={<Telemetry />} />
-      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/telemetry" element={<TelemetryLive />} />
+      <Route path="/alerts" element={<AlertsLive />} />
+      <Route path="/anomalies" element={<AnomaliesLive />} />
       <Route path="/control" element={<Guard roles={['ADMIN', 'OPERATOR']} />}><Route index element={<Control />} /></Route>
       <Route element={<Guard roles={['ADMIN']} />}>
-        <Route path="/control/automation" element={<Automation />} />
+        <Route path="/control/automation" element={<AutomationLive />} />
         <Route path="/users" element={<Users />} />
-        <Route path="/audit-logs" element={<Audit />} />
+        <Route path="/audit-logs" element={<AuditLive />} />
+        <Route path="/monitoring" element={<MonitoringLive />} />
+        <Route path="/ota" element={<OtaLive />} />
       </Route>
     </Route></Route>
     <Route path="*" element={<Navigate to="/dashboard" replace />} />

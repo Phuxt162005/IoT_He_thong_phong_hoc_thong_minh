@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Activity, Bell, BookOpen, Boxes, ChevronLeft, Gauge, LogOut, Menu, Moon, Settings, Shield, SlidersHorizontal, Sun, Users } from 'lucide-react';
@@ -12,10 +12,13 @@ const nav = [
   { to: '/devices', label: 'Thiết bị', icon: Boxes },
   { to: '/telemetry', label: 'Telemetry', icon: Activity },
   { to: '/alerts', label: 'Cảnh báo', icon: Bell },
+  { to: '/anomalies', label: 'Phát hiện bất thường', icon: Activity },
   { to: '/control', label: 'Điều khiển', icon: SlidersHorizontal, roles: ['ADMIN', 'OPERATOR'] },
   { to: '/control/automation', label: 'Tự động hóa', icon: Settings, roles: ['ADMIN'] },
   { to: '/users', label: 'Người dùng', icon: Users, roles: ['ADMIN'] },
   { to: '/audit-logs', label: 'Audit logs', icon: Shield, roles: ['ADMIN'] },
+  { to: '/monitoring', label: 'Giám sát hệ thống', icon: Activity, roles: ['ADMIN'] },
+  { to: '/ota', label: 'OTA firmware', icon: Boxes, roles: ['ADMIN'] },
 ];
 
 export function Layout() {
@@ -23,11 +26,9 @@ export function Layout() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(false);
-  const [roomIds, setRoomIds] = useState<string[]>([]);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-  useEffect(() => { apiService.rooms().then(rooms => setRoomIds(rooms.map(room => room.id))).catch(() => setRoomIds([])); }, []);
-  const socketStatus = useWebSocket(roomIds);
+  const socketStatus = useWebSocket();
   const allowed = nav.filter(item => !item.roles || (user && item.roles.includes(user.role)));
   return <div className={dark ? 'app dark' : 'app'}>
     <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
