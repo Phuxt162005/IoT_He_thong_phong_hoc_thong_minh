@@ -79,6 +79,10 @@ Khi dùng phần cứng thật, đăng ký/provision thiết bị với mã và 
 
 ## Kiểm thử giao diện tích hợp
 
+Khi chuẩn bị dùng phần cứng thật, backend không tự tạo phòng, thiết bị hoặc số đo mẫu khi khởi động. Tạo phòng/đăng ký thiết bị trên giao diện rồi provision và cấu hình firmware. Các lệnh `npm run demo:backend` và `npm run check:stack` chủ động tạo dữ liệu chạy thử trên database ứng dụng, vì vậy không chạy chúng nếu muốn giữ database trống cho dữ liệu thật. Kiểm thử giao diện và integration ở dưới dùng database riêng.
+
+Phần đèn/quạt dùng ô trạng thái riêng, biểu tượng và nhãn tiếng Việt. Khi thiết bị offline, trạng thái đã nhận được hiển thị là “Bật/Tắt lần cuối”; “Đang bật” chỉ dùng khi thiết bị online. Không có bộ điều khiển thì hiển thị “Chưa xác định”, không tạo giá trị thay thế. Xem [ghi nhận dọn dữ liệu và giao diện](../docs/remove-demo-data-and-actuator-ui.md).
+
 Chạy từ thư mục gốc, sau khi khởi động PostgreSQL/MQTT thử nghiệm và cấu hình `.env.test` theo [hướng dẫn vận hành](../docs/backend-operations.md). Các ca này tạo database riêng và không dùng dữ liệu ứng dụng đang chạy. Cần Chrome; có thể đặt `BROWSER_BIN` nếu Chrome nằm ở vị trí khác.
 
 ```powershell

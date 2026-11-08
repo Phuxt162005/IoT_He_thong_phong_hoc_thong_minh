@@ -1,0 +1,11 @@
+import{y as l,r as h,j as t}from"./index-BrjFa_df.js";/**
+ * @license lucide-react v0.468.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const N=l("Fan",[["path",{d:"M10.827 16.379a6.082 6.082 0 0 1-8.618-7.002l5.412 1.45a6.082 6.082 0 0 1 7.002-8.618l-1.45 5.412a6.082 6.082 0 0 1 8.618 7.002l-5.412-1.45a6.082 6.082 0 0 1-7.002 8.618l1.45-5.412Z",key:"484a7f"}],["path",{d:"M12 12v.01",key:"u5ubse"}]]);/**
+ * @license lucide-react v0.468.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const g=l("Lightbulb",[["path",{d:"M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5",key:"1gvzjb"}],["path",{d:"M9 18h6",key:"x1upvd"}],["path",{d:"M10 22h4",key:"ceow96"}]]);function p(a=!0){const[n,s]=h.useState(Date.now);return h.useEffect(()=>{if(!a)return;s(Date.now());const c=window.setInterval(()=>s(Date.now()),1e3);return()=>window.clearInterval(c)},[a]),n}function m(a){return a==="ON"?"Bật":a==="OFF"?"Tắt":"Chưa xác định"}function w({type:a,state:n="UNKNOWN",online:s=!1,available:c=!0,children:i}){const e=n==="ON"||n==="OFF",o=s&&c,r=a==="light"?"Đèn":"Quạt",d=a==="light"?g:N,u=!c||!e?"Chưa xác định":o?n==="ON"?"Đang bật":"Đã tắt":n==="ON"?"Bật lần cuối":"Tắt lần cuối",x=c?s?e?"Đã nhận phản hồi từ thiết bị":"Chờ thiết bị gửi trạng thái":"Thiết bị đang ngoại tuyến":"Chưa có bộ điều khiển";return t.jsxs("article",{className:`actuator-tile ${o&&e?n==="ON"?"is-on":"is-off":"is-unknown"} ${i?"actuator-panel":""}`,"data-actuator":a,"data-state":n,"aria-label":`${r}: ${u}`,children:[t.jsxs("div",{className:"actuator-heading",children:[t.jsx("span",{className:"actuator-icon",children:t.jsx(d,{size:22,strokeWidth:1.8})}),t.jsxs("div",{children:[t.jsx("h4",{children:r}),t.jsx("span",{className:"actuator-kind",children:a==="light"?"Chiếu sáng":"Thông gió"})]})]}),t.jsxs("span",{className:"actuator-state",children:[t.jsx("span",{"aria-hidden":"true"}),u]}),t.jsx("p",{className:"actuator-hint",children:x}),i&&t.jsx("div",{className:"actuator-actions",children:i})]})}export{w as A,m as a,p as u};

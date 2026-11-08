@@ -287,7 +287,7 @@ test(
     );
     assert.ok(
       await evaluate(
-        'document.querySelector(".control-grid .badge")?.textContent==="ON"',
+        'document.querySelector(".control-grid [data-actuator=light]")?.getAttribute("data-state")==="ON"',
       ),
       "A mock timeout never fabricates a physical state change",
     );
