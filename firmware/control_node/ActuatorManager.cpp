@@ -255,6 +255,7 @@ bool ActuatorManager::sendAck(
   PendingAck ack;
 
   ack.commandId = commandId;
+  ack.sessionId = _session.getSessionId();
   ack.version = version;
   ack.success = success;
   ack.errorCode = errorCode;
@@ -294,7 +295,7 @@ void ActuatorManager::loop() {
   doc["command_id"] = ack.commandId;
   doc["device_id"] = _deviceId;
   doc["room_id"] = _roomId;
-  doc["session_id"] = _session.getSessionId();
+  doc["session_id"] = ack.sessionId;
   doc["shadow_version"] = ack.version;
   doc["status"] = ack.success ? "SUCCESS" : "FAILED";
   doc["timestamp"] = timestamp;

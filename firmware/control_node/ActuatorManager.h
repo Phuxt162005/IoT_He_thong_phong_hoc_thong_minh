@@ -70,6 +70,7 @@ private:
 
   struct PendingAck {
     String commandId;
+    String sessionId;
     uint32_t version;
     bool success;
     String errorCode;
