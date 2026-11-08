@@ -261,8 +261,12 @@ bool OfflineQueue::repairTrailingRecord() {
   return true;
 }
 
-bool OfflineQueue::validateRecord(const String& json, String* messageId) {
+bool OfflineQueue::validateRecord(
+  const String& json,
+  String* messageId
+) {
   StaticJsonDocument<2048> doc;
+
   DeserializationError err = deserializeJson(doc, json);
 
   if (err || !doc.is<JsonObject>()) {
@@ -270,31 +274,169 @@ bool OfflineQueue::validateRecord(const String& json, String* messageId) {
     return false;
   }
 
-  // Hỗ trợ cả payload MQTT chuẩn và payload legacy.
-  const char* id = doc["msg_id"];
-  if (!id) id = doc["eventId"];
-  if (!id || !*id || strlen(id) > 64) {
-    errorMessage = "Ban ghi thieu msg_id/eventId hop le";
+  auto validIdentifier = [](const char* value) -> bool {
+    if (!value || !*value || strlen(value) > 40) {
+      return false;
+    }
+
+    for (size_t i = 0; value[i] != '\0'; ++i) {
+      const char c = value[i];
+
+      if (!((c >= 'A' && c <= 'Z') ||
+            (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9') ||
+            c == '_' || c == '-')) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const bool isCanonical = doc.containsKey("msg_id");
+  const bool isLegacy = doc.containsKey("eventId");
+
+  // Không chấp nhận thiếu hoặc trộn hai định dạng.
+  if (isCanonical == isLegacy) {
+    errorMessage = "Payload thieu hoac trung dinh dang";
     return false;
   }
 
-  if (doc.containsKey("msg_id")) {
-    const char* deviceId = doc["device_id"];
-    const char* roomId = doc["room_id"];
-    if (!deviceId || !*deviceId || !roomId || !*roomId) {
-      errorMessage = "Payload chuan thieu device_id/room_id";
+  const char* id = nullptr;
+
+  if (isCanonical) {
+    // Payload chuẩn không được chứa trường legacy.
+    if (doc.containsKey("messageType") ||
+        doc.containsKey("deviceId") ||
+        doc.containsKey("roomCode") ||
+        doc.size() != 5) {
+      errorMessage = "Payload chuan chua truong khong hop le";
       return false;
     }
+
+    if (!doc["msg_id"].is<const char*>() ||
+        !doc["device_id"].is<const char*>() ||
+        !doc["room_id"].is<const char*>() ||
+        !doc["timestamp"].is<uint64_t>() ||
+        !doc["data"].is<JsonObject>()) {
+      errorMessage = "Payload chuan sai kieu du lieu";
+      return false;
+    }
+
+    id = doc["msg_id"];
+
+    if (!validIdentifier(doc["device_id"]) ||
+        !validIdentifier(doc["room_id"]) ||
+        !id || !*id || strlen(id) > 64) {
+      errorMessage = "Payload chuan sai dinh danh";
+      return false;
+    }
+
+    const uint64_t timestamp = doc["timestamp"].as<uint64_t>();
+
+    if (timestamp > 8640000000000000ULL) {
+      errorMessage = "Timestamp vuot gioi han";
+      return false;
+    }
+
+    JsonObject data = doc["data"];
+
+    if (data.size() != 4 ||
+        !data["temperature"].is<float>() ||
+        !data["humidity"].is<float>() ||
+        !data["lux"].is<uint16_t>() ||
+        !data["occupancy"].is<bool>()) {
+      errorMessage = "Du lieu telemetry chuan sai cau truc";
+      return false;
+    }
+
+    const float temperature = data["temperature"].as<float>();
+    const float humidity = data["humidity"].as<float>();
+    const uint16_t lux = data["lux"].as<uint16_t>();
+
+    if (!isfinite(temperature) ||
+        temperature < -10.0f ||
+        temperature > 60.0f ||
+        !isfinite(humidity) ||
+        humidity < 0.0f ||
+        humidity > 100.0f ||
+        lux > 65535) {
+      errorMessage = "Gia tri telemetry chuan vuot gioi han";
+      return false;
+    }
+
   } else {
-    const char* deviceId = doc["deviceId"];
-    const char* roomId = doc["roomCode"];
-    if (!deviceId || !*deviceId || !roomId || !*roomId) {
-      errorMessage = "Payload legacy thieu deviceId/roomCode";
+    // Payload legacy không được chứa trường chuẩn.
+    if (doc.containsKey("msg_id") ||
+        doc.containsKey("device_id") ||
+        doc.containsKey("room_id") ||
+        doc.containsKey("data") ||
+        doc.size() < 7 ||
+        doc.size() > 8) {
+      errorMessage = "Payload legacy chua truong khong hop le";
+      return false;
+    }
+
+    if (!doc["messageType"].is<const char*>() ||
+        !doc["eventId"].is<const char*>() ||
+        !doc["deviceId"].is<const char*>() ||
+        !doc["roomCode"].is<const char*>() ||
+        !doc["temperatureC"].is<float>() ||
+        !doc["humidityPercent"].is<float>() ||
+        !doc["illuminanceLux"].is<float>()) {
+      errorMessage = "Payload legacy sai kieu du lieu";
+      return false;
+    }
+
+    if (String(doc["messageType"].as<const char*>()) != "telemetry") {
+      errorMessage = "messageType legacy khong hop le";
+      return false;
+    }
+
+    id = doc["eventId"];
+
+    if (!id || !*id || strlen(id) > 64 ||
+        !validIdentifier(doc["deviceId"]) ||
+        !validIdentifier(doc["roomCode"])) {
+      errorMessage = "Payload legacy sai dinh danh";
+      return false;
+    }
+
+    const float temperature = doc["temperatureC"].as<float>();
+    const float humidity = doc["humidityPercent"].as<float>();
+    const float lux = doc["illuminanceLux"].as<float>();
+
+    if (!isfinite(temperature) ||
+        temperature < -10.0f ||
+        temperature > 60.0f ||
+        !isfinite(humidity) ||
+        humidity < 0.0f ||
+        humidity > 100.0f ||
+        !isfinite(lux) ||
+        lux < 0.0f ||
+        lux > 65535.0f) {
+      errorMessage = "Gia tri telemetry legacy vuot gioi han";
+      return false;
+    }
+
+    if (doc.containsKey("occupancy") &&
+        !doc["occupancy"].is<bool>()) {
+      errorMessage = "Occupancy legacy sai kieu du lieu";
+      return false;
+    }
+
+    if (doc.containsKey("timestamp") &&
+        !doc["timestamp"].is<const char*>()) {
+      errorMessage = "Timestamp legacy sai kieu du lieu";
       return false;
     }
   }
 
-  if (messageId) *messageId = String(id);
+  if (messageId) {
+    *messageId = String(id);
+  }
+
+  errorMessage = "";
   return true;
 }
 
