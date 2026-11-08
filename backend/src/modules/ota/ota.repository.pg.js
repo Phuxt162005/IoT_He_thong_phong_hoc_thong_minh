@@ -216,10 +216,10 @@ export class OtaRepository {
     const terminal = terminalStatuses.includes(status);
     const result = await client.query(
       `UPDATE ota_jobs
-       SET status=$1,
+       SET status=$1::varchar,
            progress=COALESCE($2,progress),
            error_code=$3,
-           started_at=CASE WHEN $1='DOWNLOADING' AND started_at IS NULL THEN clock_timestamp() ELSE started_at END,
+           started_at=CASE WHEN $1::varchar='DOWNLOADING' AND started_at IS NULL THEN clock_timestamp() ELSE started_at END,
            last_status_at=clock_timestamp(),
            finished_at=CASE WHEN $4::boolean THEN COALESCE(finished_at,clock_timestamp()) ELSE NULL END
        WHERE job_id=$5
