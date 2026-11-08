@@ -10,6 +10,7 @@ import type {
   DeviceRecord,
 } from "../lib/resource-types";
 import { useApi, usePage, useRooms } from "../hooks/useApi";
+import { deviceBlockReason } from "../lib/device-readiness";
 import { Card, Empty, Loading, StatusBadge } from "../components/ui";
 import {
   Choice,
@@ -226,7 +227,8 @@ export function DevicesPage() {
           {
             label: "Thao tác",
             render: (d) =>
-              admin && (
+              admin &&
+              d.lifecycle_status !== "DECOMMISSIONED" && (
                 <button
                   className="secondary"
                   onClick={() =>
@@ -264,6 +266,13 @@ function ConfigPanel({ device }: { device: DeviceRecord }) {
         : false,
   });
   const state = query.data?.data.state;
+  const limits = query.data?.data.limits;
+  const blockReason = deviceBlockReason(device, [
+    "PROVISIONED",
+    "ACTIVE",
+    "FAULT",
+    "MAINTENANCE",
+  ]);
   return (
     <Card>
       <h3>Cấu hình từ xa</h3>
@@ -296,19 +305,13 @@ function ConfigPanel({ device }: { device: DeviceRecord }) {
           {admin && (
             <button
               className="primary"
-              disabled={
-                !state ||
-                device.connection_status !== "ONLINE" ||
-                device.broker_sync_status !== "SYNCED" ||
-                !["PROVISIONED", "ACTIVE", "FAULT", "MAINTENANCE"].includes(
-                  device.lifecycle_status,
-                )
-              }
+              disabled={!state || Boolean(blockReason)}
               onClick={() => setEdit(true)}
             >
               Đổi cấu hình
             </button>
           )}
+          {admin && blockReason && <p className="muted small">{blockReason}</p>}
           <Table
             items={query.data?.data.history || []}
             rowKey={(row) => row.config_id}
@@ -346,7 +349,7 @@ function ConfigPanel({ device }: { device: DeviceRecord }) {
                     type: "number" as const,
                     required: true,
                     min: 1,
-                    max: 300,
+                    max: limits?.sample_interval_seconds.max ?? 300,
                   },
                 ]
               : []),
@@ -356,8 +359,10 @@ function ConfigPanel({ device }: { device: DeviceRecord }) {
               type: "number",
               required: true,
               min: 1,
-              max: 60,
-              hint: "Backend sẽ kiểm tra giới hạn an toàn để tránh thiết bị bị báo offline.",
+              max: limits?.heartbeat_interval_seconds.max,
+              hint: limits
+                ? `Tối đa ${limits.heartbeat_interval_seconds.max} giây theo timeout hiện tại của hệ thống.`
+                : "Backend sẽ kiểm tra giới hạn an toàn của heartbeat.",
             },
           ]}
           initial={Object.fromEntries(
@@ -473,7 +478,16 @@ export function DeviceDetailPage() {
           <StatusBadge status={device.lifecycle_status} />
           <StatusBadge status={device.connection_status} />
         </div>
-        {admin && (
+        {device.device_type === "CONTROL_NODE" && (
+          <p>
+            <Link
+              to={`/control?device_id=${device.device_id}&room_id=${device.room_id || ""}`}
+            >
+              Xem trạng thái và lịch sử điều khiển →
+            </Link>
+          </p>
+        )}
+        {admin && device.lifecycle_status !== "DECOMMISSIONED" && (
           <div className="device-actions">
             <button
               className="secondary"

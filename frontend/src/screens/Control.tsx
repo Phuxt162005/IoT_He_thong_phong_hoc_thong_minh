@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../store/auth";
+import { useSearchParams } from "react-router-dom";
+import { useClock } from "../hooks/useClock";
+import { deviceBlockReason } from "../lib/device-readiness";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { commandText, dateText, page, write } from "../lib/resources";
 import type { CommandRecord, ShadowRecord } from "../lib/resource-types";
@@ -16,13 +19,18 @@ import {
 type Submission = {
   device: string;
   key: string;
+  retryUntil: number;
   desired_state: { light?: "ON" | "OFF"; fan?: "ON" | "OFF" };
 };
+// The backend caches an idempotency key for 60 seconds. Use a monotonic
+// 55-second window from the first attempt, preserving a network safety margin.
+const SAFE_RETRY_MS = 55000;
 export function ControlPage() {
   const canControl = useAuthStore((state) => state.user?.role !== "VIEWER");
   const queries = useQueryClient();
+  const [params] = useSearchParams();
   const rooms = useRooms();
-  const [selectedRoom, setRoom] = useState("");
+  const [selectedRoom, setRoom] = useState(() => params.get("room_id") || "");
   const room =
     rooms.data?.find((item) => item.room_id === selectedRoom)?.room_id ||
     rooms.data?.[0]?.room_id ||
@@ -31,13 +39,13 @@ export function ControlPage() {
   const controls =
     devices.data?.filter(
       (device) =>
-        device.room_id === room &&
-        device.device_type === "CONTROL_NODE" &&
-        !["REVOKED", "DECOMMISSIONED"].includes(device.lifecycle_status),
+        device.room_id === room && device.device_type === "CONTROL_NODE",
     ) || [];
-  const [selection, setDevice] = useState("");
+  const [selection, setDevice] = useState(() => params.get("device_id") || "");
   const device =
-    controls.find((item) => item.device_id === selection) || controls[0];
+    controls.find((item) => item.device_id === selection) ||
+    controls.find((item) => item.lifecycle_status === "ACTIVE") ||
+    controls[0];
   const id = device?.device_id || "";
   const shadow = useApi<ShadowRecord>(
     "shadow",
@@ -60,6 +68,16 @@ export function ControlPage() {
   const [error, setError] = useState<unknown>();
   const [message, setMessage] = useState("");
   const [retry, setRetry] = useState<Submission>();
+  const now = useClock(Boolean(retry));
+  useEffect(() => {
+    if (retry && performance.now() >= retry.retryUntil) {
+      setRetry(undefined);
+      setError(undefined);
+      setMessage(
+        "Đã hết thời hạn gửi lại an toàn. Hãy cập nhật lịch sử và trạng thái trước khi tạo yêu cầu mới.",
+      );
+    }
+  }, [retry, now]);
   const [modeEditor, setModeEditor] = useState(false);
   const finish = (command: CommandRecord) => {
     if (
@@ -116,7 +134,12 @@ export function ControlPage() {
       const data = (
         event as CustomEvent<{
           type: string;
-          payload: { command_id?: string; device_id?: string; status?: string };
+          payload: {
+            command_id?: string;
+            device_id?: string;
+            status?: string;
+            error_code?: string;
+          };
         }>
       ).detail;
       if (
@@ -125,13 +148,24 @@ export function ControlPage() {
         data.payload.status &&
         data.payload.status !== "PENDING"
       )
-        finish({ ...pendingRef.current!, status: data.payload.status });
+        finish({
+          ...pendingRef.current!,
+          status: data.payload.status,
+          error_code: data.payload.error_code,
+        });
     };
     window.addEventListener("iot:event", listener);
     return () => window.removeEventListener("iot:event", listener);
   }, [queries]);
   async function send(submission: Submission) {
     if (!canControl || busyRef.current || pendingRef.current) return;
+    if (performance.now() >= submission.retryUntil) {
+      setRetry(undefined);
+      setMessage(
+        "Đã hết thời hạn gửi lại an toàn. Hãy kiểm tra lịch sử trước khi tạo yêu cầu mới.",
+      );
+      return;
+    }
     busyRef.current = true;
     setBusy(true);
     setError(undefined);
@@ -161,9 +195,17 @@ export function ControlPage() {
     }
   }
   const blocked = busy || Boolean(pending);
-  const ready =
-    device?.lifecycle_status === "ACTIVE" &&
-    device.connection_status === "ONLINE";
+  const blockReason = deviceBlockReason(
+    device,
+    ["ACTIVE"],
+    rooms.data?.find((item) => item.room_id === room)?.status,
+  );
+  const ready = !blockReason;
+  const canChangeMode = Boolean(
+    id &&
+      device &&
+      !["REVOKED", "DECOMMISSIONED"].includes(device.lifecycle_status),
+  );
   return (
     <>
       <Title>Điều khiển</Title>
@@ -191,7 +233,7 @@ export function ControlPage() {
           disabled={blocked}
           options={controls.map((device) => ({
             value: device.device_id,
-            label: device.device_name || device.device_code,
+            label: `${device.device_name || device.device_code} · ${device.lifecycle_status}`,
           }))}
           onChange={(value) => {
             setDevice(value);
@@ -202,7 +244,7 @@ export function ControlPage() {
         {canControl && (
           <button
             className="secondary"
-            disabled={!id || blocked}
+            disabled={!canChangeMode || blocked}
             onClick={() => setModeEditor(true)}
           >
             Chế độ {device?.control_mode || "AUTO/MANUAL"}
@@ -231,7 +273,12 @@ export function ControlPage() {
       {retry && (
         <button
           className="secondary"
-          disabled={blocked || retry.device !== id}
+          disabled={
+            blocked ||
+            retry.device !== id ||
+            performance.now() >= retry.retryUntil ||
+            !ready
+          }
           onClick={() => void send(retry)}
         >
           Gửi lại cùng yêu cầu
@@ -239,8 +286,7 @@ export function ControlPage() {
       )}
       {!ready && (
         <p className="muted">
-          Chỉ điều khiển thiết bị ACTIVE và ONLINE. Chọn thiết bị có trạng thái
-          báo về rõ ràng.
+          {blockReason} Bạn vẫn có thể xem trạng thái và lịch sử lệnh.
         </p>
       )}
       <div className="control-grid">
@@ -267,6 +313,7 @@ export function ControlPage() {
                     void send({
                       device: id,
                       key: crypto.randomUUID(),
+                      retryUntil: performance.now() + SAFE_RETRY_MS,
                       desired_state: {
                         [actuator]: state === "ON" ? "OFF" : "ON",
                       },

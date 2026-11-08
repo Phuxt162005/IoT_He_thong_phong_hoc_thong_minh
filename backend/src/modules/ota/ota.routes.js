@@ -74,10 +74,17 @@ export function createOtaRoutes(
     async (req, res) => {
       const textHeader = (name) => {
         const value = req.get(name);
-        if (!value || req.get("x-metadata-encoding") !== "percent-utf8")
-          return value;
+        const encoding = req.get("x-metadata-encoding");
+        if (!value) return value;
         try {
-          return decodeURIComponent(value);
+          if (encoding === "percent-utf8") return decodeURIComponent(value);
+          if (encoding === "base64-utf8") {
+            const bytes = Buffer.from(value, "base64");
+            if (bytes.toString("base64") !== value)
+              throw new Error("Invalid base64");
+            return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+          }
+          return value;
         } catch {
           throw new AppError(
             "INVALID_METADATA_ENCODING",

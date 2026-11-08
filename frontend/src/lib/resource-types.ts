@@ -31,6 +31,7 @@ export type DeviceRecord = {
   device_type: "SENSOR_NODE" | "CONTROL_NODE";
   room_id: string | null;
   room_code?: string;
+  room_status?: "ACTIVE" | "INACTIVE";
   lifecycle_status: string;
   connection_status: string;
   broker_sync_status: string;
@@ -55,6 +56,7 @@ export type TelemetryRecord = {
   lux: number;
   occupancy: boolean | null;
   stale?: boolean;
+  fresh_until?: string;
   clock_skew?: boolean;
   is_backfill?: boolean;
 };
@@ -189,6 +191,10 @@ export type ConfigHistory = {
   error_code?: string;
 };
 export type ConfigData = {
+  limits?: {
+    sample_interval_seconds: { min: number; max: number };
+    heartbeat_interval_seconds: { min: number; max: number };
+  };
   state: {
     desired_version: number;
     applied_version: number;

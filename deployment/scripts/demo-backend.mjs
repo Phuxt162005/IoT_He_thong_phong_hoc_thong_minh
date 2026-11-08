@@ -14,9 +14,12 @@ async function until(read, check) {
 try {
   token = (await api("/auth/login", { username: process.env.ADMIN_USERNAME, password: process.env.ADMIN_PASSWORD })).access_token;
   const suffix = randomBytes(6).toString("hex");
-  room = await api("/rooms", { room_code: `CHECK_${suffix}`, room_name: "BE-16 simulated backend verification" });
+  room = await api("/rooms", { room_code: `CHECK_${suffix}`, room_name: process.env.DEMO_ROOM_NAME || "Phòng học" });
+  room = await api(`/rooms/${room.room_id}`, { room_name: process.env.DEMO_ROOM_NAME || `Phòng học A${BigInt(room.room_id) + 100n}` }, "PATCH");
+  const roomLabel = room.room_name.replace(/^Phòng học\s*/i, "");
   for (const type of ["SENSOR_NODE", "CONTROL_NODE"]) {
-    const device = await api("/devices", { device_code: `${type === "SENSOR_NODE" ? "S" : "C"}_${suffix}`, device_name: `Simulated ${type}`, device_type: type, room_id: room.room_id });
+    const deviceName = `${type === "SENSOR_NODE" ? "Cảm biến môi trường" : "Bộ điều khiển đèn, quạt"} ${roomLabel}`.slice(0, 100);
+    const device = await api("/devices", { device_code: `${type === "SENSOR_NODE" ? "S" : "C"}_${suffix}`, device_name: deviceName, device_type: type, room_id: room.room_id });
     devices.push(device);
     const issued = await api(`/devices/${device.device_id}/provision`, { reason: "BE-16 simulated verification" });
     const credential = issued.credentials;

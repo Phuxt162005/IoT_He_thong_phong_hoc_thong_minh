@@ -17,6 +17,7 @@ import type {
   TelemetryRecord,
 } from "../lib/resource-types";
 import { useApi, useDevices, usePage, useRooms } from "../hooks/useApi";
+import { useClock } from "../hooks/useClock";
 import { Card, Empty, Loading, StatusBadge } from "../components/ui";
 import { Choice, ErrorBox, Title } from "../components/workspace-ui";
 type Snapshot = {
@@ -45,12 +46,22 @@ export function DashboardPage() {
     Boolean(room),
   );
   const sample = query.data?.latest_telemetry[0];
-  const control = devices.data?.find(
+  const now = useClock(Boolean(sample?.fresh_until));
+  const serverNow =
+    now +
+    (query.data
+      ? Date.parse(query.data.generated_at) - query.dataUpdatedAt
+      : 0);
+  const sampleStale =
+    sample?.stale ||
+    Boolean(sample?.fresh_until && serverNow > Date.parse(sample.fresh_until));
+  const controls = devices.data?.filter(
     (device) =>
-      device.device_type === "CONTROL_NODE" &&
-      device.room_id === room &&
-      !["REVOKED", "DECOMMISSIONED"].includes(device.lifecycle_status),
+      device.device_type === "CONTROL_NODE" && device.room_id === room,
   );
+  const control =
+    controls?.find((device) => device.lifecycle_status === "ACTIVE") ||
+    controls?.[0];
   const shadow = useApi<ShadowRecord>(
     "shadow",
     `/devices/${control?.device_id}/shadow`,
@@ -122,7 +133,7 @@ export function DashboardPage() {
               hiển thị bên dưới.
             </p>
           )}
-          {sample?.stale && (
+          {sampleStale && sample && (
             <p className="form-error">
               Dữ liệu cảm biến đã cũ · lần đo cuối{" "}
               {dateText(sample.recorded_at)}.

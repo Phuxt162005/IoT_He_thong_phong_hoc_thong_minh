@@ -1,0 +1,1 @@
+import{r}from"./index-DHZzNa63.js";function a(t=!0){const[o,e]=r.useState(Date.now);return r.useEffect(()=>{if(!t)return;e(Date.now());const n=window.setInterval(()=>e(Date.now()),1e3);return()=>window.clearInterval(n)},[t]),o}export{a as u};

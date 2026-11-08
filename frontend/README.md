@@ -67,7 +67,15 @@ Danh sách lấy số trang, tổng bản ghi và khoảng thời gian từ `met
 
 WebSocket làm mới những nhóm dữ liệu liên quan, gộp các sự kiện liên tiếp để hạn chế gọi API. Lệnh điều khiển nhận ACK được xử lý ngay theo mã lệnh; các job OTA đang chạy được kiểm tra lại mỗi 15 giây. Có thể dùng nút cập nhật trên màn hình để đọc lại ngay.
 
-OTA gửi metadata tiếng Việt bằng header `x-metadata-encoding: percent-utf8`; backend vẫn nhận metadata ASCII từ client cũ. Không cần migration database mới. Chi tiết thay đổi và kiểm chứng ở [frontend-backend-completion.md](../docs/frontend-backend-completion.md).
+OTA gửi metadata tiếng Việt bằng header `x-metadata-encoding: base64-utf8`, đủ chỗ cho ghi chú 2.000 ký tự trong giới hạn HTTP header. Backend vẫn nhận `percent-utf8` và metadata ASCII từ client cũ. Không cần migration database mới. Chi tiết thay đổi ở [frontend-backend-completion.md](../docs/frontend-backend-completion.md) và [bản sửa các trường hợp biên](../docs/frontend-backend-edge-cases.md).
+
+## Tên phòng, thiết bị và dữ liệu chạy thử
+
+Script `npm run demo:backend` dùng tên dễ đọc như **Phòng học A101**, **Cảm biến môi trường A101** và **Bộ điều khiển đèn, quạt A101**. Số phòng mặc định dựa trên ID để các lần chạy không trùng tên; có thể đặt `DEMO_ROOM_NAME` trước khi chạy để dùng tên phòng khác. Bản script cũ từng đặt tên **BE-16 simulated backend verification** và **Simulated SENSOR_NODE / CONTROL_NODE**.
+
+Đổi tên phòng/thiết bị không cần phần cứng và không làm thay đổi nguồn số đo. Script này vẫn gửi dữ liệu **chạy thử** qua MQTT vào PostgreSQL thật; khác với `VITE_USE_MOCK=true` chỉ lưu trong bộ nhớ frontend. Mẫu 36°C / 65% / 250 lux và lịch sử vẫn được giữ sau khi script kết thúc. `OFFLINE` nghĩa là hiện không nhận được tín hiệu mới. `UNKNOWN` nghĩa là chưa có trạng thái chấp hành xác nhận cho phiên hiện tại. “WebSocket đã kết nối” xác nhận kết nối trình duyệt với backend; trạng thái từng ESP32 được hiển thị riêng.
+
+Khi dùng phần cứng thật, đăng ký/provision thiết bị với mã và phòng phù hợp rồi cấu hình credential cho firmware. Heartbeat và telemetry hợp lệ sẽ cập nhật Dashboard. Các tên phòng/thiết bị cũ vẫn giữ nguyên đến khi Admin sửa tên; hệ thống không tự đổi tên dựa trên việc cắm phần cứng.
 
 ## Kiểm thử giao diện tích hợp
 

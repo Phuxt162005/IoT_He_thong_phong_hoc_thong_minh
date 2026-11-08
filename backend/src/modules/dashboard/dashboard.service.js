@@ -65,6 +65,6 @@ export class DashboardService {
     const alerts = (await this.pool.query(`SELECT a.severity,count(*)::integer AS count FROM alerts a JOIN rooms r USING(room_id) WHERE a.status<>'RESOLVED' AND ${scope} GROUP BY a.severity ORDER BY a.severity`, params)).rows;
     const latest = (await this.pool.query(`SELECT ${columns},d.device_code FROM telemetry_latest l JOIN sensor_data s ON s.data_id=l.data_id
       JOIN devices d ON d.device_id=s.device_id JOIN rooms r ON r.room_id=s.room_id WHERE ${scope} ORDER BY s.recorded_at DESC,s.data_id DESC LIMIT 20`, params)).rows.map((row) => ({ ...row, stale: Date.now() - row.recorded_at.getTime() > this.freshnessSeconds * 1000 }));
-    return { rooms_count: rooms, device_counts: deviceCounts, unresolved_alert_counts: alerts, latest_telemetry: latest, latest_limit: 20, generated_at: new Date() };
+    return { rooms_count: rooms, device_counts: deviceCounts, unresolved_alert_counts: alerts, latest_telemetry: latest.map(row => ({ ...row, fresh_until: new Date(row.recorded_at.getTime() + this.freshnessSeconds * 1000) })), latest_limit: 20, generated_at: new Date() };
   }
 }

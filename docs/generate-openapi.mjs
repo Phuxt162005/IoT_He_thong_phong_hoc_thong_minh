@@ -612,7 +612,7 @@ paths["/api/v1/ota/firmware"] ??= {};
 paths["/api/v1/ota/firmware"].post = {
   summary: "Upload firmware binary",
   description:
-    "Upload application/octet-stream. Metadata is provided through HTTP headers. Set x-metadata-encoding=percent-utf8 and percent-encode version, hardware target, file name and release notes when sending Unicode. Length limits apply after decoding. Legacy unencoded headers remain supported. The backend calculates SHA-256 and signs the digest using Ed25519.",
+    "Upload application/octet-stream. Metadata is provided through HTTP headers. Use x-metadata-encoding=base64-utf8 with Base64-encoded UTF-8 version, hardware target, file name and release notes to support Unicode within HTTP header limits. percent-utf8 and legacy unencoded headers remain supported. Length limits apply after decoding. The backend calculates SHA-256 and signs the digest using Ed25519.",
   operationId: "post_api_v1_ota_firmware",
   tags: ["ota"],
   parameters: [
@@ -620,8 +620,8 @@ paths["/api/v1/ota/firmware"].post = {
       in: "header",
       name: "x-metadata-encoding",
       required: false,
-      schema: { type: "string", enum: ["percent-utf8"] },
-      description: "Optional percent-encoded UTF-8 metadata; x-device-type is never encoded.",
+      schema: { type: "string", enum: ["base64-utf8", "percent-utf8"] },
+      description: "Optional UTF-8 metadata encoding; x-device-type is never encoded. Base64 is recommended for long Unicode notes.",
     },
     {
       in: "header",

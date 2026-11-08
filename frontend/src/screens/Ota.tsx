@@ -4,6 +4,7 @@ import { useAuthStore } from "../store/auth";
 import { all, dateText, page, upload, write } from "../lib/resources";
 import type { FirmwareRecord, JobRecord, Params } from "../lib/resource-types";
 import { useDevices, usePage, useRooms } from "../hooks/useApi";
+import { deviceBlockReason } from "../lib/device-readiness";
 import { Empty, StatusBadge } from "../components/ui";
 import {
   Choice,
@@ -384,8 +385,7 @@ function UpdateJob({ close }: { close: () => void }) {
             devices.data
               ?.filter(
                 (device) =>
-                  ["PROVISIONED", "ACTIVE"].includes(device.lifecycle_status) &&
-                  device.connection_status === "ONLINE",
+                  !deviceBlockReason(device, ["PROVISIONED", "ACTIVE"]),
               )
               .map((device) => ({
                 value: device.device_id,
@@ -418,6 +418,8 @@ function UpdateJob({ close }: { close: () => void }) {
           release = firmware.data?.find(
             (row) => row.firmware_id === values.firmware_id,
           );
+        const blocked = deviceBlockReason(device, ["PROVISIONED", "ACTIVE"]);
+        if (blocked) throw new Error(blocked);
         if (
           !device ||
           !release ||

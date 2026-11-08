@@ -63,6 +63,41 @@ test("OTA: percent-encoded UTF-8 metadata round-trips and invalid encoding is re
   );
 });
 
+test("OTA: full-length Unicode metadata fits HTTP headers and malformed Base64/UTF-8 is rejected", async (t) => {
+  const f = await iotFixture(t);
+  const notes = "ấ".repeat(2000);
+  const fileName = "cảm-biến.bin";
+  const encode = (value) => Buffer.from(value, "utf8").toString("base64");
+  const headers = {
+    Authorization: `Bearer ${f.token}`,
+    "Content-Type": "application/octet-stream",
+    "x-metadata-encoding": "base64-utf8",
+    "x-firmware-version": encode("2.0-unicode"),
+    "x-device-type": "SENSOR_NODE",
+    "x-hardware-target": encode("ESP32"),
+    "x-firmware-file-name": encode(fileName),
+    "x-release-notes": encode(notes),
+  };
+  const response = await fetch(`${f.base}/api/v1/ota/firmware`, {
+    method: "POST",
+    headers,
+    body: Buffer.from("firmware"),
+  });
+  assert.equal(response.status, 201);
+  const { data } = await response.json();
+  assert.equal(data.release_notes, notes);
+  assert.equal(data.file_name, fileName);
+  for (const invalid of ["not base64!", "/w=="]) {
+    const failed = await fetch(`${f.base}/api/v1/ota/firmware`, {
+      method: "POST",
+      headers: { ...headers, "x-release-notes": invalid },
+      body: Buffer.from("firmware"),
+    });
+    assert.equal(failed.status, 400);
+    assert.equal((await failed.json()).error.code, "INVALID_METADATA_ENCODING");
+  }
+});
+
 test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS", async (t) => {
   const f = await iotFixture(t);
   const node = await f.activateSensor();

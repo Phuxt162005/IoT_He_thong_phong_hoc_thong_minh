@@ -162,6 +162,63 @@ test(
     await until(
       'location.pathname==="/dashboard"&&Boolean(document.querySelector(".metric-grid"))',
     );
+    await nav("/telemetry");
+    await until(
+      'document.querySelector("h2")?.textContent === "Telemetry" && document.querySelectorAll("select").length >= 3',
+    );
+    await until(
+      'Array.from(document.querySelector("select")?.options || []).some(option=>option.value === "r1")',
+    );
+    await evaluate(
+      '(()=>{const input=document.querySelector("select");input.value="r1";input.dispatchEvent(new Event("change",{bubbles:true}));})()',
+    );
+    await until('Boolean(document.querySelector(".chart.large"))');
+    await evaluate(
+      'document.querySelector(".workspace-filters input[type=checkbox]").click()',
+    );
+    await until(
+      'document.querySelectorAll("input[type=datetime-local]").length===2',
+    );
+    const initialRange = await evaluate(
+      'Array.from(document.querySelectorAll("input[type=datetime-local]")).map(input=>input.value)',
+    );
+    const setRangeInput = async (index, value) => {
+      await evaluate(
+        `(()=>{const input=document.querySelectorAll('input[type=datetime-local]')[${index}];Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+      );
+      await delay(50);
+    };
+    await setRangeInput(0, "2020-01-01T00:00:00");
+    await setRangeInput(1, "2020-01-02T00:00:00");
+    await click("Áp dụng / Cập nhật");
+    await until(
+      'document.body.innerText.includes("0 bản ghi")&&!document.querySelector(".chart.large")',
+    );
+    await evaluate(
+      'document.querySelector(".card input[type=checkbox]").click()',
+    );
+    await until(
+      'document.querySelector(".telemetry-summary")?.textContent.includes("0 mẫu")',
+    );
+    assert.equal(
+      await evaluate('Boolean(document.querySelector(".chart.large"))'),
+      false,
+    );
+    await setRangeInput(0, initialRange[0]);
+    await setRangeInput(1, initialRange[1]);
+    await evaluate(
+      '(()=>{const input=Array.from(document.querySelectorAll(".card select")).find(select=>Array.from(select.options).some(option=>option.value==="day"));input.value="day";input.dispatchEvent(new Event("change",{bubbles:true}));})()',
+    );
+    await click("Áp dụng / Cập nhật");
+    await until(
+      '/12 mẫu · [12] nhóm ngày/.test(document.querySelector(".telemetry-summary")?.textContent||"")',
+    );
+    assert.ok(
+      await evaluate('document.body.innerText.includes("Tỷ lệ có người (%)")'),
+    );
+    t.diagnostic(
+      "Mock statistics respects the selected range, groups daily samples and labels occupancy percentages",
+    );
     await nav("/rooms");
     await click("+ Thêm phòng");
     await fill("room_code", "MOCK_NEW");
