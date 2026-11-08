@@ -75,11 +75,17 @@ void setup() {
   sensorDrivers.begin();
 
   // 2. Khoi tao bo nho dem LittleFS cho hang doi ngoai tuyen
-  if (!LittleFS.begin(true)) {
-    Serial.println("[LittleFS] Khoi tao LittleFS that bai!");
-  } else {
-    Serial.println("[LittleFS] LittleFS san sang.");
+  if (!LittleFS.begin(false)) {
+    Serial.println(
+      "[LittleFS] Mount that bai. Dung he thong de bao toan du lieu."
+    );
+
+    while (true) {
+      delay(1000);
+    }
   }
+
+  Serial.println("[LittleFS] LittleFS san sang.");
 
   if (!syncManager.begin()) {
     Serial.println("[OfflineQueue] Khoi tao sync manager that bai: " + syncManager.lastError());
