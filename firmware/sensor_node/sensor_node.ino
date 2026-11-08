@@ -88,10 +88,23 @@ void setup() {
   Serial.println("[LittleFS] LittleFS san sang.");
 
   if (!syncManager.begin()) {
-    Serial.println("[OfflineQueue] Khoi tao sync manager that bai: " + syncManager.lastError());
-  } else {
-    Serial.println("[OfflineQueue] Sync manager san sang. So ban tin ton dong: " + String(syncManager.queuedCount()));
+    Serial.println(
+      "[OfflineQueue] Khoi tao that bai: " +
+      syncManager.lastError()
+    );
+    Serial.println(
+      "[FATAL] Dung Sensor Node de tranh mat du lieu telemetry."
+    );
+
+    while (true) {
+      delay(1000);
+    }
   }
+
+  Serial.println(
+    "[OfflineQueue] Sync manager san sang. So ban tin ton dong: " +
+    String(syncManager.queuedCount())
+  );
 
   // 3. Khoi tao Preferences NVS cho cau hinh tu xa
   configManager.begin();
