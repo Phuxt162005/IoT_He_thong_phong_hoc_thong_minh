@@ -61,13 +61,11 @@ bool TelemetryMessage::build(
     return false;
   }
 
-  struct timeval tv;
+  struct timeval tv = {};
 
-  if (gettimeofday(&tv, nullptr) != 0) {
-    return false;
-  }
+  const bool clockAvailable = gettimeofday(&tv, nullptr) == 0;
 
-  const bool clockReady = tv.tv_sec >= 1700000000;
+  const bool clockReady = clockAvailable && tv.tv_sec >= 1700000000;
 
   StaticJsonDocument<512> doc;
 
