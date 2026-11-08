@@ -42,11 +42,9 @@ bool NodeSessionManager::begin() {
     return false;
   }
 
-  // Tăng buffer size để đảm bảo vừa các gói tin JSON lớn
   _mqtt.setBufferSize(2048);
   _mqtt.setKeepAlive(30);
 
-  // Cấu hình đồng bộ thời gian NTP (UTC 0)
   configTime(0, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
 
   return true;
@@ -131,10 +129,8 @@ bool NodeSessionManager::connectMqtt() {
     return false;
   }
 
-  // 1. Sinh session_id mới cho phiên kết nối này theo chuẩn BE-09
   _sessionId = generateSessionId();
 
-  // 2. Chuẩn bị bản tin Last Will and Testament (LWT) gắn với session_id hiện tại
   StaticJsonDocument<256> willDoc;
   willDoc["device_id"] = _deviceId;
   willDoc["room_id"] = _roomId;
@@ -145,14 +141,13 @@ bool NodeSessionManager::connectMqtt() {
   String willPayload;
   serializeJson(willDoc, willPayload);
 
-  // 3. Thực hiện kết nối MQTT với LWT (QoS 1, retain false)
   bool success = _mqtt.connect(
     _deviceId.c_str(),
     _mqttUsername.c_str(),
     _mqttPassword.c_str(),
     _statusTopic.c_str(),
-    1,     // willQoS = 1
-    false, // willRetain = false
+    1,
+    false,
     willPayload.c_str()
   );
 
@@ -164,12 +159,10 @@ bool NodeSessionManager::connectMqtt() {
   _errorMessage = "";
   _onlineStatusPublished = false;
 
-  // 4. Gọi callback ứng dụng đăng ký (để subscribe các topic như /config, /command, /telemetry/ack, v.v.)
   if (_onConnectedCallback) {
     _onConnectedCallback(_sessionId);
   }
 
-  // 5. Nếu thời gian đã đồng bộ, publish ngay bản tin ONLINE và heartbeat đầu tiên
   if (isTimeSynced()) {
     publishOnlineStatus();
   }
@@ -193,7 +186,6 @@ bool NodeSessionManager::publishOnlineStatus() {
   doc["timestamp"] = nowMs;
   doc["status"] = "ONLINE";
 
-  // Nếu có hook bổ sung (cho Control Node đính kèm reported_state và shadow_version)
   if (_extraStatusHook) {
     String extraJson = _extraStatusHook(_sessionId);
     if (extraJson.length() > 0) {
@@ -214,7 +206,6 @@ bool NodeSessionManager::publishOnlineStatus() {
   if (ok) {
     _onlineStatusPublished = true;
     _errorMessage = "";
-    // Gửi ngay heartbeat đầu tiên của phiên theo yêu cầu BE-09 (cần heartbeat mới để kích hoạt)
     publishHeartbeat();
   } else {
     _errorMessage = "Publish /status ONLINE that bai";
@@ -232,17 +223,15 @@ bool NodeSessionManager::publishHeartbeat() {
     return false;
   }
 
-  // Backend yêu cầu uptime_seconds phải tăng dần và duy nhất trong cùng session
   uint32_t currentUptime = (uint32_t)(millis() / 1000);
   if (currentUptime <= _lastUptimeSeconds) {
     currentUptime = _lastUptimeSeconds + 1;
   }
   _lastUptimeSeconds = currentUptime;
 
-  // Lấy thông số chẩn đoán
   uint32_t freeHeap = ESP.getFreeHeap();
   int rssi = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127;
-  if (rssi > 0 || rssi < -127) rssi = -127; // clamp [-127, 0]
+  if (rssi > 0 || rssi < -127) rssi = -127;
 
   StaticJsonDocument<384> doc;
   doc["msg_id"] = generateMsgId();
@@ -285,7 +274,6 @@ String NodeSessionManager::lastError() const {
 void NodeSessionManager::loop() {
   const uint32_t now = millis();
 
-  // 1. Kiểm tra kết nối Wi-Fi (nếu mất thì thử kết nối lại sau mỗi 5s)
   if (!isWifiConnected()) {
     _onlineStatusPublished = false;
     if (now - _lastWifiAttemptMillis >= 5000) {
@@ -295,21 +283,17 @@ void NodeSessionManager::loop() {
     return;
   }
 
-  // 2. Kiểm tra trạng thái NTP
   if (!_timeSynced) {
     isTimeSynced();
   }
 
-  // 3. Quản lý kết nối MQTT
   if (_mqtt.connected()) {
     _mqtt.loop();
 
-    // Nếu vừa đồng bộ thời gian mà chưa gửi ONLINE status
     if (!_onlineStatusPublished && isTimeSynced()) {
       publishOnlineStatus();
     }
 
-    // Kiểm tra chu kỳ gửi heartbeat
     if (isTimeSynced() && (now - _lastHeartbeatMillis >= _heartbeatIntervalSeconds * 1000)) {
       publishHeartbeat();
     }

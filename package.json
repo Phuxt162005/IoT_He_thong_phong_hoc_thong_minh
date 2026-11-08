@@ -27,6 +27,7 @@
     "test:ota": "node --test tests/integration/ota.test.js",
     "test:firmware-phase1": "node --test tests/integration/phase1-firmware-session.test.js",
     "test:firmware-phase2": "node --test tests/integration/phase2-firmware-config.test.js",
+    "test:firmware-phase3": "node --test tests/integration/phase3-firmware-sensor.test.js",
     "dev:cli": "node deployment/scripts/dev-cli.mjs"
   },
   "engines": {

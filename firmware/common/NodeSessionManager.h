@@ -87,4 +87,3 @@ private:
   bool publishOnlineStatus();
   bool isValidIdentifier(const String& val) const;
 };
-

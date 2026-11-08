@@ -86,7 +86,9 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // Cấu hình broker MQTT và callback
+  // Cấu hình broker MQTT va callback (kèm timeout nhanh để chống nghẽn)
+  wifiClient.setConnectionTimeout(300);
+  mqttClient.setSocketTimeout(1);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
 

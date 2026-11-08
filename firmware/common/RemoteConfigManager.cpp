@@ -21,13 +21,11 @@ RemoteConfigManager::RemoteConfigManager(
 }
 
 bool RemoteConfigManager::begin() {
-  // Mở namespace "dev_cfg" trong bộ nhớ Flash NVS của ESP32
   if (!_prefs.begin("dev_cfg", false)) {
     Serial.println("[Config] Canh bao: Khong the mo NVS Preferences, su dung cau hinh mac dinh.");
     return false;
   }
 
-  // Đọc cấu hình đã lưu trước đó (nếu có)
   if (_isSensorNode) {
     _sampleInterval = _prefs.getUInt("sample_int", _sampleInterval);
   }
@@ -35,7 +33,6 @@ bool RemoteConfigManager::begin() {
   _appliedVersion = _prefs.getUInt("app_ver", 0);
   _lastConfigId = _prefs.getString("last_cfg", "");
 
-  // Áp dụng chu kỳ heartbeat đã lưu vào NodeSessionManager
   _session.setHeartbeatInterval(_heartbeatInterval);
 
   Serial.printf(
@@ -118,19 +115,16 @@ bool RemoteConfigManager::handleMessage(const char* topic, const uint8_t* payloa
     return false;
   }
 
-  // 1. Kiểm tra định danh thiết bị và phòng
   if (String(devId) != _deviceId || String(rmId) != _roomId) {
     Serial.println("[Config] device_id hoac room_id khong khop");
     return false;
   }
 
-  // 2. Kiểm tra phiên kết nối hiện tại
   if (String(sessId) != _session.getSessionId()) {
     Serial.printf("[Config] session_id (%s) khong khop phien hien tai (%s)\n", sessId, _session.getSessionId().c_str());
     return false;
   }
 
-  // 3. Kiểm tra hạn thực thi (expires_at)
   uint64_t nowMs = _session.getNowMs();
   if (nowMs > 0 && expiresAt > 0 && nowMs > expiresAt) {
     Serial.println("[Config] Cau hinh da het han, tu choi");
@@ -138,8 +132,6 @@ bool RemoteConfigManager::handleMessage(const char* topic, const uint8_t* payloa
     return true;
   }
 
-  // 4. Chống thực thi lặp (Deduplication) theo chuẩn Backend:
-  // Nếu config_id hoặc version đã được xử lý trước đó, gửi lại ACK SUCCESS mà không ghi lại Flash
   if (String(configId) == _lastConfigId || version <= _appliedVersion) {
     Serial.println("[Config] Nhan lai cau hinh da xu ly, gui lai ACK khong ghi de Flash.");
     String currentSettingsJson;
@@ -153,7 +145,6 @@ bool RemoteConfigManager::handleMessage(const char* topic, const uint8_t* payloa
     return true;
   }
 
-  // 5. Kiểm tra tính hợp lệ của các thông số
   bool valid = true;
   String errorCode = "INVALID_SETTINGS";
 
@@ -167,7 +158,6 @@ bool RemoteConfigManager::handleMessage(const char* topic, const uint8_t* payloa
 
   if (settings.containsKey("sample_interval_seconds")) {
     if (!_isSensorNode) {
-      // Control Node không hỗ trợ sample_interval
       valid = false;
       errorCode = "UNSUPPORTED_SETTING";
     } else {
@@ -185,7 +175,6 @@ bool RemoteConfigManager::handleMessage(const char* topic, const uint8_t* payloa
     return true;
   }
 
-  // 6. Áp dụng cấu hình mới và lưu vào NVS (Preferences)
   if (settings.containsKey("heartbeat_interval_seconds")) {
     _heartbeatInterval = settings["heartbeat_interval_seconds"];
     _prefs.putUInt("hb_int", _heartbeatInterval);
@@ -209,12 +198,10 @@ bool RemoteConfigManager::handleMessage(const char* topic, const uint8_t* payloa
     _isSensorNode ? (", Sample=" + String(_sampleInterval) + "s").c_str() : ""
   );
 
-  // Kích hoạt callback thông báo ứng dụng chính
   if (_onChanged) {
     _onChanged(_sampleInterval, _heartbeatInterval);
   }
 
-  // 7. Gửi ACK SUCCESS kèm applied_settings khớp với cấu hình vừa nhận
   String appliedSettingsJson;
   serializeJson(settings, appliedSettingsJson);
   sendAck(configId, version, true, "", appliedSettingsJson);
