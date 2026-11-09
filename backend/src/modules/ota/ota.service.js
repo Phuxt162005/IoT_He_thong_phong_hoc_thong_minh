@@ -485,7 +485,9 @@ export class OtaService {
       const postRebootStatus = ["SUCCESS", "FAILED", "ROLLED_BACK"].includes(
         data.status,
       );
-      const isPostReboot = job.status === "REBOOTING" && postRebootStatus;
+      const isPostReboot =
+        postRebootStatus &&
+        (job.status === "REBOOTING" || job.status === data.status);
       const isOriginalSession = job.session_id === data.session_id;
       const isCurrentDeviceSession = device.session_id === data.session_id;
 
@@ -630,6 +632,7 @@ export class OtaService {
         room_id: data.room_id,
         session_id: data.session_id,
         result: "PROCESSED",
+        status: data.status,
       },
     );
 
