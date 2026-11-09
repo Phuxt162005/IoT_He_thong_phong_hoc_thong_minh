@@ -1,19 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { iotFixture, waitFor } from "../helpers/iot.js";
-import { TelemetryPipeline, bindTelemetry } from "../../backend/src/modules/telemetry-ingestion/telemetry-pipeline.js";
+import {
+  TelemetryPipeline,
+  bindTelemetry,
+} from "../../backend/src/modules/telemetry-ingestion/telemetry-pipeline.js";
 
 test("PHASE 3: Sensor Node Drivers, Telemetry Ingestion, and Offline Sync Verification", async (t) => {
   const f = await iotFixture(t);
 
   // 1. Khởi động Telemetry Pipeline trong Backend
-  const pipeline = new TelemetryPipeline({ pool: f.pool, mqtt: f.runtime, logger: f.logger });
+  const pipeline = new TelemetryPipeline({
+    pool: f.pool,
+    mqtt: f.runtime,
+    logger: f.logger,
+  });
   const unbindTelemetry = bindTelemetry(f.runtime, pipeline);
   t.after(unbindTelemetry);
 
   // 2. Đăng ký & Kích hoạt Sensor Node
   const sensorDevice = await f.register("SENSOR_NODE");
-  const sensorCreds = (await f.action(sensorDevice.device_id, "provision")).body.data.credentials;
+  const sensorCreds = (await f.action(sensorDevice.device_id, "provision")).body
+    .data.credentials;
   const sensorBaseTopic = `smartclassroom/room/${f.room.room_code}/device/${sensorDevice.device_code}`;
 
   const sessionId = "sess-p3-test-0001";
@@ -44,7 +52,9 @@ test("PHASE 3: Sensor Node Drivers, Telemetry Ingestion, and Offline Sync Verifi
     }
   });
 
-  await sensorClient.subscribeAsync(`${sensorBaseTopic}/telemetry/ack`, { qos: 1 });
+  await sensorClient.subscribeAsync(`${sensorBaseTopic}/telemetry/ack`, {
+    qos: 1,
+  });
   await sensorClient.subscribeAsync(`${sensorBaseTopic}/config`, { qos: 1 });
 
   // Gửi bản tin /status ONLINE
@@ -74,18 +84,46 @@ test("PHASE 3: Sensor Node Drivers, Telemetry Ingestion, and Offline Sync Verifi
       wifi_rssi_dbm: -50,
       firmware_version: "1.0.0",
     }),
-    { qos: 0 },
+    { qos: 1 },
   );
 
-  await f.action(sensorDevice.device_id, "activate");
-
-  // Đảm bảo thiết bị đã ONLINE trong database
+  // Chờ backend ghi nhận heartbeat của đúng phiên thiết bị
   await waitFor(async () => {
     const res = await f.pool.query(
-      "SELECT connection_status FROM devices WHERE device_id = $1",
-      [sensorDevice.device_id]
+      `SELECT connection_status, session_id, last_heartbeat_at
+       FROM devices
+       WHERE device_id = $1`,
+      [sensorDevice.device_id],
     );
-    return res.rows[0]?.connection_status === "ONLINE";
+
+    const device = res.rows[0];
+
+    return (
+      device?.connection_status === "ONLINE" &&
+      device?.session_id === sessionId &&
+      device?.last_heartbeat_at !== null
+    );
+  });
+
+  // Chỉ kích hoạt sau khi heartbeat đã được backend xác nhận
+  const activateRes = await f.action(sensorDevice.device_id, "activate");
+
+  assert.equal(
+    activateRes.status,
+    200,
+    `Kích hoạt Sensor Node thất bại: ${JSON.stringify(activateRes.body)}`,
+  );
+
+  // Xác nhận thiết bị thực sự đã ACTIVE
+  await waitFor(async () => {
+    const res = await f.pool.query(
+      `SELECT lifecycle_status
+       FROM devices
+       WHERE device_id = $1`,
+      [sensorDevice.device_id],
+    );
+
+    return res.rows[0]?.lifecycle_status === "ACTIVE";
   });
 
   // ==============================================================================
@@ -108,16 +146,18 @@ test("PHASE 3: Sensor Node Drivers, Telemetry Ingestion, and Offline Sync Verifi
   await sensorClient.publishAsync(
     `${sensorBaseTopic}/telemetry`,
     JSON.stringify(telemetrySample1),
-    { qos: 1 }
+    { qos: 1 },
   );
 
   // Chờ Backend phản hồi ACK STORED
-  await waitFor(() => acks.some((a) => a.msg_id === "tel-p3-001" && a.status === "STORED"));
+  await waitFor(() =>
+    acks.some((a) => a.msg_id === "tel-p3-001" && a.status === "STORED"),
+  );
 
   // Kiểm tra dữ liệu được lưu chính xác vào PostgreSQL
   const dbResult1 = await f.pool.query(
     "SELECT temperature, humidity, lux, occupancy FROM sensor_data WHERE device_id = $1 ORDER BY recorded_at DESC LIMIT 1",
-    [sensorDevice.device_id]
+    [sensorDevice.device_id],
   );
 
   assert.equal(dbResult1.rowCount, 1);
@@ -163,36 +203,43 @@ test("PHASE 3: Sensor Node Drivers, Telemetry Ingestion, and Offline Sync Verifi
     await sensorClient.publishAsync(
       `${sensorBaseTopic}/telemetry`,
       JSON.stringify(item),
-      { qos: 1 }
+      { qos: 1 },
     );
   }
 
   // Chờ cả 3 gói đều nhận được ACK STORED
   await waitFor(() => {
     const ackIds = new Set(acks.map((a) => a.msg_id));
-    return ackIds.has("tel-p3-off-01") && ackIds.has("tel-p3-off-02") && ackIds.has("tel-p3-off-03");
+    return (
+      ackIds.has("tel-p3-off-01") &&
+      ackIds.has("tel-p3-off-02") &&
+      ackIds.has("tel-p3-off-03")
+    );
   });
 
   // Xác nhận tổng cộng 4 bản ghi telemetry trong database
   const countRes = await f.pool.query(
     "SELECT COUNT(*) AS total FROM sensor_data WHERE device_id = $1",
-    [sensorDevice.device_id]
+    [sensorDevice.device_id],
   );
   assert.equal(Number(countRes.rows[0].total), 4);
 
   // ==============================================================================
   // Test Case 3: Đổi chu kỳ lấy mẫu từ xa (Remote Sampling Interval Configuration)
   // ==============================================================================
-  const configRes = await f.request(`/devices/${sensorDevice.device_id}/configs`, {
-    method: "POST",
-    token: f.token,
-    body: {
-      settings: {
-        sample_interval_seconds: 3,
-        heartbeat_interval_seconds: 5,
+  const configRes = await f.request(
+    `/devices/${sensorDevice.device_id}/configs`,
+    {
+      method: "POST",
+      token: f.token,
+      body: {
+        settings: {
+          sample_interval_seconds: 3,
+          heartbeat_interval_seconds: 5,
+        },
       },
     },
-  });
+  );
 
   assert.equal(configRes.status, 202);
 
@@ -215,14 +262,14 @@ test("PHASE 3: Sensor Node Drivers, Telemetry Ingestion, and Offline Sync Verifi
       timestamp: Date.now(),
       applied_settings: receivedConfig.settings,
     }),
-    { qos: 1 }
+    { qos: 1 },
   );
 
   // Đảm bảo cấu hình mới được áp dụng trong database
   await waitFor(async () => {
     const res = await f.pool.query(
       "SELECT applied_version, applied_settings FROM device_settings WHERE device_id = $1",
-      [sensorDevice.device_id]
+      [sensorDevice.device_id],
     );
     return res.rows[0]?.applied_version === receivedConfig.version;
   });
