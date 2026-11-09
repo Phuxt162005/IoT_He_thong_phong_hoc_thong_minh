@@ -1,6 +1,7 @@
 #include "MqttSyncManager.h"
 #include <ArduinoJson.h>
 #include <stdint.h>
+#include <string.h>
 
 MqttSyncManager::MqttSyncManager(
   PubSubClient& mqttClient,
