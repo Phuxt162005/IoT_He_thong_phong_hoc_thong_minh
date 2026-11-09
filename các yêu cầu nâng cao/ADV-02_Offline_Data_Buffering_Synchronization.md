@@ -3,7 +3,7 @@
 > **Tên tiếng Anh:** Offline Data Buffering & Synchronization  
 > **Dự án:** Hệ thống phòng học thông minh (Smart Classroom)  
 > **Phạm vi:** Firmware ESP32 (Sensor Node), MQTT và Backend PostgreSQL  
-> **Trạng thái tổng hợp:** Firmware Sensor Node và Control Node đã được Verify thành công trên Arduino IDE theo kết quả kiểm tra của nhóm. Sketch Sensor Node chính đã tích hợp SensorDrivers, hàng đợi LittleFS và MqttSyncManager. Backend có luồng tiếp nhận telemetry và 7 integration test case trong mã nguồn; tài liệu hiện ghi nhận kết quả PASS của 6 test case trước đó, chưa có kết quả xác nhận riêng cho test case thứ 7. Đã bổ sung GitHub Actions workflow để biên dịch firmware nhưng chưa xác nhận workflow này chạy thành công. Chưa kiểm thử mất mạng/khôi phục mạng và phục hồi hàng đợi LittleFS trên ESP32 thật.
+> **Trạng thái tổng hợp:** Firmware Sensor Node đã tích hợp SensorDrivers, hàng đợi LittleFS và MqttSyncManager. Firmware Sensor Node và Control Node đã biên dịch thành công trên GitHub Actions. Backend đã triển khai luồng tiếp nhận telemetry, lưu dữ liệu PostgreSQL và xác nhận ACK sau khi transaction hoàn tất. GitHub Actions Backend Checks trên commit `abab893` đạt kết quả 106/106 test PASS, bao gồm unit test Node.js 22, Node.js 24, integration test và deployment. Chưa kiểm thử mất mạng, khôi phục kết nối và phục hồi hàng đợi LittleFS trên ESP32 thật.
 
 ---
 
@@ -51,14 +51,12 @@ Bản ghi bù offline (`is_backfill`) vẫn được lưu vào bảng lịch s�
 
 ## 3. Cấu trúc mã nguồn liên quan
 
-```text
+## 3. Cấu trúc mã nguồn liên quan
+
+````text
 source code IoT/
-├── package.json
 ├── backend/
 │   └── src/
-│       ├── mqtt/
-│       │   ├── dynamic-security.js
-│       │   └── bootstrap-cli.js
 │       └── modules/
 │           └── telemetry-ingestion/
 │               ├── telemetry-pipeline.js
@@ -66,63 +64,101 @@ source code IoT/
 │               ├── telemetry-ingestion.repository.pg.js
 │               └── telemetry-normalizer.js
 ├── firmware/
-│   ├── sensor_node/
-│   │   ├── sensor_node.ino
-│   │   ├── OfflineQueue.h
-│   │   ├── OfflineQueue.cpp
-│   │   ├── MqttSyncManager.h
-│   │   ├── MqttSyncManager.cpp
-│   │   ├── TelemetryMessage.h
-│   │   ├── TelemetryMessage.cpp
-│   │   ├── SensorDrivers.h
+│   ├── common/
+│   │   ├── ActuatorManager.cpp
+│   │   ├── ActuatorManager.h
+│   │   ├── Config.h.example
+│   │   ├── NodeSessionManager.cpp
+│   │   ├── NodeSessionManager.h
+│   │   ├── OledDisplay.cpp
+│   │   ├── OledDisplay.h
+│   │   ├── RemoteConfigManager.cpp
+│   │   ├── RemoteConfigManager.h
 │   │   ├── SensorDrivers.cpp
-│   │   └── offline_sync/
-│   │       ├── OfflineQueue.h
-│   │       ├── OfflineQueue.cpp
-│   │       ├── MqttSyncManager.h
-│   │       ├── MqttSyncManager.cpp
-│   │       └── offline_sync_example.ino
-│   └── common/
-│       ├── OfflineQueue.h
+│   │   ├── SensorDrivers.h
+│   │   ├── TelemetryMessage.cpp
+│   │   └── TelemetryMessage.h
+│   ├── control_node/
+│   │   ├── control_node.ino
+│   │   ├── ActuatorManager.cpp
+│   │   ├── ActuatorManager.h
+│   │   ├── NodeSessionManager.cpp
+│   │   ├── NodeSessionManager.h
+│   │   ├── RemoteConfigManager.cpp
+│   │   └── RemoteConfigManager.h
+│   └── sensor_node/
+│       ├── sensor_node.ino
+│       ├── Config.h.example
 │       ├── OfflineQueue.cpp
+│       ├── OfflineQueue.h
+│       ├── MqttSyncManager.cpp
 │       ├── MqttSyncManager.h
-│       └── MqttSyncManager.cpp
+│       ├── TelemetryMessage.cpp
+│       ├── TelemetryMessage.h
+│       ├── SensorDrivers.cpp
+│       ├── SensorDrivers.h
+│       ├── NodeSessionManager.cpp
+│       ├── NodeSessionManager.h
+│       ├── OledDisplay.cpp
+│       ├── OledDisplay.h
+│       ├── RemoteConfigManager.cpp
+│       └── RemoteConfigManager.h
 ├── deployment/
-│   ├── compose.yml
-│   └── scripts/
-│       └── setup-local.mjs
-└── tests/
-    ├── helpers/
-    │   ├── database.js
-    │   └── iot.js
-    └── integration/
-        └── telemetry.test.js
-```
+│   └── compose.yml
+├── tests/
+│   ├── helpers/
+│   │   ├── database.js
+│   │   └── iot.js
+│   └── integration/
+│       ├── telemetry.test.js
+│       └── phase3-firmware-sensor.test.js
+└── .github/
+    └── workflows/
+        ├── backend.yml
+        └── firmware.yml
 
-**Lưu ý về nguồn mã firmware:** Sketch chính `firmware/sensor_node/sensor_node.ino` include `OfflineQueue.h` và `MqttSyncManager.h` ngay trong thư mục `firmware/sensor_node/`. Đây là bộ triển khai đang được Sensor Node chính sử dụng. Hai vị trí `firmware/sensor_node/offline_sync/` và `firmware/common/` còn chứa bộ mã phiên bản cũ; các file `OfflineQueue` và `MqttSyncManager` trong hai vị trí này trùng nội dung với nhau nhưng khác với bản đang dùng ở thư mục `firmware/sensor_node/`. Việc xử lý hoặc loại bỏ các bản trùng lặp được để ở bước công việc code tiếp theo, chưa thực hiện trong lần cập nhật tài liệu này.
+
+**Lưu ý:** Trong cây trên, các file `TelemetryMessage` và `SensorDrivers` ở `common` vẫn được giữ. Không nhầm việc xóa bản trùng OfflineQueue/MqttSyncManager với xóa toàn bộ module dùng chung.
+
+## Bước 3 — Sửa mục 3.1: Trách nhiệm các thành phần
+
+Tìm bảng bắt đầu bằng:
+
+`### 3.1. Trách nhiệm các thành phần`
+
+Xóa hai dòng bảng cũ mô tả:
+
+- `firmware/sensor_node/offline_sync/`
+- `firmware/sensor_node/offline_sync/offline_sync_example.ino`
+
+Thay bằng dòng sau:
+
+```markdown
+| `firmware/common/` | Chứa các module dùng chung giữa các loại node như NodeSessionManager, OledDisplay, RemoteConfigManager, SensorDrivers và TelemetryMessage. Không chứa bộ triển khai OfflineQueue/MqttSyncManager đang được Sensor Node sử dụng. |
+| `.github/workflows/firmware.yml` | Cài đặt Arduino CLI, ESP32 Arduino Core và các thư viện; tạo Config.h từ file mẫu rồi biên dịch Sensor Node và Control Node trên GitHub Actions. |, chưa thực hiện trong lần cập nhật tài liệu này.
 
 ### 3.1. Trách nhiệm các thành phần
 
-| File/thành phần | Trách nhiệm |
-|---|---|
-| `firmware/sensor_node/OfflineQueue.h` | Khai báo API hàng đợi: khởi tạo, thêm bản ghi, xem bản ghi đầu, xác nhận xóa, đếm bản ghi, kiểm tra hàng đợi đầy và lấy thông báo lỗi. |
-| `firmware/sensor_node/OfflineQueue.cpp` | Cài đặt hàng đợi LittleFS; kiểm tra JSON và ID bản tin; chống bản ghi trùng; giới hạn dung lượng; phục hồi file chính/tạm/backup và xử lý file lỗi. |
-| `firmware/sensor_node/MqttSyncManager.h/.cpp` | Quản lý gửi telemetry qua MQTT, đăng ký topic ACK, retry khi timeout/mất ACK và chỉ xác nhận xóa bản ghi khi ACK hợp lệ. Hỗ trợ xác thực ACK theo cả định dạng legacy (`eventId`) và định dạng hiện hành (`msg_id`). |
-| `firmware/sensor_node/TelemetryMessage.h/.cpp` | Định nghĩa cấu trúc mẫu đo và tạo payload telemetry theo định dạng hiện hành để đưa vào hàng đợi. |
-| `firmware/sensor_node/SensorDrivers.h/.cpp` | Khởi tạo và đọc dữ liệu từ các cảm biến được tích hợp trên Sensor Node. |
-| `firmware/sensor_node/sensor_node.ino` | Sketch chính khởi tạo cảm biến, OLED, LittleFS, OfflineQueue, MqttSyncManager, Wi-Fi/MQTT; đưa mẫu đo vào hàng đợi và điều phối đồng bộ trong vòng lặp chính. |
-| `firmware/sensor_node/offline_sync/` và `firmware/common/` | Chứa các bản triển khai OfflineQueue/MqttSyncManager cũ; chưa phải nguồn mã được sketch Sensor Node chính include. |
-| `firmware/sensor_node/offline_sync/offline_sync_example.ino` | Sketch minh họa riêng cho cơ chế offline sync; không phải sketch Sensor Node chính đang được sử dụng. |
-| `telemetry-pipeline.js` | Điều phối luồng telemetry từ MQTT: chuẩn hóa dữ liệu, kiểm tra thiết bị/topic, gọi xử lý lưu trữ trong transaction và gửi ACK sau khi lưu thành công. |
-| `telemetry-ingestion.service.js` | Cung cấp logic tiếp nhận telemetry, kiểm tra dữ liệu và xử lý kết quả lưu/nhận diện bản tin trùng. |
-| `telemetry-ingestion.repository.pg.js` | Thao tác với PostgreSQL; lưu telemetry, xử lý trùng theo thiết bị và mã bản tin, cập nhật dữ liệu mới nhất và tạo sự kiện `telemetry.stored`. |
-| `telemetry-normalizer.js` | Chuẩn hóa payload theo định dạng hiện hành hoặc định dạng cũ; kiểm tra cấu trúc, kiểu dữ liệu và tạo hash nội dung. |
-| `dynamic-security.js` | Giao tiếp với MQTT Dynamic Security để quản lý identity và role của backend/thiết bị trong broker. |
-| `tests/integration/telemetry.test.js` | Kiểm thử tích hợp luồng MQTT → backend → PostgreSQL → ACK và các trường hợp lỗi liên quan. |
-| `tests/helpers/database.js`, `tests/helpers/iot.js` | Chuẩn bị database/schema riêng, MQTT identity, thiết bị và fixture phục vụ integration test. |
-| `deployment/compose.yml` | Khai báo PostgreSQL và MQTT broker, bao gồm các dịch vụ dành riêng cho môi trường test. |
-| `package.json` | Khai báo các lệnh chạy test và bootstrap MQTT broker. |
-| `.github/workflows/firmware.yml` | Cài đặt Arduino CLI, ESP32 Arduino Core và thư viện; tạo `Config.h` từ file mẫu rồi biên dịch Sensor Node và Control Node trên GitHub Actions. |
+| File/thành phần                                              | Trách nhiệm                                                                                                                                                                                                          |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `firmware/sensor_node/OfflineQueue.h`                        | Khai báo API hàng đợi: khởi tạo, thêm bản ghi, xem bản ghi đầu, xác nhận xóa, đếm bản ghi, kiểm tra hàng đợi đầy và lấy thông báo lỗi.                                                                               |
+| `firmware/sensor_node/OfflineQueue.cpp`                      | Cài đặt hàng đợi LittleFS; kiểm tra JSON và ID bản tin; chống bản ghi trùng; giới hạn dung lượng; phục hồi file chính/tạm/backup và xử lý file lỗi.                                                                  |
+| `firmware/sensor_node/MqttSyncManager.h/.cpp`                | Quản lý gửi telemetry qua MQTT, đăng ký topic ACK, retry khi timeout/mất ACK và chỉ xác nhận xóa bản ghi khi ACK hợp lệ. Hỗ trợ xác thực ACK theo cả định dạng legacy (`eventId`) và định dạng hiện hành (`msg_id`). |
+| `firmware/sensor_node/TelemetryMessage.h/.cpp`               | Định nghĩa cấu trúc mẫu đo và tạo payload telemetry theo định dạng hiện hành để đưa vào hàng đợi.                                                                                                                    |
+| `firmware/sensor_node/SensorDrivers.h/.cpp`                  | Khởi tạo và đọc dữ liệu từ các cảm biến được tích hợp trên Sensor Node.                                                                                                                                              |
+| `firmware/sensor_node/sensor_node.ino`                       | Sketch chính khởi tạo cảm biến, OLED, LittleFS, OfflineQueue, MqttSyncManager, Wi-Fi/MQTT; đưa mẫu đo vào hàng đợi và điều phối đồng bộ trong vòng lặp chính.                                                        |
+| `firmware/sensor_node/offline_sync/` và `firmware/common/`   | Chứa các bản triển khai OfflineQueue/MqttSyncManager cũ; chưa phải nguồn mã được sketch Sensor Node chính include.                                                                                                   |
+| `firmware/sensor_node/offline_sync/offline_sync_example.ino` | Đây là payload minh họa theo định dạng cũ mà backend normalizer vẫn hỗ trợ. Sketch Sensor Node chính hiện sử dụng SensorDrivers để đọc dữ liệu cảm biến và TelemetryMessage để tạo payload theo định dạng hiện hành. Payload cũ vẫn được backend hỗ trợ nhằm duy trì khả năng tương thích.dụng.                                                                                                                |
+| `telemetry-pipeline.js`                                      | Điều phối luồng telemetry từ MQTT: chuẩn hóa dữ liệu, kiểm tra thiết bị/topic, gọi xử lý lưu trữ trong transaction và gửi ACK sau khi lưu thành công.                                                                |
+| `telemetry-ingestion.service.js`                             | Cung cấp logic tiếp nhận telemetry, kiểm tra dữ liệu và xử lý kết quả lưu/nhận diện bản tin trùng.                                                                                                                   |
+| `telemetry-ingestion.repository.pg.js`                       | Thao tác với PostgreSQL; lưu telemetry, xử lý trùng theo thiết bị và mã bản tin, cập nhật dữ liệu mới nhất và tạo sự kiện `telemetry.stored`.                                                                        |
+| `telemetry-normalizer.js`                                    | Chuẩn hóa payload theo định dạng hiện hành hoặc định dạng cũ; kiểm tra cấu trúc, kiểu dữ liệu và tạo hash nội dung.                                                                                                  |
+| `dynamic-security.js`                                        | Giao tiếp với MQTT Dynamic Security để quản lý identity và role của backend/thiết bị trong broker.                                                                                                                   |
+| `tests/integration/telemetry.test.js`                        | Kiểm thử tích hợp luồng MQTT → backend → PostgreSQL → ACK và các trường hợp lỗi liên quan.                                                                                                                           |
+| `tests/helpers/database.js`, `tests/helpers/iot.js`          | Chuẩn bị database/schema riêng, MQTT identity, thiết bị và fixture phục vụ integration test.                                                                                                                         |
+| `deployment/compose.yml`                                     | Khai báo PostgreSQL và MQTT broker, bao gồm các dịch vụ dành riêng cho môi trường test.                                                                                                                              |
+| `package.json`                                               | Khai báo các lệnh chạy test và bootstrap MQTT broker.                                                                                                                                                                |
+| `.github/workflows/firmware.yml`                             | Cài đặt Arduino CLI, ESP32 Arduino Core và thư viện; tạo `Config.h` từ file mẫu rồi biên dịch Sensor Node và Control Node trên GitHub Actions.                                                                       |
 
 ## 4. Cấu trúc dữ liệu và giao tiếp
 
@@ -139,7 +175,7 @@ source code IoT/
   "humidityPercent": 65,
   "illuminanceLux": 320
 }
-```
+````
 
 Đây là payload minh họa theo định dạng cũ mà backend normalizer vẫn hỗ trợ. Các giá trị cảm biến trong sketch minh họa `offline_sync_example.ino` là dữ liệu mẫu; sketch Sensor Node chính hiện sử dụng `SensorDrivers` để đọc dữ liệu cảm biến và `TelemetryMessage` để tạo payload theo định dạng hiện hành.
 
@@ -225,7 +261,7 @@ Backend chỉ publish ACK sau khi hàm ingest trả về sau khi transaction Pos
 
 ### 6.1. Integration test backend
 
-Lệnh kiểm thử:
+Lệnh kiểm thử riêng:
 
 ```powershell
 node --test tests/integration/telemetry.test.js
@@ -247,15 +283,15 @@ todo 0
 
 **Kết quả đã được ghi nhận: 6/6 integration test PASS.** Không suy diễn kết quả 7/7 khi chưa có log chạy mới xác nhận test case thứ 7.
 
-| STT | Trường hợp kiểm thử | Kết quả |
-|---:|---|---|
-| 1 | Telemetry MQTT được commit vào database trước khi ACK; nhiều lần gửi đồng thời cùng bản tin chỉ tạo một bản ghi/sự kiện. | PASS |
-| 2 | Khi ghi database thất bại thì không gửi ACK; sau khi khôi phục database, gửi lại thành công và không có dữ liệu ghi dở. | PASS |
-| 3 | Dữ liệu backfill giữ nguyên thời điểm đo, không ghi đè dữ liệu mới nhất và không trở thành dữ liệu đủ điều kiện. | PASS |
-| 4 | Payload cũ giữ được lux dạng thập phân và occupancy `NULL`; timestamp thiếu hoặc ở tương lai chỉ đi vào lịch sử, không cập nhật dữ liệu mới nhất. | PASS |
-| 5 | Payload không khớp topic bị từ chối; năm phép đo không hợp lệ khiến thiết bị chuyển `FAULT`; mẫu hợp lệ vẫn được ghi nhận nhưng không đủ điều kiện xử lý như trạng thái `ACTIVE`. | PASS |
-| 6 | Thiết bị đã bị thu hồi không thể tiếp tục ingest telemetry; thiết bị khác có thể sử dụng cùng `msg_id` mà không bị coi là trùng toàn hệ thống. | PASS |
-| 7 | Backfill cũ không tạo dữ liệu latest khi chưa có bản ghi latest. | Chưa xác nhận kết quả chạy |
+| STT | Trường hợp kiểm thử                                                                                                                                                               | Kết quả                    |
+| --: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+|   1 | Telemetry MQTT được commit vào database trước khi ACK; nhiều lần gửi đồng thời cùng bản tin chỉ tạo một bản ghi/sự kiện.                                                          | PASS                       |
+|   2 | Khi ghi database thất bại thì không gửi ACK; sau khi khôi phục database, gửi lại thành công và không có dữ liệu ghi dở.                                                           | PASS                       |
+|   3 | Dữ liệu backfill giữ nguyên thời điểm đo, không ghi đè dữ liệu mới nhất và không trở thành dữ liệu đủ điều kiện.                                                                  | PASS                       |
+|   4 | Payload cũ giữ được lux dạng thập phân và occupancy `NULL`; timestamp thiếu hoặc ở tương lai chỉ đi vào lịch sử, không cập nhật dữ liệu mới nhất.                                 | PASS                       |
+|   5 | Payload không khớp topic bị từ chối; năm phép đo không hợp lệ khiến thiết bị chuyển `FAULT`; mẫu hợp lệ vẫn được ghi nhận nhưng không đủ điều kiện xử lý như trạng thái `ACTIVE`. | PASS                       |
+|   6 | Thiết bị đã bị thu hồi không thể tiếp tục ingest telemetry; thiết bị khác có thể sử dụng cùng `msg_id` mà không bị coi là trùng toàn hệ thống.                                    | PASS                       |
+|   7 | Backfill cũ không tạo dữ liệu latest khi chưa có bản ghi latest.                                                                                                                  | Chưa xác nhận kết quả chạy |
 
 ### 6.2. Môi trường integration test
 
@@ -304,23 +340,23 @@ Các kiểm thử còn cần thực hiện:
 
 ## 8. Công việc tiếp theo
 
-| STT | Công việc | Mục đích/kết quả cần xác nhận |
-|---:|---|---|
-| 1 | Chốt `firmware/sensor_node/` là nguồn mã chính cho OfflineQueue và MqttSyncManager; rà soát tham chiếu trước khi xử lý các bản cũ trong `firmware/common/` và `firmware/sensor_node/offline_sync/`. | Chỉ còn một nguồn triển khai chính, không xóa nhầm file đang được sử dụng. |
-| 2 | Cập nhật và xác nhận kết quả integration test thứ 7. | Có kết quả chạy đầy đủ 7 test case, ghi nhận đúng số PASS/FAIL. |
-| 3 | Xác nhận GitHub Actions workflow biên dịch firmware cho Sensor Node và Control Node. | Có kết quả build thành công trên GitHub Actions. |
-| 4 | Kiểm thử hàng đợi LittleFS trên ESP32 thật: mất Wi-Fi, mất MQTT, khởi động lại, hàng đợi đầy. | Xác nhận khả năng lưu và phục hồi dữ liệu trên thiết bị. |
-| 5 | Kiểm tra chỉ xóa bản ghi sau ACK `STORED` có mã định danh tương ứng. | Không mất bản ghi khi ACK sai hoặc bị mất. |
-| 6 | Kiểm thử đầu cuối ESP32 → MQTT → backend → PostgreSQL → ACK → ESP32. | Xác nhận tích hợp thực tế giữa firmware và backend. |
-| 7 | Đánh giá dung lượng hàng đợi và tuổi thọ flash theo chu kỳ gửi telemetry thực tế. | Xác định giới hạn vận hành phù hợp. |
-| 8 | Bảo đảm credential và cấu hình kết nối được quản lý an toàn. | Không để lộ thông tin bí mật trong source code/repository. |
+| STT | Công việc                                                                            | Mục đích/kết quả cần xác nhận                                 |
+| --: | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+|   1 | Kiểm thử hàng đợi LittleFS trên ESP32 thật khi mất Wi-Fi, mất MQTT và khởi động lại. | Xác nhận dữ liệu được lưu và phục hồi an toàn.                |
+|   2 | Khôi phục kết nối và kiểm tra gửi bù dữ liệu theo thứ tự.                            | Không mất bản ghi chưa được xác nhận.                         |
+|   3 | Làm mất ACK, gửi ACK sai ID và ACK sai trạng thái.                                   | Xác nhận thiết bị chỉ xóa bản ghi khi nhận ACK STORED hợp lệ. |
+|   4 | Kiểm tra hàng đợi đầy, file lỗi và mất nguồn trong quá trình cập nhật file.          | Đánh giá khả năng bảo toàn dữ liệu.                           |
+|   5 | Đánh giá dung lượng hàng đợi và tuổi thọ flash theo chu kỳ gửi telemetry thực tế.    | Xác định giới hạn vận hành phù hợp.                           |
+|   6 | Kiểm thử đầu cuối ESP32 → MQTT → Backend → PostgreSQL → ACK → ESP32.                 | Xác nhận tích hợp thực tế trên phần cứng.                     |
 
 ## 9. Kết luận và đánh giá trạng thái
 
-ADV-02 đã có các thành phần chính cho cơ chế lưu telemetry offline trên ESP32 bằng LittleFS và tiếp nhận, lưu trữ, chống trùng telemetry ở backend. Sketch Sensor Node chính đã tích hợp `SensorDrivers`, `OfflineQueue` và `MqttSyncManager`. Backend sử dụng PostgreSQL transaction và chỉ gửi ACK ứng dụng sau khi dữ liệu được commit thành công. Cơ chế này cho phép thiết bị gửi lại bản tin khi không nhận được ACK mà không tạo dữ liệu trùng.
+ADV-02 đã triển khai các thành phần chính cho cơ chế lưu telemetry khi mất kết nối trên Sensor Node bằng LittleFS. Thiết bị đưa bản ghi vào hàng đợi, gửi lại khi MQTT được khôi phục và chỉ xóa bản ghi khi nhận ACK ứng dụng hợp lệ. Backend tiếp nhận telemetry, kiểm tra dữ liệu, lưu PostgreSQL trong transaction và chỉ gửi ACK STORED sau khi lưu thành công.
 
-Ở mức firmware, Sensor Node và Control Node đã được Verify thành công trên Arduino IDE theo kết quả kiểm tra của nhóm. Repository đã bổ sung workflow GitHub Actions để biên dịch hai firmware, nhưng chưa có kết quả xác nhận workflow chạy thành công. Ở mức kiểm thử backend, tài liệu trước đó ghi nhận 6/6 integration test PASS; mã nguồn hiện có 7 test case và cần xác nhận kết quả chạy của test case thứ 7.
+Các bản triển khai OfflineQueue và MqttSyncManager trùng lặp đã được loại bỏ. Sensor Node sử dụng bộ triển khai thống nhất tại `firmware/sensor_node/`; các module dùng chung trong `firmware/common/` vẫn được giữ lại.
 
-Tuy nhiên, firmware chưa được kiểm thử mất mạng/khôi phục mạng và phục hồi hàng đợi LittleFS trên ESP32 thật. Cần xác nhận GitHub Actions build, hoàn tất việc xử lý các bản mã trùng lặp và kiểm thử đầu cuối trên phần cứng trước khi kết luận ADV-02 đã hoàn tất.
+Về kiểm thử phần mềm, GitHub Actions Backend Checks trên commit `abab893` đạt 106/106 test PASS, bao gồm unit test Node.js 22, Node.js 24, integration test và deployment. GitHub Actions Firmware Build trên commit `6421454` cũng biên dịch thành công cả Sensor Node và Control Node.
 
-**Đánh giá:** Đã có triển khai chính cho cơ chế offline queue trên Sensor Node và luồng tiếp nhận telemetry ở backend; hai firmware đã Verify trên Arduino IDE. Phần integration test backend có 6 kết quả PASS được ghi nhận trước đó, trong khi test case thứ 7 chưa có kết quả xác nhận. Chưa đủ cơ sở kết luận ADV-02 đã hoàn tất kiểm thử đầu cuối trên phần cứng.
+Tuy nhiên, chưa có kết quả kiểm thử mất mạng, phục hồi hàng đợi LittleFS và gửi bù telemetry trên ESP32 thật. Vì vậy, kết quả hiện tại xác nhận mức triển khai và kiểm thử phần mềm, chưa xác nhận đầy đủ khả năng vận hành thực tế trên phần cứng.
+
+**Đánh giá:** ADV-02 đã hoàn thành phần triển khai firmware/backend và kiểm thử tự động trong repository. Phần kiểm thử độ bền, phục hồi dữ liệu và đồng bộ đầu cuối trên ESP32 thật vẫn là giới hạn cần thực hiện khi có điều kiện phần cứng.
