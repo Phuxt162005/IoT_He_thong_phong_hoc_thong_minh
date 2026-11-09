@@ -1,5 +1,6 @@
 #include "OtaMessage.h"
 #include <ArduinoJson.h>
+#include <time.h>
 
 bool isValidHex(const String& value, size_t expectedLength) {
   if (value.length() != expectedLength) return false;
@@ -45,6 +46,7 @@ bool parseOtaCommand(const uint8_t* payload, size_t length, OtaCommand& c) {
 
 String serializeOtaStatus(const OtaStatus& s) {
   JsonDocument doc;
+
   doc["job_id"] = s.jobId;
   doc["device_id"] = s.deviceId;
   doc["room_id"] = s.roomId;
@@ -52,8 +54,9 @@ String serializeOtaStatus(const OtaStatus& s) {
   doc["version"] = s.version;
   doc["status"] = s.status;
   doc["progress"] = s.progress;
-  doc["message"] = s.message;
-  doc["timestamp"] = millis();
+
+  // Unix timestamp tính bằng milliseconds.
+  doc["timestamp"] = (uint64_t)time(nullptr) * 1000ULL;
 
   String output;
   serializeJson(doc, output);
