@@ -107,11 +107,14 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
   );
   const uploaded = await uploadFirmware(f);
   const firmwareId = uploaded.body.data.firmware_id;
+  let command;
   let otaAck;
+
   node.client.on("message", (topic, raw) => {
     if (topic === node.topic + "/ota/command") {
       command = JSON.parse(raw.toString());
     }
+
     if (topic === node.topic + "/ota/ack") {
       otaAck = JSON.parse(raw.toString());
     }
@@ -125,7 +128,6 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
     ).status,
     200,
   );
-  let command;
   node.client.on("message", (topic, raw) => {
     if (topic === node.topic + "/ota/command")
       command = JSON.parse(raw.toString());
@@ -190,9 +192,33 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
     assert.equal(otaAck.room_id, f.room.room_code);
     assert.equal(otaAck.session_id, "boot-1");
     assert.equal(otaAck.result, "PROCESSED");
-
+    assert.equal(otaAck.status, status);
     otaAck = undefined;
   }
+
+  // Gửi lại SUCCESS để kiểm tra cơ chế retry khi ACK trước đó bị mất.
+  await node.client.publishAsync(
+    node.topic + "/ota/status",
+    JSON.stringify({
+      job_id: jobId,
+      device_id: node.device.device_code,
+      room_id: f.room.room_code,
+      session_id: "boot-1",
+      status: "SUCCESS",
+      progress: 100,
+      version: "1.0.1",
+      timestamp: Date.now(),
+    }),
+    { qos: 1 },
+  );
+
+  await waitFor(() => Boolean(otaAck));
+  assert.equal(otaAck.job_id, jobId);
+  assert.equal(otaAck.status, "SUCCESS");
+  assert.equal(otaAck.result, "PROCESSED");
+
+  otaAck = undefined;
+
   const listed = await f.request(
     `/ota/jobs?device_id=${node.device.device_id}`,
     { token: f.token },
