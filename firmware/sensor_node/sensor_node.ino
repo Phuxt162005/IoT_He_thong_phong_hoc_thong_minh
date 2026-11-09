@@ -44,7 +44,7 @@ RemoteConfigManager configManager(
 
 #if OTA_ENABLED
 bool otaStartupChecksPassed = false;
-bool otaBootConfirmed = false;
+bool otaBootDecisionMade = false;
 uint32_t otaStartupTime = 0;
 #endif
 
@@ -67,19 +67,19 @@ uint32_t lastSampleTime = 0;
 TelemetrySample currentSample;
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-#if OTA_ENABLED
-  String topicName(topic);
+  #if OTA_ENABLED
+    String topicName(topic);
 
-  if (topicName == OTA_COMMAND_TOPIC) {
-    otaClient.handleCommand(topic, payload, length);
-    return;
-  }
+    if (topicName == OTA_COMMAND_TOPIC) {
+      otaClient.handleCommand(topic, payload, length);
+      return;
+    }
 
-  if (topicName == OTA_ACK_TOPIC) {
-    otaClient.handleAck(topic, payload, length);
-    return;
-  }
-#endif
+    if (topicName == OTA_ACK_TOPIC) {
+      otaClient.handleAck(topic, payload, length);
+      return;
+    }
+  #endif
 
   if (configManager.handleMessage(topic, payload, length)) {
     return;
@@ -94,20 +94,20 @@ void onMqttConnected(const String& sessionId) {
   configManager.subscribe();
   syncManager.onMqttConnected();
 
-#if OTA_ENABLED
-  otaClient.setCurrentSessionId(sessionId);
+  #if OTA_ENABLED
+    otaClient.setCurrentSessionId(sessionId);
 
-  bool commandSubscribed = mqttClient.subscribe(OTA_COMMAND_TOPIC, 1);
-  bool ackSubscribed = mqttClient.subscribe(OTA_ACK_TOPIC, 1);
+    bool commandSubscribed = mqttClient.subscribe(OTA_COMMAND_TOPIC, 1);
+    bool ackSubscribed = mqttClient.subscribe(OTA_ACK_TOPIC, 1);
 
-  Serial.printf(
-    "[OTA] Subscribe command: %s | ACK: %s\n",
-    commandSubscribed ? "OK" : "FAILED",
-    ackSubscribed ? "OK" : "FAILED"
-  );
+    Serial.printf(
+      "[OTA] Subscribe command: %s | ACK: %s\n",
+      commandSubscribed ? "OK" : "FAILED",
+      ackSubscribed ? "OK" : "FAILED"
+    );
 
-  otaClient.publishPendingSuccess();
-#endif
+    otaClient.publishPendingSuccess();
+  #endif
 }
 
 void onConfigChanged(uint32_t sampleInterval, uint32_t heartbeatInterval) {
@@ -201,11 +201,19 @@ void loop() {
   // 1. Dieu phoi duy tri ket noi Wi-Fi, MQTT, dong bo NTP va gui heartbeat
   sessionManager.loop();
   #if OTA_ENABLED
-    if (!otaBootConfirmed &&
-        otaStartupChecksPassed &&
+    if (!otaBootDecisionMade &&
         millis() - otaStartupTime >= 30000) {
-      otaBootConfirmed = otaClient.confirmBoot();
+
+      otaBootDecisionMade = true;
+
+      if (otaStartupChecksPassed) {
+        Serial.println("[OTA] Startup checks passed. Confirming firmware.");
+        otaClient.confirmBoot();
+      } else {
+        otaClient.rollbackBoot("Sensor startup check failed");
+      }
     }
+
     otaClient.publishPendingSuccess();
   #endif
   // 2. Dieu phoi dong bo du lieu cam bien (gui telemetry va xu ly bu du lieu ngoai tuyen)

@@ -50,7 +50,7 @@ ActuatorManager actuatorManager(
 
 #if OTA_ENABLED
 bool otaStartupChecksPassed = false;
-bool otaBootConfirmed = false;
+bool otaBootDecisionMade = false;
 uint32_t otaStartupTime = 0;
 #endif
 
@@ -69,19 +69,19 @@ String getExtraStatus(const String& sessionId) {
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-#if OTA_ENABLED
-  String topicName(topic);
+  #if OTA_ENABLED
+    String topicName(topic);
 
-  if (topicName == OTA_COMMAND_TOPIC) {
-    otaClient.handleCommand(topic, payload, length);
-    return;
-  }
+    if (topicName == OTA_COMMAND_TOPIC) {
+      otaClient.handleCommand(topic, payload, length);
+      return;
+    }
 
-  if (topicName == OTA_ACK_TOPIC) {
-    otaClient.handleAck(topic, payload, length);
-    return;
-  }
-#endif
+    if (topicName == OTA_ACK_TOPIC) {
+      otaClient.handleAck(topic, payload, length);
+      return;
+    }
+  #endif
 
   if (actuatorManager.handleMessage(topic, payload, length)) {
     return;
@@ -98,20 +98,20 @@ void onMqttConnected(const String& sessionId) {
   actuatorManager.subscribe();
   configManager.subscribe();
 
-#if OTA_ENABLED
-  otaClient.setCurrentSessionId(sessionId);
+  #if OTA_ENABLED
+    otaClient.setCurrentSessionId(sessionId);
 
-  bool commandSubscribed = mqttClient.subscribe(OTA_COMMAND_TOPIC, 1);
-  bool ackSubscribed = mqttClient.subscribe(OTA_ACK_TOPIC, 1);
+    bool commandSubscribed = mqttClient.subscribe(OTA_COMMAND_TOPIC, 1);
+    bool ackSubscribed = mqttClient.subscribe(OTA_ACK_TOPIC, 1);
 
-  Serial.printf(
-    "[OTA] Subscribe command: %s | ACK: %s\n",
-    commandSubscribed ? "OK" : "FAILED",
-    ackSubscribed ? "OK" : "FAILED"
-  );
+    Serial.printf(
+      "[OTA] Subscribe command: %s | ACK: %s\n",
+      commandSubscribed ? "OK" : "FAILED",
+      ackSubscribed ? "OK" : "FAILED"
+    );
 
-  otaClient.publishPendingSuccess();
-#endif
+    otaClient.publishPendingSuccess();
+  #endif
 }
 
 void onConfigChanged(uint32_t sampleInterval, uint32_t heartbeatInterval) {
@@ -173,16 +173,22 @@ void setup() {
 void loop() {
   sessionManager.loop();
 
-#if OTA_ENABLED
-  if (!otaBootConfirmed &&
-      otaStartupChecksPassed &&
-      millis() - otaStartupTime >= 30000) {
+  #if OTA_ENABLED
+    if (!otaBootDecisionMade &&
+        millis() - otaStartupTime >= 30000) {
 
-    otaBootConfirmed = otaClient.confirmBoot();
-  }
+      otaBootDecisionMade = true;
 
-  otaClient.publishPendingSuccess();
-#endif
+      if (otaStartupChecksPassed) {
+        Serial.println("[OTA] Startup checks passed. Confirming firmware.");
+        otaClient.confirmBoot();
+      } else {
+        otaClient.rollbackBoot("Control startup check failed");
+      }
+    }
+
+    otaClient.publishPendingSuccess();
+  #endif
 
   actuatorManager.loop();
 

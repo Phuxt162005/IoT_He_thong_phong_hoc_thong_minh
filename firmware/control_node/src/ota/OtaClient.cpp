@@ -439,3 +439,51 @@ bool OtaClient::confirmBoot() {
   Serial.println("[OTA] New firmware confirmed. Rollback cancelled.");
   return true;
 }
+
+bool OtaClient::rollbackBoot(const String& reason) {
+  const esp_partition_t* running = esp_ota_get_running_partition();
+
+  if (running == nullptr) {
+    Serial.println("[OTA] Cannot get running partition for rollback.");
+    return false;
+  }
+
+  esp_ota_img_states_t state;
+
+  esp_err_t stateResult = esp_ota_get_state_partition(running, &state);
+
+  if (stateResult != ESP_OK) {
+    Serial.printf(
+      "[OTA] Cannot get partition state for rollback: %s\n",
+      esp_err_to_name(stateResult)
+    );
+    return false;
+  }
+
+  if (state != ESP_OTA_IMG_PENDING_VERIFY) {
+    Serial.printf(
+      "[OTA] Rollback rejected: unexpected image state %d\n",
+      state
+    );
+    return false;
+  }
+
+  Serial.printf(
+    "[OTA] New firmware health check failed: %s\n",
+    reason.c_str()
+  );
+
+  Serial.println("[OTA] Marking firmware invalid and requesting rollback.");
+
+  esp_err_t result = esp_ota_mark_app_invalid_rollback_and_reboot();
+
+  if (result != ESP_OK) {
+    Serial.printf(
+      "[OTA] Rollback failed: %s\n",
+      esp_err_to_name(result)
+    );
+    return false;
+  }
+
+  return true;
+}

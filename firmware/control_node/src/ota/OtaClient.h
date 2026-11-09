@@ -34,6 +34,7 @@ public:
 
   bool publishPendingSuccess();
   bool confirmBoot();
+  bool rollbackBoot(const String& reason);
 
 private:
   PubSubClient& _mqtt;
