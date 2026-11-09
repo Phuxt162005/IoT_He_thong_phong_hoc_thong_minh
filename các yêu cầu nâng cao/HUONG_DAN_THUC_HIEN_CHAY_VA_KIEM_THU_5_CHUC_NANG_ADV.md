@@ -1,326 +1,475 @@
-# HƯỚNG DẪN THỰC HIỆN, VẬN HÀNH VÀ KIỂM THỬ 5 CHỨC NĂNG NÂNG CAO
+# HƯỚNG DẪN CHẠY, KIỂM THỬ VÀ ĐÁNH GIÁ 5 CHỨC NĂNG NÂNG CAO (ADV-01 → ADV-05)
 
 **Dự án:** Hệ thống phòng học thông minh (Smart Classroom)  
-**Phạm vi:** ADV-01 đến ADV-05  
-**Loại tài liệu:** Hướng dẫn thực hành dành cho thành viên phát triển, tích hợp và kiểm thử hệ thống.
+**Phạm vi:** ADV-01, ADV-02, ADV-03, ADV-04, ADV-05  
+**Đối tượng sử dụng:** Thành viên phát triển, tích hợp và kiểm thử  
+**Loại tài liệu:** Hướng dẫn thực hành độc lập  
+**Phiên bản:** 2.0  
+**Ngày biên soạn:** 09/11/2026
 
 ---
 
-## Mục lục
+# Mục lục
 
-1. [Mục đích và phạm vi](#1-mục-đích-và-phạm-vi)
+1. [Mục đích và nguyên tắc sử dụng](#1-mục-đích-và-nguyên-tắc-sử-dụng)
 2. [Tổng quan 5 chức năng](#2-tổng-quan-5-chức-năng)
 3. [Chuẩn bị môi trường](#3-chuẩn-bị-môi-trường)
-4. [Quy trình làm việc chung](#4-quy-trình-làm-việc-chung)
+4. [Khởi chạy hệ thống và kiểm tra nền tảng](#4-khởi-chạy-hệ-thống-và-kiểm-tra-nền-tảng)
 5. [ADV-01 — Digital Twin / Device Shadow](#5-adv-01--digital-twin--device-shadow)
 6. [ADV-02 — Offline Data Buffering & Synchronization](#6-adv-02--offline-data-buffering--synchronization)
 7. [ADV-03 — Monitoring và Logging tập trung](#7-adv-03--monitoring-và-logging-tập-trung)
 8. [ADV-04 — Phát hiện dữ liệu môi trường bất thường](#8-adv-04--phát-hiện-dữ-liệu-môi-trường-bất-thường)
 9. [ADV-05 — Cập nhật firmware từ xa (OTA)](#9-adv-05--cập-nhật-firmware-từ-xa-ota)
-10. [Quy trình kiểm thử tích hợp 5 chức năng](#10-quy-trình-kiểm-thử-tích-hợp-5-chức-năng)
-11. [Bảng tổng hợp lệnh chạy và kiểm thử](#11-bảng-tổng-hợp-lệnh-chạy-và-kiểm-thử)
-12. [Xử lý lỗi và lưu ý vận hành](#12-xử-lý-lỗi-và-lưu-ý-vận-hành)
-13. [Checklist nghiệm thu](#13-checklist-nghiệm-thu)
-14. [Kết luận](#14-kết-luận)
+10. [Kiểm thử phối hợp 5 chức năng](#10-kiểm-thử-phối-hợp-5-chức-năng)
+11. [Đánh giá và ghi nhận kết quả](#11-đánh-giá-và-ghi-nhận-kết-quả)
+12. [Bảng lệnh kiểm thử tổng hợp](#12-bảng-lệnh-kiểm-thử-tổng-hợp)
+13. [Xử lý lỗi thường gặp](#13-xử-lý-lỗi-thường-gặp)
+14. [Checklist nghiệm thu](#14-checklist-nghiệm-thu)
+15. [Kết luận](#15-kết-luận)
 
 ---
 
-## 1. Mục đích và phạm vi
+## 1. Mục đích và nguyên tắc sử dụng
 
-Tài liệu này hướng dẫn cách tiếp cận, thực hiện, khởi chạy và kiểm thử năm chức năng nâng cao của hệ thống phòng học thông minh:
+Tài liệu hướng dẫn cách chuẩn bị môi trường, khởi chạy các dịch vụ cần thiết, thực hiện nghiệp vụ, chạy test và đánh giá kết quả cho năm chức năng nâng cao:
 
-- **ADV-01:** Digital Twin / Device Shadow.
-- **ADV-02:** Lưu dữ liệu khi mất mạng và đồng bộ lại.
-- **ADV-03:** Monitoring và Logging tập trung.
-- **ADV-04:** Phát hiện dữ liệu môi trường bất thường.
-- **ADV-05:** Cập nhật firmware từ xa (OTA).
-
-Nội dung được tổng hợp từ năm tài liệu mô tả chức năng tương ứng. Vì vậy, tài liệu tập trung vào cấu trúc source code, luồng xử lý, cơ sở dữ liệu, giao tiếp, lệnh chạy và các trường hợp kiểm thử đã được mô tả.
-
-### 1.1. Cách đọc trạng thái triển khai
-
-Trong quá trình làm và kiểm thử, cần phân biệt ba mức sau:
-
-| Mức | Ý nghĩa |
+| Mã | Tên chức năng |
 |---|---|
-| Đã có mã nguồn/module | Chức năng đã có thành phần xử lý trong repository. |
-| Đã có kiểm thử tự động | Có test case cho nghiệp vụ; chỉ kết luận PASS khi lệnh kiểm thử thực sự chạy thành công. |
-| Đã kiểm thử tích hợp/phần cứng | Đã kiểm tra luồng phối hợp giữa các thành phần hoặc trên thiết bị thật. Không suy ra mức này từ unit test hay mock test. |
+| ADV-01 | Digital Twin / Device Shadow |
+| ADV-02 | Offline Data Buffering & Synchronization |
+| ADV-03 | Monitoring và Logging tập trung |
+| ADV-04 | Phát hiện dữ liệu môi trường bất thường |
+| ADV-05 | Cập nhật firmware từ xa (OTA) |
 
-**Nguyên tắc:** Không đánh dấu một chức năng hoàn tất toàn hệ thống chỉ vì module đã có mã nguồn hoặc test tự động đã PASS. Cần ghi rõ phạm vi đã kiểm chứng và phần còn thiếu.
+Hướng dẫn được tổng hợp dựa trên năm tài liệu ADV trong repository. Các lệnh chạy được đối chiếu với `package.json` và cấu trúc test hiện có.
 
-### 1.2. Phạm vi không được mặc định
+### 1.1. Phân biệt các mức hoàn thành
 
-Các tài liệu đầu vào chưa xác nhận đầy đủ giao diện dashboard cho ADV-01, ADV-03, ADV-04 và giao diện quản lý OTA. Một số kiểm thử dùng repository in-memory, mock hoặc MQTT broker/database dành riêng cho test. Firmware minh họa của ADV-02 còn cần thống nhất định dạng ACK với Backend. ADV-05 chưa có bằng chứng OTA chạy thành công trên ESP32 thật.
+Không dùng chung một kết luận “đã hoàn thành” cho mọi loại kiểm thử.
 
-Các nội dung này được đánh dấu tại từng chức năng, không được coi là đã hoàn thành.
+| Mức | Có thể kết luận khi nào? |
+|---|---|
+| Đã có mã nguồn | Repository có module/service/firmware tương ứng. |
+| Đã chạy unit test | Đã chạy đúng lệnh test và có output PASS. |
+| Đã chạy integration test | Đã chạy test với các dependency được yêu cầu, ví dụ PostgreSQL/MQTT test broker. |
+| Đã kiểm thử trên phần cứng | Đã nạp firmware lên thiết bị thật, thực hiện tình huống kiểm thử và lưu bằng chứng. |
+| Đã nghiệm thu chức năng | Các tiêu chí của phạm vi nghiệm thu đã đạt; các giới hạn còn lại được nêu rõ. |
+
+**Không suy luận từ mức thấp lên mức cao.** Unit test PASS không đồng nghĩa integration test PASS; firmware build PASS không đồng nghĩa firmware chạy đúng trên ESP32.
+
+### 1.2. Nguyên tắc an toàn
+
+- Chạy lệnh tại thư mục gốc repository, nơi có `package.json`.
+- Không chạy test có thao tác ghi/xóa dữ liệu trên database production hoặc database chứa dữ liệu thật.
+- Integration test phải dùng database test theo cấu hình repository; README quy định tên database test kết thúc bằng `_test`.
+- Không xóa Docker volume nếu cần giữ dữ liệu.
+- Không ghi mật khẩu, token, MQTT credential, private key hoặc nội dung `.env` vào tài liệu, ảnh chụp hay log chia sẻ.
+- Không tự thay đổi migration đã áp dụng. Nếu cần thay schema, sử dụng migration mới theo quy tắc repository.
+- Nếu lệnh không tồn tại trong `npm run`, kiểm tra đúng branch và `package.json` trước khi thực hiện; không tự đặt tên script.
+- Những bước cần ESP32 thật chỉ được thực hiện khi có board, firmware phù hợp, nguồn cấp và kết nối mạng an toàn.
 
 ---
 
 ## 2. Tổng quan 5 chức năng
 
-| Mã | Chức năng | Thành phần chính | Kết quả cần quan sát |
-|---|---|---|---|
-| ADV-01 | Digital Twin / Device Shadow | Backend Commands, Device Shadow, PostgreSQL, MQTT, Control Node | Desired State, Reported State, phiên bản, `in_sync`, `differences`, trạng thái command |
-| ADV-02 | Offline Data Buffering & Synchronization | Sensor Node ESP32, LittleFS, MQTT, Telemetry Ingestion, PostgreSQL | Bản ghi được lưu khi offline, gửi bù khi online, ACK `STORED`, không sinh dữ liệu trùng |
-| ADV-03 | Monitoring và Logging | LoggingService, MonitoringService, repository, MQTT runtime, PostgreSQL | Log JSON, che dữ liệu nhạy cảm, trạng thái component/device, heartbeat, counter, snapshot |
-| ADV-04 | Phát hiện dữ liệu môi trường bất thường | AnomalyDetectionService, Consumer, PostgreSQL | `WARMING_UP`, `NORMAL`, `ANOMALY`, baseline và kết quả phân tích |
-| ADV-05 | OTA | OTA Service, PostgreSQL, firmware storage, MQTT, thiết bị IoT | Firmware `DRAFT/PUBLISHED/REVOKED`, OTA Job, tiến độ và kết quả cập nhật |
+| Chức năng | Thành phần chính | Kết quả cần quan sát |
+|---|---|---|
+| ADV-01 | Commands, Device Shadow, PostgreSQL, MQTT, Control Node | Desired/Reported State, version, `in_sync`, `differences`, command status |
+| ADV-02 | Sensor Node, LittleFS, MQTT, Telemetry Ingestion, PostgreSQL | Hàng đợi offline, gửi bù, ACK `STORED`, chống trùng |
+| ADV-03 | LoggingService, MonitoringService, repository, MQTT runtime | Log JSON, che dữ liệu nhạy cảm, component status, heartbeat, counter, snapshot |
+| ADV-04 | AnomalyDetectionService, Consumer, PostgreSQL | Baseline, `WARMING_UP`, `NORMAL`, `ANOMALY`, kết quả phân tích |
+| ADV-05 | OTA Service, PostgreSQL, firmware storage, MQTT, ESP32 | Firmware release, OTA Job, tiến độ, kết quả cập nhật |
 
-### 2.1. Quan hệ giữa các chức năng
+### 2.1. Quan hệ nghiệp vụ
 
-Một luồng tích hợp điển hình có thể được hiểu như sau:
+Một luồng phối hợp có thể diễn ra như sau:
 
 1. Sensor Node thu thập dữ liệu môi trường.
-2. Nếu mất mạng, ADV-02 lưu dữ liệu vào LittleFS; khi có mạng, thiết bị gửi lại dữ liệu chưa được xác nhận.
-3. Backend tiếp nhận và lưu telemetry. Sự kiện được ghi nhận có thể được sử dụng bởi ADV-03 để thống kê/giám sát và bởi ADV-04 để phân tích bất thường.
+2. Khi mất mạng, ADV-02 lưu telemetry vào LittleFS; khi kết nối trở lại, thiết bị gửi bù các bản ghi chưa được xác nhận.
+3. Backend tiếp nhận và lưu telemetry. Dữ liệu được lưu có thể được sử dụng bởi ADV-03 để thống kê/giám sát và ADV-04 để phân tích bất thường.
 4. Với Control Node, ADV-01 quản lý trạng thái mong muốn và trạng thái thực tế khi điều khiển đèn/quạt.
-5. ADV-05 quản lý vòng đời bản firmware và yêu cầu cập nhật từ xa cho thiết bị tương thích.
+5. ADV-05 quản lý firmware và điều phối yêu cầu cập nhật từ xa cho thiết bị tương thích.
 
-Đây là quan hệ nghiệp vụ giữa các module; từng điểm tích hợp đầu cuối vẫn phải được kiểm thử riêng.
+Đây là mối quan hệ nghiệp vụ. Không mặc định rằng mọi điểm tích hợp đầu cuối đã được nghiệm thu.
 
 ---
 
 ## 3. Chuẩn bị môi trường
 
-### 3.1. Kiểm tra cấu trúc repository
+### 3.1. Công cụ cần có
 
-Mở terminal tại thư mục gốc repository — nơi có `package.json`. Kiểm tra các thư mục và file liên quan:
-
-```text
-database/
-  migrations/
-backend/
-  src/
-    modules/
-tests/
-firmware/
-deployment/
-package.json
-```
-
-Các thư mục cụ thể của từng ADV được liệt kê ở phần hướng dẫn tương ứng. Không tự tạo lại file hoặc thư mục nếu repository đã có cấu trúc tương ứng.
-
-### 3.2. Công cụ và dịch vụ cần có
-
-| Công cụ/dịch vụ | Mục đích |
+| Công cụ | Mục đích |
 |---|---|
-| Node.js và npm | Chạy Backend và các bộ kiểm thử Node.js |
-| PostgreSQL | Lưu dữ liệu nghiệp vụ, trạng thái, baseline, kết quả và OTA Job |
-| MQTT broker (ví dụ Mosquitto) | Truyền telemetry, command, ACK và trạng thái OTA |
-| Docker Compose | Khởi chạy các dịch vụ database/MQTT trong môi trường test theo cấu hình repository |
-| ESP32 Arduino Core và thư viện liên quan | Biên dịch, nạp và kiểm thử firmware khi thực hiện phần cứng |
-| Công cụ gửi HTTP request | Gọi API Backend trong các bước kiểm tra API |
+| Node.js >= 20, khuyến nghị 24 | Chạy Backend và test |
+| npm | Cài dependencies và chạy scripts |
+| Docker Desktop / Docker Compose | Khởi chạy PostgreSQL và Mosquitto theo cấu hình repository |
+| PostgreSQL | Lưu dữ liệu nghiệp vụ |
+| Mosquitto MQTT | Giao tiếp giữa Backend và thiết bị |
+| Arduino CLI, ESP32 Arduino Core | Build firmware theo workflow |
+| ESP32 Sensor Node / Control Node | Kiểm thử phần cứng thực tế |
+| HTTP client | Gọi API khi thực hiện nghiệp vụ |
 
-Tài liệu nguồn không quy định một phiên bản Node.js, PostgreSQL, Mosquitto hoặc ESP32 Arduino Core duy nhất. Sử dụng phiên bản và cấu hình được khai báo trong repository/môi trường của nhóm; không tự suy đoán phiên bản.
+README cho biết CI kiểm tra Node.js 22 và 24. Không tự suy diễn phiên bản chính xác của PostgreSQL, Mosquitto hoặc board nếu cấu hình repository không chỉ định.
 
-### 3.3. Kiểm tra package scripts
+### 3.2. Cài đặt công cụ build firmware ESP32 (chỉ cần khi build/nạp firmware local)
 
-Tại thư mục gốc repository, có thể xem các script được khai báo bằng:
+Các bài unit test Backend không cần Arduino CLI. Chỉ cần cài thêm Arduino CLI, ESP32 Arduino Core và các thư viện dưới đây khi muốn tự build firmware Sensor Node/Control Node trên máy Windows.
+
+**Bước 1 — Cài Arduino CLI**
+
+Tải bộ cài Windows 64-bit từ trang chính thức:
+
+- https://docs.arduino.cc/arduino-cli/installation/
+
+Có thể chọn Windows MSI hoặc Windows ZIP. Sau khi cài đặt, mở terminal PowerShell mới và kiểm tra:
 
 ```powershell
+arduino-cli version
+```
+
+Nếu PowerShell báo không nhận diện lệnh, kiểm tra thư mục cài đặt đã được thêm vào `PATH` hay chưa; đóng và mở lại terminal sau khi thay đổi `PATH`.
+
+**Bước 2 — Cài ESP32 Arduino Core đúng phiên bản CI**
+
+Workflow `.github/workflows/firmware.yml` hiện dùng ESP32 Arduino Core `3.2.1` và FQBN `esp32:esp32:esp32`.
+
+```powershell
+arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+arduino-cli core install esp32:esp32@3.2.1 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+```
+
+Kiểm tra:
+
+```powershell
+arduino-cli core list
+```
+
+**Bước 3 — Cài thư viện firmware theo workflow**
+
+```powershell
+arduino-cli lib install "ArduinoJson@6.21.5"
+arduino-cli lib install "PubSubClient@2.8"
+arduino-cli lib install "DHT sensor library@1.4.6"
+arduino-cli lib install "Adafruit Unified Sensor@1.1.15"
+arduino-cli lib install "BH1750@1.3.0"
+arduino-cli lib install "Adafruit GFX Library@1.11.11"
+arduino-cli lib install "Adafruit SSD1306@2.5.13"
+```
+
+**Bước 4 — Chuẩn bị cấu hình firmware**
+
+Mỗi sketch có file mẫu riêng:
+
+- `firmware/sensor_node/Config.h.example`
+- `firmware/control_node/Config.h.example`
+
+Tạo `Config.h` tương ứng từ file mẫu, sau đó điền Wi-Fi SSID/password, MQTT host/port, device ID, room ID và MQTT credential được cấp cho thiết bị.
+
+Ví dụ PowerShell cho Sensor Node:
+
+```powershell
+Copy-Item firmware/sensor_node/Config.h.example firmware/sensor_node/Config.h
+```
+
+Ví dụ cho Control Node:
+
+```powershell
+Copy-Item firmware/control_node/Config.h.example firmware/control_node/Config.h
+```
+
+Không commit `Config.h` nếu có thông tin bí mật. Không sử dụng `YOUR_WIFI_PASSWORD`, `YOUR_DEVICE_SECRET` hoặc MQTT host mẫu như cấu hình chạy thật.
+
+**Lưu ý riêng về OTA:** Trong hai file `Config.h.example`, `OTA_ENABLED` mặc định là `0`. Workflow CI tạo cấu hình tạm, bật OTA compile path và thêm public key/chứng chỉ giả chỉ để kiểm tra biên dịch. Không sao chép public key hoặc `OTA_ROOT_CA_CERT` giả của CI vào cấu hình thiết bị thật. Muốn chạy OTA thật phải dùng public key tương ứng với khóa ký firmware và CA certificate đúng cho HTTPS server.
+
+**Bước 5 — Build firmware**
+
+Build Sensor Node:
+
+```powershell
+arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/sensor_node
+```
+
+Build Control Node:
+
+```powershell
+arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/control_node
+```
+
+Nếu chỉ muốn build thông thường, giữ cấu hình phù hợp với firmware đang triển khai. Nếu cần kiểm tra nhánh biên dịch OTA, phải cấu hình `OTA_ENABLED` và các thông tin bảo mật hợp lệ trước khi build. Build thành công không chứng minh OTA hoạt động trên phần cứng.
+
+**Bước 6 — Nhận diện board và cổng serial trước khi upload**
+
+Kết nối ESP32 qua USB rồi chạy:
+
+```powershell
+arduino-cli board list
+```
+
+Chỉ thực hiện upload khi đã xác định đúng cổng serial và board. Workflow CI hiện chỉ compile, không upload firmware lên thiết bị.
+
+Tham khảo cài đặt và lệnh Arduino CLI trong tài liệu chính thức: https://docs.arduino.cc/arduino-cli/installation/ và https://docs.arduino.cc/arduino-cli/getting-started/.
+
+### 3.3. Kiểm tra thư mục gốc
+
+Mở PowerShell tại thư mục repository và chạy:
+
+```powershell
+Get-Location
+Test-Path .\package.json
 npm run
 ```
 
-Các script liên quan đến năm chức năng được tổng hợp ở phần 11. Nếu một script không xuất hiện trong `package.json` của nhánh đang sử dụng, cần kiểm tra lại đúng nhánh/phiên bản source trước khi chạy.
+`Test-Path` cần trả về `True`. Lệnh `npm run` liệt kê các scripts thực sự có trong `package.json`.
 
-### 3.4. Cấu hình môi trường
+### 3.4. Cài dependencies
 
-1. Kiểm tra các file cấu hình môi trường mà repository yêu cầu.
-2. Điền thông tin kết nối PostgreSQL, MQTT broker và các khóa cần thiết theo cấu hình local.
-3. Đảm bảo database và MQTT broker đang chạy trước khi chạy các bài integration test cần hai dịch vụ này.
-4. Không đưa mật khẩu, token, private key, credential hoặc nội dung `.env` lên GitHub hay chia sẻ trong log/ảnh chụp.
-5. Không dùng database đang chứa dữ liệu thật để chạy test có thao tác tạo/xóa dữ liệu. ADV-02 có cấu hình database và MQTT test riêng; cần giữ đúng môi trường test được mô tả.
+Nếu repository đã có `package-lock.json`, cài dependencies bằng:
 
-### 3.5. Nguyên tắc khởi chạy
+```powershell
+npm ci
+```
 
-Không có một lệnh duy nhất được năm tài liệu xác nhận là khởi chạy toàn bộ hệ thống và tất cả chức năng. Vì vậy:
+Không chạy `npm install` chỉ để thử nếu mục tiêu là giữ nguyên dependency lockfile.
 
-- Chạy migration cần thiết trước khi kiểm tra các bảng tương ứng.
-- Khởi chạy PostgreSQL và MQTT broker theo cấu hình repository khi bài test yêu cầu.
-- Khởi chạy Backend theo script hiện có của repository.
-- Chạy riêng từng bộ test ADV để khoanh vùng lỗi.
-- Chỉ kiểm thử thiết bị thật sau khi firmware, topic, payload, credential và cấu hình mạng đã được thống nhất.
+### 3.5. Tạo cấu hình local lần đầu
+
+Nếu chưa có `.env` và `.env.test`, README hướng dẫn:
+
+```powershell
+npm run setup:local
+```
+
+Lệnh này tạo cấu hình local với mật khẩu ngẫu nhiên và từ chối ghi đè file cấu hình đã tồn tại.
+
+**Nếu đã có `.env` hoặc `.env.test`:**
+- Không chạy lại `setup:local` để thay mật khẩu.
+- Đối chiếu `.env.example` và `.env.test.example` để bổ sung biến còn thiếu.
+- Giữ ổn định secret của môi trường hiện có.
+- Không chia sẻ nội dung file cấu hình có secret.
+
+### 3.6. Khởi chạy PostgreSQL và MQTT cho môi trường test
+
+Theo README, các service test được khởi chạy bằng:
+
+```powershell
+docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test mqtt mqtt-test
+```
+
+Repository quy định:
+- PostgreSQL ứng dụng: `localhost:5433`.
+- PostgreSQL test: `localhost:5434`.
+- MQTT ứng dụng: `localhost:1884`.
+- MQTT test: `localhost:1885`.
+
+Các integration test phải dùng biến `TEST_DATABASE_URL`, `TEST_MIGRATION_DATABASE_URL` và cấu hình MQTT test tương ứng. Không tự đổi các URL này sang database ứng dụng.
+
+### 3.7. Kiểm tra service
+
+Có thể xem trạng thái container:
+
+```powershell
+docker compose --env-file .env -f deployment/compose.yml --profile test ps
+```
+
+Chỉ tiếp tục các bài integration test cần dependency khi database và broker test đã ở trạng thái hoạt động.
 
 ---
 
-## 4. Quy trình làm việc chung
+## 4. Khởi chạy hệ thống và kiểm tra nền tảng
 
-Với mỗi chức năng, nên thực hiện theo trình tự:
+### 4.1. Áp dụng migration
 
-1. **Đọc module và hợp đồng dữ liệu:** xác định service, repository, route, bảng dữ liệu, MQTT topic và payload.
-2. **Kiểm tra migration:** xác nhận các bảng/cột/index cần thiết đã tồn tại.
-3. **Kiểm thử độc lập:** chạy bộ unit test hoặc integration test riêng của chức năng.
-4. **Khởi chạy dependency:** bật PostgreSQL/MQTT broker nếu luồng cần các dịch vụ này.
-5. **Thử nghiệp vụ:** tạo dữ liệu đầu vào hợp lệ, quan sát phản hồi và dữ liệu lưu.
-6. **Thử tình huống lỗi:** dữ liệu sai, mất kết nối, timeout, gửi lặp, sai phiên hoặc sai quyền.
-7. **Kiểm tra log và database:** đối chiếu kết quả trả về với trạng thái thực tế được lưu.
-8. **Kiểm thử tích hợp:** kiểm tra luồng giữa các module và thiết bị.
-9. **Ghi nhận kết quả:** lưu lệnh đã chạy, số test pass/fail, môi trường, thời điểm và phạm vi đã kiểm chứng.
+Từ thư mục gốc:
+
+```powershell
+npm run db:migrate
+```
+
+Lệnh này dùng cấu hình `.env` hiện tại. Chỉ chạy khi đã xác định đúng database đích. Migration ADV có liên quan:
+
+| Chức năng | Migration |
+|---|---|
+| ADV-01 | `008_commands_shadow.sql` |
+| ADV-04 | `016_anomaly_detection.sql` |
+| ADV-05 | `017_ota_management.sql` |
+
+ADV-02 sử dụng các bảng telemetry đã có trong backend; ADV-03 sử dụng repository cho monitoring và dữ liệu thiết bị. Không tự tạo migration mới chỉ để chạy test.
+
+### 4.2. Seed dữ liệu
+
+Nếu cần dữ liệu ban đầu cho môi trường phát triển:
+
+```powershell
+npm run db:seed
+```
+
+Seed không đặt lại mật khẩu của người dùng đã tồn tại. Tài khoản Admin được lấy từ `ADMIN_USERNAME` và `ADMIN_PASSWORD` trong `.env`.
+
+### 4.3. Bootstrap MQTT
+
+Khởi tạo broker ứng dụng:
+
+```powershell
+npm run mqtt:bootstrap
+```
+
+Khởi tạo broker test:
+
+```powershell
+npm run mqtt:bootstrap:test
+```
+
+Chạy bootstrap phù hợp với broker mà test hoặc ứng dụng sẽ sử dụng. Không dùng credential của broker ứng dụng để chạy integration test.
+
+### 4.4. Chạy Backend
+
+Nếu chạy Backend trực tiếp bằng Node.js:
+
+```powershell
+npm start
+```
+
+Hoặc chế độ tự reload khi phát triển:
+
+```powershell
+npm run dev
+```
+
+README mô tả Backend mặc định tại:
+
+```text
+http://127.0.0.1:3000
+```
+
+Kiểm tra:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/health
+Invoke-RestMethod http://127.0.0.1:3000/ready
+```
+
+- `/health`: kiểm tra ứng dụng đang hoạt động.
+- `/ready`: kiểm tra migration, PostgreSQL, MQTT subscription và realtime listener; trả 503 nếu chưa sẵn sàng.
+
+Nếu đang chạy Backend trong Docker trên cùng cổng/MQTT client ID, dừng service backend Docker trước khi chạy `npm start` để tránh xung đột.
+
+### 4.5. Chạy Backend bằng Docker (phương án thay thế)
+
+Theo README:
+
+```powershell
+npm ci
+npm run setup:local
+docker compose --env-file .env -f deployment/compose.yml --profile app up -d --build --wait backend
+npm run smoke
+```
+
+Bỏ qua `setup:local` nếu cấu hình `.env` đã tồn tại. Không chạy đồng thời Backend Docker và Backend Node.js trên cùng cổng/client ID.
 
 ---
 
 ## 5. ADV-01 — Digital Twin / Device Shadow
 
-### 5.1. Mục tiêu và nguyên lý
+### 5.1. Chức năng cần kiểm tra
 
-ADV-01 duy trì bản thể số đại diện cho trạng thái của Control Node. Hệ thống quản lý hai nhóm trạng thái:
+ADV-01 duy trì hai trạng thái của Control Node:
 
-- **Desired State:** trạng thái mà hệ thống yêu cầu thiết bị đạt được.
-- **Reported State:** trạng thái thực tế do thiết bị gửi về Backend.
+- **Desired State:** trạng thái hệ thống yêu cầu.
+- **Reported State:** trạng thái thiết bị thực tế báo về.
 
-Hệ thống so sánh hai trạng thái để xác định thiết bị đã đồng bộ hay chưa. Với phiên bản hiện tại, các cơ cấu chấp hành được mô tả là:
+Các cơ cấu chấp hành được mô tả là:
+- Đèn `light`: `ON`, `OFF`.
+- Quạt `fan`: `ON`, `OFF`.
 
-- Đèn (`light`): `ON`, `OFF`.
-- Quạt (`fan`): `ON`, `OFF`.
+Khi chưa nhận trạng thái thực tế hợp lệ, Reported State có thể là `UNKNOWN`.
 
-`UNKNOWN` biểu thị trạng thái thực tế chưa được xác định.
+**Nguyên tắc đánh giá:** Tạo lệnh chỉ cập nhật Desired State. Không được coi thiết bị đã thực hiện thành công cho tới khi Backend nhận phản hồi hợp lệ.
 
-**Điểm quan trọng:** Khi tạo lệnh, Backend cập nhật Desired State nhưng không tự cập nhật Reported State. Reported State chỉ thay đổi khi nhận phản hồi hợp lệ từ thiết bị.
-
-### 5.2. Source code cần nắm
+### 5.2. Source code
 
 ```text
 backend/src/modules/
-  device-shadow/
-    device-shadow.errors.js
-    device-shadow.mqtt.js
-    device-shadow.repository.memory.js
-    device-shadow.repository.pg.js
-    device-shadow.service.js
-  commands/
-    command-schemas.js
-    command-state.js
-    commands.routes.js
-    commands.service.js
+├── device-shadow/
+│   ├── device-shadow.errors.js
+│   ├── device-shadow.mqtt.js
+│   ├── device-shadow.repository.memory.js
+│   ├── device-shadow.repository.pg.js
+│   └── device-shadow.service.js
+└── commands/
+    ├── command-schemas.js
+    ├── command-state.js
+    ├── commands.routes.js
+    └── commands.service.js
 
-database/migrations/
-  008_commands_shadow.sql
-
-tests/
-  device-shadow.test.js
-  integration/commands.test.js
+database/migrations/008_commands_shadow.sql
+tests/device-shadow.test.js
+tests/integration/commands.test.js
 ```
 
-Vai trò chính:
+### 5.3. Chuẩn bị dữ liệu
 
-| Thành phần | Công việc |
-|---|---|
-| `device-shadow.service.js` | Tính chênh lệch và xác định trạng thái đồng bộ |
-| `device-shadow.repository.pg.js` | Truy vấn Device Shadow và command trong PostgreSQL |
-| `commands.service.js` | Tạo command, cập nhật Desired State, gửi MQTT và xử lý phản hồi |
-| `command-state.js` | Cập nhật Reported State, kết thúc command và xử lý ACK đến muộn |
-| `command-schemas.js` | Kiểm tra cấu trúc command, ACK và Reported State |
-| `008_commands_shadow.sql` | Tạo cấu trúc dữ liệu phục vụ Shadow và command |
+Cần có:
+- Một phòng học đang `ACTIVE`.
+- Một Control Node đã đăng ký và đủ điều kiện điều khiển.
+- Credential thiết bị đã đồng bộ với broker.
+- Thiết bị đang online và có heartbeat/session hợp lệ nếu kiểm thử MQTT thật.
+- Cơ cấu chấp hành `light` và/hoặc `fan`.
 
-### 5.3. Cơ sở dữ liệu và dữ liệu cần kiểm tra
+Khi Control Node được khởi tạo theo tài liệu ADV-01:
+- Desired State mặc định: `light = OFF`, `fan = OFF`.
+- Reported State ban đầu: `light = UNKNOWN`, `fan = UNKNOWN`.
+- Desired Version: `1`.
+- Reported Version: `0`.
 
-Các bảng chính được mô tả:
+### 5.4. Quy trình thực hiện nghiệp vụ
 
-- `device_shadows`: Desired State, Reported State, version và thời điểm báo cáo.
-- `commands`: lịch sử lệnh, trạng thái, session, version và ACK.
-- `actuators`: trạng thái và version theo từng cơ cấu chấp hành.
-- `command_idempotency`: chống tạo command trùng khi request được gửi lại.
+1. Đăng nhập bằng tài khoản có quyền phù hợp.
+2. Truy vấn Device Shadow của Control Node.
+3. Ghi lại Desired State, Reported State, version và trạng thái đồng bộ ban đầu.
+4. Tạo lệnh điều khiển bật đèn hoặc quạt.
+5. Kiểm tra command được tạo và Desired State/version thay đổi.
+6. Kiểm tra Reported State chưa đổi chỉ vì lệnh được publish.
+7. Nếu có thiết bị thật, xác nhận Control Node nhận lệnh MQTT và thực thi cơ cấu chấp hành.
+8. Cho thiết bị gửi ACK và Reported State đúng schema.
+9. Truy vấn lại Shadow và lịch sử command.
+10. Đối chiếu trạng thái thực tế với trạng thái mong muốn.
 
-Ví dụ trạng thái chưa đồng bộ:
+API theo tài liệu ADV-01 (đường dẫn module; prefix đầy đủ phụ thuộc cách mount router trong Backend):
+
+| Method | Đường dẫn | Mục đích |
+|---|---|---|
+| `GET` | `/devices/:id/shadow` | Truy vấn Shadow |
+| `POST` | `/devices/:id/commands` | Tạo command |
+| `GET` | `/devices/:id/commands` | Truy vấn lịch sử command |
+
+Ví dụ body tạo command theo tài liệu:
 
 ```json
 {
-  "desired_state": {"light": "ON", "fan": "OFF"},
-  "reported_state": {"light": "OFF", "fan": "OFF"},
-  "desired_version": 2,
-  "reported_version": 1
-}
-```
-
-Kết quả so sánh mong đợi:
-
-```json
-{
-  "in_sync": false,
-  "differences": {
-    "light": {"desired": "ON", "reported": "OFF"}
+  "desired_state": {
+    "fan": "ON"
   }
 }
 ```
 
-Khi tất cả thuộc tính khớp nhau, `in_sync` phải là `true` và `differences` là object rỗng.
+Tài liệu ADV-01 nêu thêm các trường có thể có như `timeout_seconds`; cần đọc schema trong `command-schemas.js` trước khi gửi request, không tự thêm field không được schema chấp nhận.
 
-### 5.4. Quy trình thực hiện nghiệp vụ
-
-**Bước 1 — Khởi tạo thiết bị**
-
-Khi Control Node được đăng ký, Backend tạo Device Shadow. Trạng thái khởi tạo được mô tả:
-
-- Desired State: `light = OFF`, `fan = OFF`.
-- Reported State: `light = UNKNOWN`, `fan = UNKNOWN`.
-- Desired Version: `1`.
-- Reported Version: `0`.
-
-Kiểm tra bản ghi tương ứng trong `device_shadows`.
-
-**Bước 2 — Gửi lệnh điều khiển**
-
-Người dùng hoặc automation yêu cầu thay đổi trạng thái. Backend thực hiện:
-
-1. Validate dữ liệu trạng thái.
-2. Kiểm tra quyền và phạm vi thiết bị.
-3. Kiểm tra thiết bị, phòng học và kết nối MQTT.
-4. Tạo `command_id`.
-5. Tăng version của Desired State.
-6. Lưu command và các thông tin liên quan trong transaction.
-7. Sau khi transaction hoàn tất, publish command qua MQTT.
-
-**Bước 3 — Kiểm tra bản tin MQTT**
-
-Topic điều khiển:
-
-```text
-smartclassroom/room/{roomCode}/device/{deviceId}/command
-```
-
-Payload command cần có các trường như `command_id`, `device_id`, `room_id`, `session_id`, `shadow_version`, `desired_state`, `timestamp` và `expires_at`.
-
-**Bước 4 — Thiết bị phản hồi**
-
-Thiết bị gửi ACK hoặc Reported State về Backend. Backend kiểm tra mã thiết bị, phòng, session, version và thông tin command. ACK thành công chỉ được chấp nhận khi trạng thái báo cáo khớp trạng thái yêu cầu.
-
-**Bước 5 — Kiểm tra đồng bộ**
-
-Truy vấn Shadow và kiểm tra:
-
-- `desired_state`.
-- `reported_state`.
-- `desired_version`.
-- `reported_version`.
-- `in_sync`.
-- `differences`.
-- Trạng thái command gần nhất.
-
-### 5.5. API liên quan
-
-| Phương thức | Endpoint | Chức năng |
-|---|---|---|
-| GET | `/devices/:id/shadow` | Truy vấn Device Shadow |
-| POST | `/devices/:id/commands` | Tạo lệnh điều khiển |
-| GET | `/devices/:id/commands` | Truy vấn lịch sử lệnh |
-
-Các route được khai báo trong `commands.routes.js`. API cần xác thực và quyền tương ứng: `commands:read`, `commands:create`. Sensor Node không được phép truy vấn Device Shadow điều khiển.
-
-Tài liệu nguồn không cung cấp mẫu request HTTP hoàn chỉnh, địa chỉ host, cách lấy token hoặc body schema đầy đủ cho từng endpoint. Khi gọi API, cần đọc schema và middleware hiện có trong source thay vì tự tạo payload theo phỏng đoán.
-
-### 5.6. Chạy kiểm thử
-
-Chạy tại thư mục gốc repository:
+### 5.5. Chạy unit test ADV-01
 
 ```powershell
 npm run test:device-shadow
 ```
 
-Bộ unit test được ghi nhận có 11 trường hợp:
+Script thực thi:
 
+```powershell
+node --test tests/device-shadow.test.js
+```
+
+11 trường hợp đã được tài liệu ADV-01 ghi nhận:
 1. Tạo Device Shadow với trạng thái ban đầu.
-2. Phát hiện chênh lệch Desired State và Reported State.
+2. Phát hiện chênh lệch Desired/Reported State.
 3. Xác định `UNKNOWN` là chưa đồng bộ.
 4. Lấy thông tin command gần nhất.
 5. Báo lỗi khi không tìm thấy Shadow.
@@ -329,91 +478,126 @@ Bộ unit test được ghi nhận có 11 trường hợp:
 8. Từ chối Desired State rỗng.
 9. Từ chối Desired State không phải object.
 10. Tạo MQTT command topic hợp lệ.
-11. Từ chối MQTT topic có ký tự không hợp lệ.
+11. Từ chối topic chứa ký tự không hợp lệ.
 
-Tài liệu nguồn ghi nhận kết quả local: **11/11 test PASS**. Đây là kết quả unit test được người dùng cung cấp, không thay thế kiểm thử đầu cuối trên ESP32/Mosquitto.
+**Kết quả đã ghi nhận trong tài liệu:** 11/11 PASS, nguồn là ảnh kết quả local do nhóm cung cấp ngày 04/11/2026.
 
-### 5.7. Kiểm thử tích hợp cần thực hiện
+### 5.6. Kiểm thử integration ADV-01
 
-Trong `tests/integration/commands.test.js` có phạm vi test cho luồng Commands/Shadow, gồm:
+Có test file:
 
-- Gửi lệnh MQTT.
-- Idempotency.
-- Phân quyền.
-- ACK sai thứ tự.
-- Timeout và ACK đến muộn.
-- Lỗi publish.
-- Lỗi transaction.
-- Thiết bị kết nối lại.
-- ACK không hợp lệ.
+```text
+tests/integration/commands.test.js
+```
 
-Khi thực hiện, cần chạy đúng môi trường integration test của repository và ghi nhận kết quả thực tế. Tài liệu nguồn chưa cung cấp kết quả chạy tích hợp local cho bộ test này.
+Chạy riêng:
 
-### 5.8. Tiêu chí đạt
+```powershell
+node --test tests/integration/commands.test.js
+```
 
-- Shadow được tạo với trạng thái ban đầu đúng.
-- Gửi command làm thay đổi Desired State và tăng version.
-- Reported State không thay đổi chỉ vì Backend publish thành công.
-- ACK/Reported State sai thiết bị, session hoặc version bị từ chối.
-- Khi thiết bị báo đúng trạng thái, Shadow chuyển sang đồng bộ.
-- ACK lặp/đến muộn không làm sai kết quả cuối cùng của command.
+Hoặc chạy toàn bộ integration test:
 
-### 5.9. Giới hạn cần ghi nhận
+```powershell
+npm run test:integration
+```
 
-Chưa có xác nhận đầu cuối với ESP32 và Mosquitto thật, cũng chưa xác nhận dashboard hiển thị đầy đủ Desired/Reported State. Cần kiểm tra riêng phần firmware gửi ACK và Reported State đúng hợp đồng MQTT.
+Các tình huống integration được mô tả trong tài liệu ADV-01 gồm MQTT command, idempotency, phân quyền, ACK sai thứ tự, timeout, ACK đến muộn, lỗi publish, lỗi transaction, thiết bị kết nối lại và ACK không hợp lệ.
+
+Tài liệu ADV-01 chưa cung cấp kết quả chạy integration độc lập cho file `commands.test.js`. Vì vậy, phải chạy lại và ghi output thực tế; không ghi 11/11 unit test thành kết quả integration.
+
+### 5.7. Đánh giá kết quả ADV-01
+
+| Kiểm tra | Kết quả mong đợi |
+|---|---|
+| Shadow mới được khởi tạo | Desired có giá trị mặc định; Reported có thể là `UNKNOWN` |
+| Tạo command | Desired State và version thay đổi |
+| Chưa có ACK hợp lệ | Reported State không tự đổi |
+| ACK hợp lệ, đúng session/version | Command và Reported State được cập nhật |
+| Desired khớp Reported | `in_sync = true`, `differences` rỗng |
+| Desired khác Reported | `in_sync = false`, `differences` chỉ ra thuộc tính lệch |
+| ACK sai session/version | Bị từ chối, không ghi đè trạng thái hợp lệ |
+| ACK lặp/đến muộn | Không làm thay đổi kết quả cuối cùng sai quy tắc |
+
+**Mức đã có bằng chứng:** 11/11 unit test PASS. Kiểm thử đầu cuối với ESP32 và Mosquitto cần xác nhận riêng.
 
 ---
 
 ## 6. ADV-02 — Offline Data Buffering & Synchronization
 
-### 6.1. Mục tiêu và nguyên lý
+### 6.1. Chức năng cần kiểm tra
 
-ADV-02 hạn chế mất telemetry khi Sensor Node mất Wi-Fi hoặc MQTT. ESP32 lưu bản ghi vào LittleFS trước khi gửi. Khi mạng phục hồi, thiết bị gửi lại các bản ghi chưa được Backend xác nhận.
+ADV-02 hạn chế mất telemetry khi Sensor Node mất Wi-Fi hoặc MQTT. Thiết bị ghi bản ghi vào LittleFS trước khi gửi. Khi kết nối khôi phục, thiết bị gửi lại bản ghi chưa được Backend xác nhận.
 
-Backend chỉ gửi ACK ứng dụng `STORED` sau khi transaction ghi dữ liệu PostgreSQL hoàn tất thành công. Thiết bị chỉ xóa bản ghi khỏi hàng đợi khi nhận ACK hợp lệ có đúng mã định danh và trạng thái `STORED`.
+Backend chỉ gửi ACK ứng dụng `STORED` sau khi transaction PostgreSQL hoàn tất. Thiết bị chỉ xóa bản ghi khỏi hàng đợi khi ACK đúng định dạng, đúng ID và đúng trạng thái.
 
-Cơ chế được mô tả là **at-least-once delivery**: một bản ghi có thể được gửi nhiều lần nếu ACK bị mất; Backend chống trùng theo thiết bị và mã bản tin.
+Thiết kế sử dụng at-least-once delivery. MQTT QoS 1 không thay thế ACK nghiệp vụ.
 
-### 6.2. Source code cần nắm
+### 6.2. Source code
 
 ```text
-firmware/sensor_node/offline_sync/
-  OfflineQueue.h
-  OfflineQueue.cpp
-  offline_sync_example.ino
+firmware/sensor_node/
+├── OfflineQueue.cpp
+├── OfflineQueue.h
+├── MqttSyncManager.cpp
+├── MqttSyncManager.h
+├── TelemetryMessage.cpp
+├── TelemetryMessage.h
+├── SensorDrivers.cpp
+├── SensorDrivers.h
+└── sensor_node.ino
 
-backend/src/
-  mqtt/
-    dynamic-security.js
-    bootstrap-cli.js
-  modules/telemetry-ingestion/
-    telemetry-pipeline.js
-    telemetry-ingestion.service.js
-    telemetry-ingestion.repository.pg.js
-    telemetry-normalizer.js
+backend/src/modules/telemetry-ingestion/
+├── telemetry-pipeline.js
+├── telemetry-ingestion.service.js
+├── telemetry-ingestion.repository.pg.js
+└── telemetry-normalizer.js
 
 tests/integration/
-  telemetry.test.js
-
-deployment/
-  compose.yml
-  scripts/setup-local.mjs
+├── telemetry.test.js
+└── phase3-firmware-sensor.test.js
 ```
 
-| Thành phần | Công việc |
-|---|---|
-| `OfflineQueue.h/.cpp` | Quản lý hàng đợi LittleFS, kiểm tra JSON/ID, giới hạn dung lượng và phục hồi file |
-| `offline_sync_example.ino` | Sketch minh họa lưu, gửi lại telemetry và xử lý ACK |
-| `telemetry-pipeline.js` | Điều phối MQTT → kiểm tra/chuẩn hóa → transaction → ACK |
-| `telemetry-ingestion.service.js` | Xử lý nghiệp vụ tiếp nhận telemetry |
-| `telemetry-ingestion.repository.pg.js` | Lưu dữ liệu, chống trùng và cập nhật dữ liệu mới nhất |
-| `telemetry-normalizer.js` | Chuẩn hóa payload hiện hành và payload cũ |
+`OfflineQueue` và `MqttSyncManager` hiện được đặt trong `firmware/sensor_node/`. Không nhầm với các module dùng chung trong `firmware/common/`.
 
-### 6.3. Quy trình hoạt động
+### 6.3. Chuẩn bị môi trường
 
-**Bước 1 — Tạo bản ghi telemetry**
+- PostgreSQL test và MQTT test broker đang hoạt động.
+- Cấu hình `.env.test` trỏ đúng database test và MQTT test.
+- Sensor Node firmware dùng cấu hình tương ứng với broker và thiết bị thử nghiệm.
+- Nếu thử trên phần cứng, cần ESP32 Sensor Node và LittleFS được mount thành công.
 
-Sensor Node đọc dữ liệu cảm biến, tạo mã định danh duy nhất cho bản ghi. Payload hiện hành được mô tả:
+Khởi chạy dependency test theo README:
+
+```powershell
+docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test mqtt mqtt-test
+```
+
+### 6.4. Kiểm tra luồng telemetry
+
+1. Sensor Node lấy mẫu cảm biến.
+2. Kiểm tra mỗi bản ghi có ID duy nhất.
+3. Xác nhận bản ghi được đưa vào hàng đợi LittleFS trước khi publish.
+4. Publish telemetry lên topic:
+
+```text
+smartclassroom/room/{roomCode}/device/{deviceId}/telemetry
+```
+
+5. Backend kiểm tra topic và định danh trong payload.
+6. Backend kiểm tra schema, giá trị cảm biến, thiết bị, phòng và credential.
+7. Backend ghi `sensor_data`, `telemetry_latest` và event trong transaction.
+8. Sau commit, Backend gửi ACK lên:
+
+```text
+smartclassroom/room/{roomCode}/device/{deviceId}/telemetry/ack
+```
+
+9. Thiết bị chỉ xóa bản ghi nếu ACK có ID khớp và `status = STORED`.
+
+### 6.5. Payload cần phân biệt
+
+**Payload hiện hành** dùng các trường `msg_id`, `device_id`, `room_id`, `timestamp` (Unix milliseconds) và object `data`.
 
 ```json
 {
@@ -430,554 +614,335 @@ Sensor Node đọc dữ liệu cảm biến, tạo mã định danh duy nhất c
 }
 ```
 
-Firmware minh họa cũng có payload dạng cũ với `eventId`, `deviceId`, `roomCode`, `temperatureC`, `humidityPercent` và `illuminanceLux`. Backend normalizer hỗ trợ cả hai dạng.
+**Payload legacy** dùng `eventId`, `deviceId`, `roomCode`, timestamp ISO và các trường như `temperatureC`, `humidityPercent`, `illuminanceLux`. Backend vẫn hỗ trợ normalizer cho payload legacy. Không tự đổi format khi firmware/backend đang kiểm thử một hợp đồng cụ thể.
 
-**Bước 2 — Ghi vào LittleFS trước khi gửi**
+ACK hiện hành có các trường `msg_id`, `device_id`, `room_id`, `status`, `duplicate`, `timestamp`; timestamp là Unix milliseconds. ACK legacy dùng `eventId` và timestamp ISO. Cả hai phải có `status = STORED` và định danh trùng bản ghi chờ.
 
-Không gửi telemetry trước rồi mới lưu. Bản ghi cần được đưa vào hàng đợi offline trước khi publish MQTT. Nếu mất mạng, bản ghi vẫn còn trên flash.
+### 6.6. Chạy test Backend ADV-02
 
-**Bước 3 — Gửi bản ghi chờ**
-
-Khi MQTT kết nối, thiết bị đọc bản ghi chưa được xác nhận ở đầu hàng đợi và publish lên topic telemetry:
-
-```text
-smartclassroom/room/{roomCode}/device/{deviceId}/telemetry
-```
-
-**Bước 4 — Backend tiếp nhận và lưu**
-
-Backend kiểm tra payload, topic, thiết bị, phòng, trạng thái thiết bị và mã bản tin. Dữ liệu được ghi trong transaction PostgreSQL. Nếu transaction thất bại, không gửi ACK `STORED`.
-
-**Bước 5 — Backend trả ACK ứng dụng**
-
-Topic ACK:
-
-```text
-smartclassroom/room/{roomCode}/device/{deviceId}/telemetry/ack
-```
-
-Ví dụ ACK theo payload dạng cũ:
-
-```json
-{
-  "messageType": "telemetry_ack",
-  "eventId": "SENSOR_01-BOOT1-ABC-1",
-  "status": "STORED",
-  "duplicate": false,
-  "timestamp": "2026-10-28T10:00:00.000Z"
-}
-```
-
-Với payload hiện hành, ACK sử dụng các trường `msg_id`, `device_id`, `room_id`, `status`, `duplicate` và `timestamp`.
-
-**Bước 6 — Xóa bản ghi đã được xác nhận**
-
-ESP32 chỉ xóa bản ghi khi ACK có mã định danh tương ứng và `status = STORED`. MQTT QoS 1 không thay thế ACK ứng dụng và không phải bằng chứng dữ liệu đã được commit vào PostgreSQL.
-
-### 6.4. Cấu hình môi trường integration test
-
-Tài liệu nguồn mô tả môi trường test riêng:
-
-- PostgreSQL test: `127.0.0.1:5434`, database `smartclass_test`.
-- MQTT test broker: `127.0.0.1:1885`.
-- Cấu hình đọc từ `.env.test`.
-- MQTT test broker cần bootstrap role/identity trước khi chạy integration test.
-
-Các lệnh được ghi nhận:
+Các script liên quan trong `package.json`:
 
 ```powershell
-docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test mqtt mqtt-test
-npm run mqtt:bootstrap:test
-node --test tests/integration/telemetry.test.js
+npm run test:telemetry-ingestion
+npm run test:integration
+npm run test:firmware-phase3
 ```
 
-Chạy tại thư mục gốc repository. Cần bảo đảm `.env`, `.env.test` và `deployment/compose.yml` đúng với cấu hình local. Không chia sẻ nội dung file môi trường.
+Ý nghĩa:
+- `test:telemetry-ingestion`: chạy `tests/telemetry-ingestion.test.js`.
+- `test:integration`: chạy toàn bộ `tests/integration/*.test.js`.
+- `test:firmware-phase3`: chạy `tests/integration/phase3-firmware-sensor.test.js`.
 
-### 6.5. Kiểm thử Backend
-
-Có thể chạy trực tiếp:
+Nếu muốn khoanh vùng riêng integration telemetry:
 
 ```powershell
 node --test tests/integration/telemetry.test.js
 ```
 
-Tài liệu nguồn ghi nhận **6/6 integration test PASS**. Sáu nhóm tình huống gồm:
+### 6.7. Kiểm thử mất mạng trên ESP32 thật
 
-1. Telemetry được commit vào database trước ACK; gửi đồng thời cùng bản tin không tạo bản ghi/sự kiện trùng.
-2. Database lỗi thì không ACK; sau khi khôi phục, gửi lại thành công và không có dữ liệu ghi dở.
-3. Backfill giữ thời điểm đo, không ghi đè dữ liệu mới nhất.
-4. Payload cũ được chuẩn hóa đúng; timestamp thiếu/tương lai không cập nhật dữ liệu mới nhất.
-5. Payload không khớp topic bị từ chối; xử lý dữ liệu không hợp lệ và trạng thái FAULT theo logic hiện tại.
-6. Thiết bị bị thu hồi không thể tiếp tục ingest; cùng `msg_id` ở thiết bị khác không bị coi là trùng toàn hệ thống.
+Đây là bài kiểm thử phần cứng, không được thay thế bằng test Backend:
 
-### 6.6. Kiểm thử firmware trên ESP32
+1. Nạp firmware Sensor Node có OfflineQueue/MqttSyncManager.
+2. Cấp nguồn và xác nhận Wi-Fi/MQTT kết nối.
+3. Ghi nhận số bản tin telemetry đang được gửi bình thường.
+4. Ngắt Wi-Fi hoặc MQTT.
+5. Tiếp tục để Sensor Node thu thập dữ liệu.
+6. Kiểm tra hàng đợi LittleFS tăng và bản ghi vẫn tồn tại khi mất mạng.
+7. Khởi động lại ESP32 khi còn bản ghi chờ.
+8. Xác nhận hàng đợi được phục hồi sau reboot.
+9. Khôi phục Wi-Fi/MQTT.
+10. Quan sát thiết bị gửi bù bản ghi chưa được xác nhận.
+11. Làm mất ACK hoặc gửi ACK sai ID/trạng thái trong môi trường kiểm thử có kiểm soát.
+12. Xác nhận thiết bị không xóa bản ghi khi ACK không hợp lệ.
+13. Khi nhận ACK `STORED` đúng ID, xác nhận bản ghi tương ứng được xóa.
+14. Đối chiếu database để bảo đảm không sinh bản ghi trùng.
 
-Các bước dưới đây là phần cần thực hiện để xác nhận firmware thực tế; tài liệu nguồn chưa xác nhận đã hoàn thành:
+Không thực hiện ngắt nguồn đột ngột trên thiết bị đang dùng cho mục đích khác hoặc đang lưu dữ liệu quan trọng.
 
-1. Mở sketch `firmware/sensor_node/offline_sync/offline_sync_example.ino` trong môi trường Arduino phù hợp.
-2. Chọn đúng board ESP32 và cấu hình cổng nạp.
-3. Kiểm tra thư viện LittleFS, Wi-Fi và MQTT được cài đúng.
-4. Thay dữ liệu cảm biến mẫu bằng thao tác đọc cảm biến thực tế.
-5. Cấu hình Wi-Fi, MQTT host và credential theo môi trường test.
-6. Biên dịch sketch và ghi nhận kết quả Verify.
-7. Nạp firmware lên ESP32.
-8. Cho thiết bị kết nối và xác nhận telemetry được gửi, Backend lưu và ACK.
-9. Ngắt Wi-Fi hoặc MQTT, tạo thêm telemetry và xác nhận hàng đợi tăng.
-10. Khởi động lại ESP32 khi còn bản ghi chờ; xác nhận hàng đợi được phục hồi.
-11. Khôi phục mạng; xác nhận bản ghi được gửi lại và chỉ bị xóa sau ACK `STORED` đúng ID.
-12. Thử ACK sai ID, sai trạng thái hoặc mất ACK; xác nhận bản ghi không bị xóa sớm.
-13. Thử hàng đợi đầy và mất nguồn trong lúc cập nhật file để đánh giá khả năng phục hồi.
+### 6.8. Đánh giá kết quả ADV-02
 
-### 6.7. Vấn đề cần xử lý trước kiểm thử đầu cuối
+| Tình huống | Điều kiện đạt |
+|---|---|
+| Mất Wi-Fi/MQTT | Telemetry mới vẫn được lưu trong LittleFS |
+| Reboot khi còn dữ liệu chờ | Hàng đợi được phục hồi |
+| Kết nối trở lại | Các bản ghi chưa xác nhận được gửi lại |
+| ACK mất | Bản ghi vẫn còn trong hàng đợi và có thể retry |
+| ACK sai ID/trạng thái | Không xóa bản ghi |
+| ACK `STORED` đúng ID | Chỉ bản ghi tương ứng được xác nhận xóa |
+| Gửi lặp cùng ID | Backend không tạo bản ghi telemetry trùng |
+| Backfill cũ hơn latest | Lưu lịch sử nhưng không ghi đè latest |
 
-Firmware minh họa hiện xử lý ACK theo định dạng cũ (`messageType`, `eventId`, `status`), trong khi Backend hỗ trợ cả payload telemetry cũ và hiện hành. Cần xác nhận chính xác định dạng ACK Backend phát ra và thống nhất hợp đồng MQTT giữa firmware chính và Backend. Không mặc định hai bên tương thích chỉ vì Backend hỗ trợ hai định dạng telemetry.
-
-### 6.8. Tiêu chí đạt
-
-- Telemetry được ghi vào LittleFS trước khi gửi.
-- Mất Wi-Fi/MQTT không làm mất bản ghi đã đưa vào hàng đợi.
-- ESP32 khởi động lại vẫn phục hồi được hàng đợi.
-- Bản ghi được gửi lại khi mạng phục hồi.
-- Chỉ ACK ứng dụng `STORED` đúng ID mới làm bản ghi được xóa.
-- Gửi lặp không tạo dữ liệu trùng trong PostgreSQL.
-- Dữ liệu backfill được giữ trong lịch sử nhưng không ghi đè dữ liệu mới nhất.
+**Kết quả đã ghi nhận trong tài liệu ADV-02:** Backend Checks trên commit `abab893` đạt 106/106 tests PASS; Firmware Build trên commit `6421454` build thành công Sensor Node và Control Node. Chưa có bằng chứng kiểm thử mất mạng, phục hồi LittleFS và gửi bù trên ESP32 thật.
 
 ---
 
 ## 7. ADV-03 — Monitoring và Logging tập trung
 
-### 7.1. Mục tiêu và nguyên lý
+### 7.1. Chức năng cần kiểm tra
 
-ADV-03 cung cấp logging có cấu trúc và thông tin monitoring để theo dõi tình trạng Backend, component và thiết bị.
+ADV-03 cung cấp:
+- Logging theo `DEBUG`, `INFO`, `WARN`, `ERROR`.
+- Log JSON gồm timestamp, level, service, message và metadata.
+- Che một số trường nhạy cảm theo tên khóa.
+- Console sink và Memory sink.
+- Trạng thái component `UP`, `DEGRADED`, `DOWN`, `UNKNOWN`.
+- Heartbeat online/offline.
+- Counter sự kiện.
+- PostgreSQL repository cho component/counter và đọc trạng thái thiết bị.
+- Snapshot tổng hợp.
 
-Các mức log:
+### 7.2. Source code và vai trò
 
-- `DEBUG`
-- `INFO`
-- `WARN`
-- `ERROR`
+Trong repository, xác định module Monitoring/Logging theo cấu trúc được mô tả trong tài liệu ADV-03. Các thành phần trọng tâm là `LoggingService`, `MonitoringService`, repository in-memory/PostgreSQL và hàm `bindMonitoring(runtime, monitoring)`.
 
-Các trạng thái component:
+`bindMonitoring()` đăng ký lắng nghe sự kiện `device-message` từ MQTT runtime để ghi nhận counter. Tuy nhiên, tài liệu ADV-03 lưu ý việc hàm này đã được đăng ký trong luồng khởi tạo thực tế cần xác nhận riêng.
 
-- `UP`
-- `DEGRADED`
-- `DOWN`
-- `UNKNOWN`
+### 7.3. Thực hiện kiểm tra Logging
 
-Trạng thái thiết bị online/offline được đánh giá từ `connectionStatus` và heartbeat gần nhất. Ngưỡng mặc định trong tài liệu là **60.000 ms (60 giây)**.
+1. Khởi tạo `LoggingService` với cấu hình sink phù hợp.
+2. Ghi thử log ở bốn mức `DEBUG`, `INFO`, `WARN`, `ERROR`.
+3. Kiểm tra output có timestamp, level, service, message và metadata.
+4. Ghi log có metadata chứa các key nhạy cảm như `password`, `token`, `secret`, `authorization`, `apiKey`.
+5. Kiểm tra giá trị nhạy cảm được che theo cơ chế hiện tại.
+6. Thử level hoặc message không hợp lệ.
+7. Kiểm tra logger từ chối dữ liệu không hợp lệ.
 
-### 7.2. Source code cần nắm
+**Lưu ý:** Cơ chế che dữ liệu hiện dựa trên tên khóa. Không kết luận rằng mọi secret nằm trong message tự do đều được phát hiện.
 
-```text
-backend/src/modules/monitoring-logging/
-  monitoring.errors.js
-  monitoring.service.js
-  monitoring.repository.memory.js
-  monitoring.repository.postgres.js
-  logging.service.js
-  logging.sinks.js
+### 7.4. Thực hiện kiểm tra Monitoring
 
-tests/
-  monitoring-logging.test.js
-```
+1. Khởi tạo trạng thái component.
+2. Cập nhật component sang `UP`, `DEGRADED`, `DOWN`, `UNKNOWN`.
+3. Gửi heartbeat với timestamp hợp lệ.
+4. Kiểm tra trạng thái online.
+5. Để thời gian vượt ngưỡng offline mặc định 60 giây theo tài liệu ADV-03.
+6. Kiểm tra trạng thái offline.
+7. Ghi nhận các event và kiểm tra counter tăng tương ứng.
+8. Gọi `getSnapshot()` và đối chiếu trạng thái component, heartbeat, counter và thông tin thiết bị.
 
-| Thành phần | Công việc |
-|---|---|
-| `logging.service.js` | Validate level/message, tạo log JSON, làm sạch metadata và che dữ liệu nhạy cảm |
-| `logging.sinks.js` | Console sink và Memory sink |
-| `monitoring.service.js` | Trạng thái component, heartbeat trong phạm vi repository hỗ trợ, counter và snapshot |
-| `monitoring.repository.memory.js` | Lưu dữ liệu trong bộ nhớ, chủ yếu phục vụ kiểm thử |
-| `monitoring.repository.postgres.js` | Lưu component/counter và đọc thiết bị từ PostgreSQL |
+Nếu kiểm tra bằng code/service trực tiếp, dùng đúng interface trong module hiện tại; tài liệu không xác nhận một HTTP API riêng cho snapshot ADV-03, vì vậy không tự đặt endpoint.
 
-### 7.3. Thực hiện Logging
-
-Một bản ghi log có các trường chính:
-
-- `timestamp`
-- `level`
-- `service`
-- `message`
-- `metadata`
-
-Quy trình xử lý:
-
-1. Module gọi logger với level, message và metadata.
-2. Logger kiểm tra level có được hỗ trợ và message có rỗng hay không.
-3. Metadata được làm sạch.
-4. Các trường nhạy cảm được nhận diện theo tên khóa, ví dụ `password`, `token`, `secret`, `authorization`, `apiKey`, được thay bằng `[REDACTED]`.
-5. Log được chuyển đến sink tương ứng.
-
-Hai sink hiện có:
-
-- `ConsoleLogSink`: ghi JSON ra console.
-- `MemoryLogSink`: lưu log trong bộ nhớ phục vụ test/kiểm tra.
-
-**Lưu ý:** Cơ chế che dữ liệu dựa trên tên khóa, không bảo đảm phát hiện mọi thông tin nhạy cảm nằm trong nội dung message tự do.
-
-### 7.4. Thực hiện Monitoring
-
-Các thao tác chính:
-
-1. Cập nhật trạng thái component.
-2. Ghi nhận heartbeat trong phạm vi repository hỗ trợ.
-3. Ghi sự kiện và tăng counter.
-4. Tạo snapshot giám sát.
-5. Liên kết sự kiện MQTT thông qua `bindMonitoring(runtime, monitoring)`.
-
-Ví dụ counter được mô tả:
-
-- `telemetry.received`
-- `mqtt.telemetry.received`
-
-Khi nhận sự kiện `device-message` từ MQTT runtime, hàm liên kết gọi `recordEvent()` và ghi metadata như mã phòng, mã thiết bị và loại thông điệp.
-
-Nếu ghi nhận Monitoring lỗi, module ghi cảnh báo tương ứng thay vì để lỗi giám sát chặn handler nghiệp vụ MQTT.
-
-### 7.5. Snapshot giám sát
-
-`getSnapshot()` tổng hợp:
-
-- `generatedAt`
-- `components`
-- `devices`
-- `counters`
-- `summary`
-
-Trong `summary` có các số liệu như tổng component, số component UP/DEGRADED/DOWN, tổng thiết bị và số thiết bị online/offline.
-
-Snapshot hiện được cung cấp ở mức service. Tài liệu nguồn chưa xác nhận API hoặc dashboard riêng cho người dùng.
-
-### 7.6. Dữ liệu PostgreSQL
-
-Repository PostgreSQL sử dụng:
-
-- `monitoring_components`: trạng thái component.
-- `monitoring_counters`: số lượng sự kiện theo counter.
-- Bảng `devices`: nguồn đọc trạng thái thiết bị.
-
-Heartbeat kết nối thực tế trong PostgreSQL thuộc trách nhiệm `DevicePresenceService`; `MonitoringService` không tự ghi heartbeat vào PostgreSQL repository. Không nhầm trạng thái kết nối `connectionStatus` với trạng thái vòng đời `lifecycleStatus`.
-
-### 7.7. Chạy kiểm thử
-
-Chạy riêng ADV-03:
+### 7.5. Chạy test ADV-03
 
 ```powershell
 npm run test:monitoring-logging
 ```
 
-Chạy toàn bộ unit test repository:
+Script chạy:
 
 ```powershell
-npm test
+node --test tests/monitoring-logging.test.js
 ```
 
-Bộ test ADV-03 có 12 nhóm trường hợp:
-
-1. Ghi log JSON có cấu trúc.
-2. Che trường nhạy cảm.
-3. Từ chối level/message không hợp lệ.
+Tài liệu ADV-03 ghi nhận 12 trường hợp:
+1. Logger ghi log JSON có cấu trúc.
+2. Logger che trường nhạy cảm.
+3. Từ chối log level/message không hợp lệ.
 4. Cập nhật trạng thái component.
-5. Heartbeat chuyển online/offline theo ngưỡng.
+5. Heartbeat tính online và chuyển offline khi quá ngưỡng.
 6. Đếm sự kiện và ghi log tương ứng.
 7. Từ chối heartbeat timestamp không hợp lệ.
-8. Từ chối trạng thái component và amount không hợp lệ.
+8. Từ chối component status và amount không hợp lệ.
 9. Không tăng counter khi log level không hợp lệ.
 10. PostgreSQL repository lưu trạng thái component.
-11. PostgreSQL repository đọc thiết bị từ bảng `devices`.
+11. PostgreSQL repository đọc trạng thái thiết bị từ `devices`.
 12. PostgreSQL repository tăng counter bằng upsert.
 
-Tài liệu nguồn ghi nhận kết quả local **12/12 test PASS**.
+**Kết quả đã ghi nhận:** 12/12 PASS trong lần chạy local do nhóm cung cấp.
 
-**Giới hạn của kết quả:** các test PostgreSQL repository trong bộ test này dùng pool giả lập để kiểm tra SQL và dữ liệu trả về. Kết quả đó chưa chứng minh truy vấn đã chạy trực tiếp trên PostgreSQL thật.
+### 7.6. Đánh giá kết quả ADV-03
 
-### 7.8. Kiểm thử tích hợp cần thực hiện
+| Hạng mục | Điều kiện đạt |
+|---|---|
+| Logging | Log JSON có đủ trường và đúng level |
+| Redaction | Các key nhạy cảm đã hỗ trợ được che |
+| Validation | Level/message/timestamp/status/amount sai bị từ chối |
+| Component | Trạng thái được cập nhật đúng |
+| Heartbeat | Online/offline đúng ngưỡng cấu hình |
+| Counter | Tăng đúng event, không tăng khi input bị từ chối |
+| Snapshot | Dữ liệu tổng hợp khớp repository |
+| PostgreSQL | Chỉ kết luận DB thật khi test trực tiếp trên PostgreSQL |
 
-Để kiểm tra hoạt động thực tế:
-
-1. Khởi chạy Backend và MQTT runtime.
-2. Xác nhận `bindMonitoring()` được đăng ký trong quá trình khởi tạo runtime.
-3. Phát sinh một sự kiện MQTT hợp lệ.
-4. Kiểm tra counter tương ứng có tăng.
-5. Kiểm tra log JSON có timestamp, level, service, message và metadata.
-6. Đưa metadata có khóa nhạy cảm vào test và xác nhận giá trị bị che.
-7. Ghi nhận heartbeat thiết bị qua luồng `DevicePresenceService`.
-8. Tạo snapshot và đối chiếu trạng thái component/device với dữ liệu nguồn.
-9. Kiểm tra trực tiếp PostgreSQL nếu muốn xác nhận repository thật.
-
-Các bước trên là kế hoạch kiểm thử tích hợp. Tài liệu nguồn chưa cung cấp kết quả nghiệm thu đầu cuối với toàn bộ ESP32, MQTT runtime, PostgreSQL thật và dashboard.
-
-### 7.9. Tiêu chí đạt
-
-- Log có cấu trúc và đúng level.
-- Metadata nhạy cảm được che theo quy tắc hiện tại.
-- Dữ liệu đầu vào không hợp lệ bị từ chối.
-- Component có trạng thái phù hợp.
-- Thiết bị quá ngưỡng heartbeat được xem là offline.
-- Counter tăng đúng sự kiện.
-- Snapshot tổng hợp đúng dữ liệu repository.
-- Lỗi Monitoring không làm dừng xử lý nghiệp vụ MQTT.
+**Giới hạn đã nêu trong tài liệu:** test repository PostgreSQL đang dùng pool giả lập; chưa chứng minh truy vấn trên PostgreSQL thật. Việc đăng ký `bindMonitoring()` trong MQTT runtime, tích hợp heartbeat thực tế và dashboard frontend cũng chưa được xác nhận.
 
 ---
 
 ## 8. ADV-04 — Phát hiện dữ liệu môi trường bất thường
 
-### 8.1. Mục tiêu và nguyên lý
+### 8.1. Chức năng cần kiểm tra
 
-ADV-04 phân tích dữ liệu cảm biến để phát hiện giá trị lệch đáng kể so với hành vi thông thường của từng thiết bị.
+ADV-04 phân tích ba chỉ số:
+- `temperatureC`
+- `humidityPercent`
+- `illuminanceLux`
 
-Phiên bản hiện tại dùng phương pháp thống kê robust dựa trên:
+Hệ thống tạo baseline riêng theo thiết bị và metric. Khi chưa đủ mẫu, kết quả là `WARMING_UP`. Khi đủ mẫu, service sử dụng Median, MAD và Robust Z-score để phân loại `NORMAL` hoặc `ANOMALY`.
 
-- Median.
-- MAD (Median Absolute Deviation).
-- Robust Z-score.
+Cấu hình mặc định trong tài liệu:
+- `minSamples = 8`
+- `windowSize = 30`
+- `threshold = 3.5`
 
-**Đây chưa phải mô hình Machine Learning được huấn luyện.** Không dùng kết quả unit test để kết luận độ chính xác của mô hình trên dữ liệu thực tế.
+Đây là phương pháp thống kê robust, chưa phải mô hình machine learning được huấn luyện.
 
-Các chỉ số hỗ trợ:
-
-- `temperatureC`.
-- `humidityPercent`.
-- `illuminanceLux`.
-
-### 8.2. Cấu hình baseline
-
-Baseline được quản lý riêng cho từng cặp thiết bị và chỉ số (`deviceId`–`metric`).
-
-Giá trị mặc định:
-
-| Tham số | Giá trị | Ý nghĩa |
-|---|---:|---|
-| `minSamples` | 8 | Số mẫu lịch sử tối thiểu trước khi phân loại |
-| `windowSize` | 30 | Số mẫu tối đa trong baseline |
-| `threshold` | 3.5 | Ngưỡng trị tuyệt đối Robust Z-score |
-
-Khi chưa đủ mẫu, kết quả là `WARMING_UP`. Khi đủ mẫu, service tính Median, MAD và Robust Z-score:
-
-\[
-\text{Robust Z-score} = \frac{0.6745(x-\text{Median})}{\text{MAD}}
-\]
-
-Nếu trị tuyệt đối score lớn hơn hoặc bằng threshold, mẫu được phân loại `ANOMALY`; ngược lại là `NORMAL`.
-
-Nếu MAD bằng 0:
-- Giá trị mới bằng Median: score bằng 0, coi là bình thường.
-- Giá trị mới khác Median: bất thường với lý do `DEVIATION_FROM_CONSTANT_BASELINE`, score là `null`.
-
-Mẫu bất thường không được thêm vào baseline. Baseline giữ tối đa 30 mẫu gần nhất theo cửa sổ trượt.
-
-### 8.3. Source code cần nắm
+### 8.2. Source code và migration
 
 ```text
-database/migrations/
-  016_anomaly_detection.sql
+database/migrations/016_anomaly_detection.sql
 
 backend/src/modules/anomaly-detection/
-  anomaly-detection.errors.js
-  anomaly-detection.repository.memory.js
-  anomaly-detection.repository.pg.js
-  anomaly-detection.service.js
-  anomaly-detection.consumer.js
-
-backend/src/server.js
+├── anomaly-detection.errors.js
+├── anomaly-detection.repository.memory.js
+├── anomaly-detection.repository.pg.js
+├── anomaly-detection.service.js
+└── anomaly-detection.consumer.js
 
 tests/
-  anomaly-detection.test.js
-  anomaly-detection-consumer.test.js
+├── anomaly-detection.test.js
+└── anomaly-detection-consumer.test.js
 ```
 
-| Thành phần | Công việc |
-|---|---|
-| `anomaly-detection.service.js` | Validate telemetry, tính thống kê robust, phân loại và quản lý baseline |
-| `anomaly-detection.consumer.js` | Đọc `telemetry.stored`, kiểm tra điều kiện, gọi service và ghi delivery |
-| `anomaly-detection.repository.pg.js` | Lưu/đọc baseline, kết quả, chống trùng và reset baseline |
-| `anomaly-detection.repository.memory.js` | Repository trong bộ nhớ phục vụ unit test |
-| `016_anomaly_detection.sql` | Tạo bảng baseline, kết quả và index |
-| `server.js` | Khởi tạo consumer và job `anomaly-detection` định kỳ |
+`server.js` khởi tạo consumer và chạy job `anomaly-detection` định kỳ.
 
-### 8.4. Cơ sở dữ liệu
+### 8.3. Chuẩn bị dữ liệu
 
-Migration `016_anomaly_detection.sql` tạo:
+Consumer chỉ xử lý dữ liệu đáp ứng điều kiện theo tài liệu:
+- Thiết bị `ACTIVE`.
+- Phòng học `ACTIVE`.
+- Telemetry đủ điều kiện.
+- Dữ liệu mới nhất, không phải backfill.
+- Không clock skew.
+- `data_id` khớp bản ghi mới nhất trong `telemetry_latest`.
 
-- `anomaly_baselines`: mẫu baseline theo thiết bị và metric.
-- `anomaly_detection_results`: kết quả phân tích gắn với `sensor_data` qua `data_id`.
+Consumer đọc sự kiện `telemetry.stored`, lấy bản ghi `sensor_data`, sau đó gọi service. Việc lưu baseline, kết quả và delivery nằm trong transaction. Nếu xử lý lỗi trước commit, transaction rollback và sự kiện có thể được retry.
 
-Mỗi bản ghi telemetry có tối đa một kết quả phân tích. Baseline được lưu PostgreSQL để tồn tại qua các lần Backend khởi động lại.
+### 8.4. Thực hiện nghiệp vụ bằng dữ liệu
 
-Áp dụng migration bằng:
+Để kiểm tra từng trạng thái, dùng dữ liệu có kiểm soát và cùng một thiết bị/metric:
 
-```powershell
-npm run db:migrate
-```
+1. Đảm bảo baseline của thiết bị/metric chưa đủ 8 mẫu.
+2. Gửi các mẫu hợp lệ để baseline tích lũy.
+3. Quan sát kết quả `WARMING_UP`.
+4. Khi baseline đủ mẫu, gửi giá trị nằm gần vùng Median.
+5. Quan sát kết quả `NORMAL`.
+6. Gửi một giá trị lệch đáng kể so với baseline.
+7. Quan sát kết quả `ANOMALY`, `score`, `median`, `mad`, `threshold` và `reason`.
+8. Kiểm tra mẫu bất thường không được thêm vào baseline.
+9. Gửi lại cùng `eventId`/`data_id` để kiểm tra chống trùng.
+10. Thử dữ liệu backfill, clock skew, không mới nhất hoặc thiết bị/phòng không ACTIVE; xác nhận consumer bỏ qua và ghi delivery theo logic.
 
-Tài liệu nguồn ghi nhận migration 016 đã được áp dụng local với kết quả `applied: 1`. Khi chạy trên môi trường khác, vẫn cần kiểm tra kết quả migration thực tế.
+Với MAD bằng 0, tài liệu mô tả:
+- Giá trị mới bằng Median: score 0, bình thường.
+- Giá trị mới khác Median: bất thường với reason `DEVIATION_FROM_CONSTANT_BASELINE`, score `null`.
 
-### 8.5. Luồng xử lý Consumer và Service
+Không tự đặt một con số “bất thường” chung cho mọi thiết bị; kết quả phụ thuộc baseline thực tế và cấu hình.
 
-**Phần A — Consumer nhận sự kiện**
-
-1. Consumer tìm sự kiện `telemetry.stored` chưa được delivery cho consumer `anomaly_detection`.
-2. Mỗi sự kiện xử lý trong transaction riêng.
-3. Đọc event và bản ghi tương ứng trong `sensor_data`.
-4. Kiểm tra `eligible`, `is_latest`, `is_backfill`, `clock_skew`.
-5. Kiểm tra thiết bị và phòng học có trạng thái `ACTIVE`.
-6. Đối chiếu `data_id` với bản ghi mới nhất trong `telemetry_latest`.
-7. Nếu không đủ điều kiện, bỏ qua và ghi nhận delivery.
-8. Nếu hợp lệ, gọi `AnomalyDetectionService`.
-9. Chỉ ghi delivery sau khi baseline và kết quả được lưu thành công. Nếu xử lý lỗi, transaction rollback để sự kiện có thể được thử lại.
-
-**Phần B — Service phân tích**
-
-1. Validate payload, `deviceId`, event ID nếu có, timestamp nếu có và chỉ số cảm biến.
-2. Kiểm tra sự kiện đã xử lý chưa.
-3. Đọc baseline theo từng metric.
-4. Nếu chưa đủ `minSamples`, thêm mẫu và trả `WARMING_UP`.
-5. Nếu đủ mẫu, tính Median, MAD và Robust Z-score.
-6. Trả `NORMAL` hoặc `ANOMALY` kèm thông tin giải thích.
-7. Chỉ thêm mẫu bình thường vào baseline.
-8. Lưu kết quả phân tích.
-
-Trong Consumer hiện tại, `eventId` được lấy từ `data_id` để nhận diện ổn định sự kiện.
-
-### 8.6. Kết quả cần quan sát
-
-Các trạng thái:
-
-- `WARMING_UP`: chưa đủ dữ liệu.
-- `NORMAL`: giá trị nằm trong ngưỡng baseline.
-- `ANOMALY`: giá trị lệch khỏi baseline theo quy tắc đã cấu hình.
-
-Kết quả tổng thể gồm `eventId`, `deviceId`, `timestamp`, `analyzedAt`, `anomalyDetected`, `findings` và `duplicate`.
-
-Mỗi phần tử `findings` có thể chứa metric, value, status, anomaly, số mẫu baseline, median, MAD, score, threshold và reason tùy trạng thái.
-
-### 8.7. Chạy kiểm thử
-
-Chạy riêng ADV-04:
+### 8.5. Chạy test ADV-04
 
 ```powershell
 npm run test:anomaly-detection
 ```
 
-Chạy toàn bộ test repository:
+Script chạy các file:
+
+```text
+tests/anomaly-detection*.test.js
+```
+
+Chạy toàn bộ repository:
 
 ```powershell
 npm test
 ```
 
-Các test ADV-04 bao gồm:
+Áp dụng migration:
 
-1. Trả `WARMING_UP` khi chưa đủ mẫu.
-2. Phát hiện nhiệt độ lệch khỏi baseline.
+```powershell
+npm run db:migrate
+```
+
+Chỉ chạy migration sau khi xác định `.env` đang trỏ đúng database phát triển mong muốn.
+
+### 8.6. Các trường hợp test đã ghi nhận
+
+Tài liệu ADV-04 ghi nhận 16 test:
+1. `WARMING_UP` khi chưa đủ mẫu.
+2. Phát hiện nhiệt độ lệch baseline.
 3. Giá trị bình thường không bị đánh dấu bất thường.
-4. Không thêm điểm bất thường vào baseline.
-5. Xử lý nhiều chỉ số trong cùng telemetry.
+4. Không đưa điểm bất thường vào baseline.
+5. Xử lý nhiều chỉ số trong telemetry.
 6. Từ chối dữ liệu cảm biến không hợp lệ.
-7. Không cập nhật baseline lần hai khi trùng event ID.
-8. Reset baseline của một chỉ số.
+7. Không cập nhật baseline lần hai khi trùng `eventId`.
+8. Reset baseline một chỉ số.
 9. Từ chối reset metric không hỗ trợ.
-10. Consumer xử lý telemetry hợp lệ.
+10. Consumer xử lý telemetry hợp lệ và lưu baseline/kết quả/delivery.
 11. Consumer bỏ qua telemetry không eligible.
 12. Consumer bỏ qua backfill hoặc clock skew.
 13. Consumer bỏ qua thiết bị/phòng không hoạt động.
-14. Rollback khi lưu kết quả thất bại.
-15. Không xử lý lại sự kiện đã delivery.
-16. Bỏ qua telemetry không còn mới nhất.
+14. Rollback và không đánh dấu delivery khi lưu kết quả thất bại.
+15. Không xử lý lại event đã delivery.
+16. Bỏ qua telemetry không còn là bản ghi mới nhất.
 
-Tài liệu nguồn ghi nhận:
-- ADV-04: **16/16 test PASS**.
-- Toàn repository tại lần chạy được ghi nhận: **52/52 test PASS**.
-- Migration 016: đã áp dụng local.
+**Kết quả đã ghi nhận tại local:** ADV-04 16/16 PASS; toàn bộ repository 52/52 PASS. Migration `016_anomaly_detection.sql` được áp dụng với `applied: 1`.
 
-Consumer test dùng mock PostgreSQL client; do đó chưa chứng minh toàn bộ thao tác baseline/kết quả đã được kiểm thử trực tiếp trên PostgreSQL thật.
+### 8.7. Đánh giá kết quả ADV-04
 
-### 8.8. Kiểm thử nghiệp vụ bằng dữ liệu
+| Tình huống | Kết quả mong đợi |
+|---|---|
+| Chưa đủ 8 mẫu | `WARMING_UP` |
+| Đủ mẫu, điểm mới bình thường | `NORMAL` |
+| Robust Z-score đạt/vượt ngưỡng | `ANOMALY` |
+| Điểm bị phân loại bất thường | Không thêm vào baseline |
+| Event trùng | Không phân tích/lưu lặp |
+| Dữ liệu backfill/clock skew/không mới nhất | Consumer bỏ qua theo điều kiện |
+| Lưu kết quả thất bại | Transaction rollback, delivery chưa được commit |
 
-Để kiểm tra logic phân loại, nên thực hiện các nhóm dữ liệu:
-
-1. Gửi ít hơn 8 mẫu cho cùng thiết bị và metric; kiểm tra `WARMING_UP`.
-2. Gửi đủ mẫu lịch sử có giá trị tương đối ổn định.
-3. Gửi giá trị gần Median; kiểm tra `NORMAL`.
-4. Gửi giá trị lệch lớn so với baseline; kiểm tra `ANOMALY`.
-5. Kiểm tra mẫu `ANOMALY` không bị thêm vào baseline.
-6. Gửi lại cùng event/data ID; kiểm tra kết quả không bị xử lý hai lần.
-7. Reset baseline của một metric; xác nhận metric đó quay lại giai đoạn khởi tạo.
-
-Để kiểm thử Consumer, cần tạo telemetry đi qua luồng ingest và phát sinh `telemetry.stored`, sau đó xác nhận consumer xử lý event. Cần đảm bảo bản ghi đủ điều kiện, là bản mới nhất, không phải backfill và không có clock skew.
-
-### 8.9. Tiêu chí đạt
-
-- Baseline được tách theo từng thiết bị và metric.
-- Chưa đủ mẫu thì trả `WARMING_UP`.
-- Đủ mẫu thì phân loại theo Robust Z-score và threshold.
-- Mẫu bất thường không làm nhiễm baseline.
-- Event trùng không bị phân tích lặp.
-- Dữ liệu backfill, clock skew, không mới nhất hoặc thiết bị/phòng không hoạt động bị bỏ qua theo quy tắc.
-- Lỗi lưu kết quả không đánh dấu delivery thành công.
-- Baseline và kết quả được lưu bền vững trên PostgreSQL khi kiểm thử database thật.
-
-### 8.10. Giới hạn cần ghi nhận
-
-Chưa có kết quả kiểm thử PostgreSQL integration riêng và kiểm thử đầu cuối ESP32 → MQTT → ingestion → consumer. Chưa xác nhận kết quả được hiển thị trên dashboard hoặc kết nối với chức năng cảnh báo. Chưa có dữ liệu thực nghiệm để đánh giá precision, recall hay false-positive rate. Giai đoạn warming-up và trường hợp MAD bằng 0 cần được đánh giá trên dữ liệu thực tế.
+**Giới hạn:** Consumer test dùng mock PostgreSQL client; chưa phải kiểm thử PostgreSQL integration thật. Chưa có bằng chứng kiểm thử đầu cuối ESP32 → MQTT → telemetry ingestion → Consumer. Chưa có chỉ số precision/recall/false-positive trên dữ liệu thực.
 
 ---
 
 ## 9. ADV-05 — Cập nhật firmware từ xa (OTA)
 
-### 9.1. Mục tiêu và giới hạn phạm vi
+### 9.1. Chức năng cần kiểm tra
 
-ADV-05 hiện có nền tảng Backend cho quản lý firmware, phát hành/thu hồi firmware, tạo OTA Job, gửi lệnh MQTT, nhận trạng thái OTA và cung cấp file firmware qua endpoint tải có chữ ký.
+ADV-05 hỗ trợ quản lý firmware, phát hành/thu hồi, tạo OTA Job, gửi lệnh MQTT, cung cấp firmware qua HTTPS và tiếp nhận trạng thái OTA.
 
-Theo tài liệu nguồn, **chưa có bằng chứng OTA hoàn chỉnh chạy trên ESP32 thật**. Không được xem các trạng thái Backend như `SUCCESS` hoặc `ROLLED_BACK` là bằng chứng thiết bị đã thực sự cài firmware hoặc rollback nếu chưa kiểm tra phần cứng.
+Hai loại thiết bị:
+- `SENSOR_NODE`
+- `CONTROL_NODE`
 
-### 9.2. Source code cần nắm
+Phần Backend và test tự động đã có; OTA end-to-end trên ESP32 thật chưa được xác nhận.
+
+### 9.2. Source code và migration
 
 ```text
-database/migrations/
-  017_ota_management.sql
+database/migrations/017_ota_management.sql
 
-backend/src/
-  mqtt/
-    runtime.js
-  modules/ota/
-    ota.service.js
-    ota.routes.js
-    ota.repository.pg.js
-    ota.storage.js
-    ota.download-signer.js
-    ota.download.routes.js
+backend/src/modules/ota/
+├── ota.service.js
+├── ota.routes.js
+├── ota.repository.pg.js
+├── ota.storage.js
+├── ota.download-signer.js
+└── ota.download.routes.js
 
-tests/integration/
-  ota.test.js
+backend/src/mqtt/
+├── bootstrap.js
+├── bootstrap-cli.js
+└── runtime.js
+
+tests/integration/ota.test.js
 ```
 
-| Thành phần | Công việc |
-|---|---|
-| `ota.service.js` | Đăng ký/phát hành/thu hồi firmware, tạo job, xử lý trạng thái, retry và timeout |
-| `ota.routes.js` | API quản lý firmware và OTA Job |
-| `ota.repository.pg.js` | PostgreSQL firmware, job, credential/session, outbox và chuyển trạng thái |
-| `ota.storage.js` | Lưu/đọc/kiểm tra file firmware |
-| `ota.download-signer.js` | Ký và xác minh URL tải bằng HMAC-SHA256 |
-| `ota.download.routes.js` | Xác minh token, trạng thái firmware và stream file |
-| `mqtt/runtime.js` | Subscribe và xử lý topic `ota/status` |
-| `017_ota_management.sql` | Tạo bảng firmware và OTA Job |
+### 9.3. Trạng thái dữ liệu
 
-### 9.3. Cơ sở dữ liệu và trạng thái
-
-Hai bảng nghiệp vụ chính:
-
-- `firmware_releases`: metadata, file, hash, chữ ký và trạng thái firmware.
-- `ota_jobs`: thiết bị đích, firmware, tiến độ, trạng thái, lỗi, thời hạn và thông tin session.
-
-Outbox sử dụng bảng `ota_command_outbox` để quản lý việc gửi lệnh MQTT và retry.
-
-Trạng thái firmware:
-
+Firmware release:
 - `DRAFT`
 - `PUBLISHED`
 - `REVOKED`
 
-Trạng thái OTA Job:
-
+OTA Job:
 - `PENDING`
 - `NOTIFIED`
 - `DOWNLOADING`
@@ -990,77 +955,45 @@ Trạng thái OTA Job:
 - `CANCELLED`
 - `TIMEOUT`
 
-### 9.4. Quy trình đăng ký firmware
+Một thiết bị chỉ có tối đa một OTA Job đang hoạt động.
 
-1. Chuẩn bị file firmware `.bin` phù hợp với loại thiết bị và phần cứng mục tiêu.
-2. Người có quyền `ota:firmware:write` gửi file cùng metadata qua API.
-3. Backend validate phiên bản, loại thiết bị, hardware target, tên file và release notes.
-4. Backend kiểm tra file không rỗng.
-5. Backend tính SHA-256 và kích thước file.
-6. File được lưu trong `LocalFirmwareStorage` dưới tên UUID.
-7. Backend tạo bản ghi firmware ở trạng thái `DRAFT`.
-8. Kiểm tra lại bản ghi trong danh sách firmware.
+### 9.4. Quy trình đăng ký và phát hành firmware
 
-Loại thiết bị được hỗ trợ theo source hiện tại:
-- `SENSOR_NODE`
-- `CONTROL_NODE`
+1. Đăng ký firmware với version, device type, hardware target, file name và release notes.
+2. Backend tính SHA-256, kích thước file và lưu file.
+3. Firmware được tạo ở trạng thái `DRAFT`.
+4. Khi publish, Backend đọc lại file.
+5. Kiểm tra kích thước và SHA-256 khớp metadata.
+6. Ký hash bằng Ed25519.
+7. Chuyển firmware sang `PUBLISHED`.
 
-Không dùng một firmware cho mọi thiết bị nếu `device_type` hoặc `hardware_target` không tương thích.
+Không sử dụng firmware rỗng hoặc metadata thiếu. Không publish lại firmware đã publish.
 
-### 9.5. Quy trình phát hành firmware
+### 9.5. API Backend
 
-1. Chọn firmware đang ở `DRAFT`.
-2. Gọi API publish với quyền `ota:firmware:write`.
-3. Backend đọc lại file đã lưu.
-4. Kiểm tra file tồn tại và kích thước khớp.
-5. Tính lại SHA-256 và so với hash ban đầu.
-6. Backend ký hash bằng khóa riêng Ed25519.
-7. Firmware chuyển sang `PUBLISHED` và ghi `published_at`.
-8. Kiểm tra firmware trong danh sách.
-
-Firmware đã `PUBLISHED` không thể publish lại bằng API hiện tại.
-
-**Phân biệt hai loại chữ ký:**
-- Ed25519 ký SHA-256 của firmware.
-- HMAC-SHA256 ký URL tải và token có thời hạn.
-
-Hai chữ ký có mục đích khác nhau. Backend tạo chữ ký Ed25519 không đồng nghĩa ESP32 đã xác minh chữ ký đó.
-
-### 9.6. API Backend
-
-| Phương thức | Endpoint | Quyền | Mục đích |
+| Method | Endpoint | Quyền | Chức năng |
 |---|---|---|---|
 | POST | `/api/v1/ota/firmware` | `ota:firmware:write` | Đăng ký firmware |
 | GET | `/api/v1/ota/firmware` | `ota:firmware:read` | Liệt kê firmware |
 | POST | `/api/v1/ota/firmware/:id/publish` | `ota:firmware:write` | Phát hành firmware |
 | POST | `/api/v1/ota/firmware/:id/revoke` | `ota:firmware:write` | Thu hồi firmware |
-| POST | `/api/v1/devices/:id/ota` | `ota:jobs:create` | Tạo OTA Job cho thiết bị |
+| POST | `/api/v1/devices/:id/ota` | `ota:jobs:create` | Tạo OTA Job |
 | GET | `/api/v1/ota/jobs` | `ota:jobs:read` | Tra cứu OTA Job |
+| GET | `/ota/download/:token/:signature` | URL token/signature | Tải firmware |
 
-Endpoint tải firmware:
+### 9.6. Tạo OTA Job
 
-```text
-GET /ota/download/:token/:signature
-```
+Backend kiểm tra:
+- Người yêu cầu có quyền và phạm vi thiết bị.
+- Thiết bị `PROVISIONED` hoặc `ACTIVE`.
+- Thiết bị `ONLINE`, heartbeat còn mới và MQTT session hợp lệ.
+- Phòng học `ACTIVE`.
+- Credential đã đồng bộ (`SYNCED`).
+- Firmware `PUBLISHED`.
+- Device type và hardware target tương thích.
+- Thiết bị chưa có job đang hoạt động.
 
-Các API quản lý yêu cầu xác thực và quyền tương ứng. Tài liệu nguồn không cung cấp body request hoàn chỉnh, host, token mẫu hoặc cách khởi tạo private key. Cần đọc schema, cấu hình và middleware trong source trước khi gọi API; không tự đặt khóa hoặc thông tin xác thực.
-
-### 9.7. Tạo OTA Job
-
-Khi yêu cầu cập nhật, Backend kiểm tra:
-
-1. Người yêu cầu có quyền và thiết bị thuộc phạm vi quản lý.
-2. Thiết bị ở trạng thái vòng đời `PROVISIONED` hoặc `ACTIVE`.
-3. Thiết bị đang `ONLINE`, heartbeat còn mới và có MQTT session hợp lệ.
-4. Phòng học ở trạng thái `ACTIVE`.
-5. Credential thiết bị đã đồng bộ với broker (`SYNCED`).
-6. Firmware ở trạng thái `PUBLISHED`.
-7. `device_type` và `hardware_version` của thiết bị phù hợp với firmware.
-8. Thiết bị chưa có OTA Job đang hoạt động.
-
-Sau đó Backend tạo job, lưu session/credential version và firmware version trước cập nhật, tạo outbox và gửi lệnh qua MQTT.
-
-### 9.8. Giao tiếp MQTT
+Sau đó Backend tạo job, lưu session/credential version và firmware version trước cập nhật, tạo outbox rồi gửi lệnh MQTT.
 
 Topic command:
 
@@ -1068,402 +1001,390 @@ Topic command:
 smartclassroom/room/{room_code}/device/{device_code}/ota/command
 ```
 
-Payload command có các trường chính:
-
-- `job_id`
-- `firmware_id`
-- `device_id`
-- `room_id`
-- `session_id`
-- `version`
-- `device_type`
-- `hardware_target`
-- `download_url`
-- `file_size`
-- `sha256`
-- `expires_at`
-- `signature`
-
 Topic status:
 
 ```text
 smartclassroom/room/{room_code}/device/{device_code}/ota/status
 ```
 
-Backend nhận và kiểm tra `job_id`, `device_id`, `room_id`, `session_id`, `status`, `progress`, `error_code`, `version` và `timestamp`.
+### 9.7. Tải firmware và kiểm tra an toàn
 
-Backend kiểm tra job có thuộc đúng thiết bị, topic đúng phòng/thiết bị, session hiện tại và credential version có hợp lệ hay không. `SUCCESS` cần phiên bản báo về khớp firmware của job và progress bằng 100. `ROLLED_BACK` cần phiên bản báo về khớp firmware trước cập nhật.
+Endpoint download kiểm tra:
+1. HMAC-SHA256 của URL.
+2. Token chưa hết hạn.
+3. Firmware tồn tại và còn `PUBLISHED`.
+4. Storage path trong token khớp database.
+5. File tồn tại, kích thước khớp metadata.
 
-### 9.9. Quy trình tải firmware và kiểm tra an toàn ở Backend
+Phân biệt:
+- **Ed25519:** chữ ký hash firmware.
+- **HMAC-SHA256:** chữ ký bảo vệ URL tải.
 
-Endpoint tải firmware thực hiện:
+### 9.8. Chạy test OTA
 
-1. Xác minh chữ ký HMAC-SHA256 của URL.
-2. Kiểm tra token chưa hết hạn.
-3. Kiểm tra firmware ID và storage path.
-4. Kiểm tra firmware vẫn `PUBLISHED`.
-5. Đối chiếu storage path với database.
-6. Kiểm tra file tồn tại và kích thước khớp metadata.
-7. Stream file với các header phù hợp, không cache nội dung.
+Trước tiên bootstrap role/ACL trên broker test:
 
-Thời hạn URL tải mặc định được mô tả là 300 giây. OTA Job có timeout mặc định 900 giây theo cấu hình service hiện tại. Đây là các giá trị mặc định được ghi trong tài liệu nguồn, cần đánh giá lại khi dùng firmware và mạng thực tế.
+```powershell
+npm run mqtt:bootstrap:test
+```
 
-### 9.10. Chạy kiểm thử Backend
-
-Chạy:
+Chạy riêng OTA:
 
 ```powershell
 npm run test:ota
 ```
 
-Script này chạy:
+Chạy toàn bộ integration test:
 
 ```powershell
-node --test tests/integration/ota.test.js
+npm run test:integration
 ```
 
-Bộ test hiện có 12 trường hợp:
+### 9.9. Các test OTA
 
-1. Đăng ký firmware hợp lệ.
-2. Từ chối file rỗng.
-3. Từ chối thiếu metadata.
-4. Phát hành firmware và tạo chữ ký.
-5. Không phát hành lại firmware đã phát hành.
-6. Thu hồi firmware đã phát hành.
-7. Không thu hồi firmware chưa phát hành.
-8. Liệt kê firmware theo quyền.
-9. Từ chối API quản lý khi không có token.
-10. Xác minh URL tải có chữ ký hợp lệ.
-11. Từ chối URL sai chữ ký.
-12. Từ chối URL hết hạn.
+Tài liệu ADV-05 hiện ghi nhận 15 test case, gồm:
+1. Metadata UTF-8 percent-encoded và encoding không hợp lệ.
+2. Metadata Unicode đầy đủ, Base64/UTF-8 sai.
+3. Tạo OTA Job, publish MQTT, status, ACK/retry và vòng đời đến `SUCCESS`.
+4. Đăng ký firmware hợp lệ.
+5. Từ chối file rỗng.
+6. Từ chối thiếu metadata.
+7. Publish firmware và tạo chữ ký.
+8. Từ chối publish lại.
+9. Thu hồi firmware đã publish.
+10. Từ chối thu hồi firmware `DRAFT`.
+11. Danh sách firmware theo quyền.
+12. Từ chối API khi thiếu token.
+13. URL tải có chữ ký hợp lệ.
+14. Từ chối URL sai chữ ký.
+15. Từ chối URL hết hạn.
 
-**Lưu ý:** Tài liệu nguồn xác nhận có 12 test case trong source, không cung cấp kết quả chạy PASS độc lập. Cần chạy lệnh trên môi trường của nhóm và ghi nhận số test thực tế.
+### 9.10. Đánh giá kết quả ADV-05
 
-### 9.11. Phần firmware ESP32 cần triển khai/kiểm thử
+Tài liệu ghi nhận:
+- Lần chạy OTA đầu tiên: 14/15 PASS, 1 FAIL do MQTT test broker trả `Not authorized` khi Subscribe.
+- Sau khi chạy `npm run mqtt:bootstrap:test`, lần integration tiếp theo đạt 106/106 PASS, trong đó 15/15 test OTA PASS.
+- GitHub Actions Backend checks và ESP32 Firmware Build đều Success tại commit được nêu trong tài liệu ADV-05.
 
-Để OTA hoàn chỉnh trên thiết bị, cần thực hiện các công việc chưa được xác nhận trong tài liệu nguồn:
+Build firmware PASS chỉ chứng minh biên dịch thành công theo CI. Chưa xác nhận ESP32 thật tải firmware, xác minh Ed25519, ghi OTA partition, reboot hoặc rollback.
 
-1. Xây dựng/tích hợp OTA handler cho ESP32.
-2. Nhận và validate lệnh `ota/command`.
-3. Kiểm tra job, firmware, device, room, session và thời hạn.
-4. Tải firmware từ HTTPS URL.
-5. Kiểm tra kích thước và SHA-256.
-6. Xác minh chữ ký Ed25519 bằng public key tương ứng.
-7. Ghi firmware vào OTA partition.
-8. Chỉ chuyển boot partition sau khi kiểm tra hợp lệ.
-9. Reboot và xác nhận firmware mới khởi động.
-10. Gửi tiến độ và kết quả lên `ota/status`.
-11. Thiết kế và kiểm thử rollback nếu firmware mới không hoạt động.
-12. Xử lý mất Wi-Fi/MQTT, mất nguồn, retry và job trùng.
+### 9.11. Kiểm thử phần cứng còn thiếu
 
-### 9.12. Kiểm thử đầu cuối OTA
+Khi có board và firmware OTA phù hợp:
+1. Build đúng target Sensor Node/Control Node.
+2. Đăng ký và publish firmware tương thích.
+3. Tạo OTA Job.
+4. Xác nhận thiết bị nhận lệnh.
+5. Tải firmware qua HTTPS.
+6. Kiểm tra kích thước, SHA-256 và chữ ký Ed25519.
+7. Ghi vào OTA partition.
+8. Reboot và xác nhận firmware mới hoạt động.
+9. Kiểm tra Backend nhận `SUCCESS` và cập nhật `firmware_version`.
+10. Thử sai hash/chữ ký, URL hết hạn, mất mạng, mất nguồn và tình huống rollback.
 
-Khi firmware OTA đã được triển khai, kiểm tra tối thiểu:
-
-- Firmware đúng loại thiết bị và hardware target.
-- Firmware sai hash.
-- Chữ ký Ed25519 không hợp lệ.
-- URL tải hết hạn.
-- Firmware đã bị thu hồi.
-- Thiết bị offline hoặc heartbeat cũ.
-- Thiết bị có credential/session không hợp lệ.
-- Mất Wi-Fi/MQTT trong lúc tải.
-- Mất nguồn trong lúc ghi flash.
-- Reboot sau cài đặt.
-- Firmware mới hoạt động và Backend cập nhật `firmware_version`.
-- Cố tình tạo lỗi boot để kiểm tra rollback.
-- Job timeout và trạng thái thiết bị gửi đến muộn.
-
-### 9.13. Tiêu chí đạt
-
-**Ở mức Backend:**
-- Đăng ký, phát hành và thu hồi firmware đúng quy tắc.
-- Hash và chữ ký được kiểm tra.
-- Chỉ firmware `PUBLISHED` mới được tạo job/tải.
-- OTA Job chỉ được tạo cho thiết bị tương thích và đủ điều kiện.
-- Outbox retry hoạt động theo logic.
-- Status sai thiết bị/session/job bị từ chối.
-- Tiến độ không giảm; `SUCCESS` yêu cầu progress 100 và version đúng.
-
-**Ở mức thiết bị:**
-- ESP32 tải đúng file, xác minh hash/chữ ký.
-- Cài đặt và reboot thành công.
-- Backend nhận status hợp lệ.
-- Rollback hoạt động khi có lỗi.
-
-Chỉ được kết luận OTA hoàn tất toàn hệ thống khi đã có kiểm thử trên phần cứng thật.
+Chỉ đánh dấu OTA phần cứng PASS khi có bằng chứng trên ESP32 thật.
 
 ---
 
-## 10. Quy trình kiểm thử tích hợp 5 chức năng
+## 10. Kiểm thử phối hợp 5 chức năng
 
-Phần này sắp xếp các bài kiểm thử theo luồng hệ thống. Đây là kế hoạch kiểm thử tích hợp; không phải khẳng định rằng toàn bộ các bước đã được thực hiện.
+Phần này là trình tự kiểm thử phối hợp đề xuất, không phải khẳng định rằng toàn bộ các bước đã được thực hiện.
 
-### 10.1. Giai đoạn 1 — Kiểm tra nền tảng
+### 10.1. Giai đoạn A — Nền tảng
 
-1. Kiểm tra repository và package scripts.
-2. Khởi chạy PostgreSQL.
-3. Khởi chạy MQTT broker.
-4. Kiểm tra cấu hình Backend.
-5. Áp dụng các migration cần thiết theo thứ tự migration của repository.
-6. Khởi chạy Backend và kiểm tra log khởi động.
-7. Xác nhận MQTT runtime kết nối broker.
+1. Kiểm tra `.env` và `.env.test` đã cấu hình.
+2. Khởi chạy PostgreSQL/MQTT test.
+3. Áp dụng migration phù hợp.
+4. Bootstrap MQTT test.
+5. Chạy Backend.
+6. Kiểm tra `/health` và `/ready`.
 
-### 10.2. Giai đoạn 2 — Kiểm tra telemetry và offline
+### 10.2. Giai đoạn B — Telemetry và offline
 
-1. Cho Sensor Node gửi telemetry bình thường.
-2. Xác nhận Backend lưu telemetry.
-3. Ngắt mạng và tạo một số bản ghi.
-4. Xác nhận các bản ghi được giữ trong LittleFS.
-5. Khởi động lại thiết bị khi vẫn còn dữ liệu chờ.
-6. Khôi phục mạng.
-7. Xác nhận thiết bị gửi bù dữ liệu.
-8. Xác nhận Backend chống trùng và chỉ ACK `STORED` sau khi commit.
-9. Xác nhận dữ liệu backfill không ghi đè dữ liệu mới nhất.
+1. Sensor Node gửi telemetry bình thường.
+2. Backend lưu telemetry và ACK `STORED`.
+3. Ngắt mạng.
+4. Sensor Node tiếp tục tạo dữ liệu và lưu LittleFS.
+5. Khởi động lại thiết bị khi còn dữ liệu chờ.
+6. Khôi phục mạng và quan sát gửi bù.
+7. Kiểm tra không mất dữ liệu, không trùng dữ liệu và ACK đúng ID.
 
-### 10.3. Giai đoạn 3 — Kiểm tra Monitoring và Logging
+### 10.3. Giai đoạn C — Monitoring và Logging
 
-1. Phát sinh telemetry và sự kiện MQTT.
-2. Kiểm tra counter tương ứng.
-3. Kiểm tra log JSON.
-4. Kiểm tra dữ liệu nhạy cảm bị che.
-5. Kiểm tra heartbeat và trạng thái online/offline.
-6. Tạo snapshot và đối chiếu dữ liệu component/device.
+1. Phát sinh telemetry, command và MQTT event.
+2. Kiểm tra log JSON.
+3. Kiểm tra key nhạy cảm được che.
+4. Kiểm tra component status và heartbeat.
+5. Kiểm tra counter.
+6. Kiểm tra snapshot.
+7. Xác nhận rõ Monitoring đã được bind vào runtime hay mới chỉ kiểm thử service độc lập.
 
-### 10.4. Giai đoạn 4 — Kiểm tra phát hiện bất thường
+### 10.4. Giai đoạn D — Phát hiện bất thường
 
-1. Gửi telemetry hợp lệ từ thiết bị đang ACTIVE.
-2. Đảm bảo dữ liệu là mới nhất, không phải backfill và không clock skew.
-3. Gửi đủ mẫu để baseline đạt `minSamples`.
-4. Gửi giá trị bình thường và xác nhận `NORMAL`.
-5. Gửi giá trị lệch và xác nhận `ANOMALY`.
-6. Kiểm tra mẫu bất thường không được đưa vào baseline.
-7. Gửi lại cùng event/data ID và xác nhận không xử lý trùng.
-8. Kiểm tra baseline và kết quả được lưu trong PostgreSQL.
+1. Dùng telemetry hợp lệ của thiết bị ACTIVE/phòng ACTIVE.
+2. Đưa đủ mẫu để baseline đạt `minSamples`.
+3. Gửi giá trị bình thường.
+4. Gửi giá trị lệch.
+5. Kiểm tra `WARMING_UP`, `NORMAL`, `ANOMALY`.
+6. Kiểm tra baseline không hấp thụ điểm bất thường.
+7. Gửi event trùng, backfill, clock skew và dữ liệu không còn mới nhất.
+8. Kiểm tra consumer bỏ qua hoặc xử lý theo điều kiện.
 
-### 10.5. Giai đoạn 5 — Kiểm tra Device Shadow
+### 10.5. Giai đoạn E — Device Shadow
 
-1. Đăng ký Control Node và xác nhận Shadow được tạo.
-2. Truy vấn Desired/Reported State ban đầu.
-3. Gửi lệnh bật đèn hoặc quạt.
-4. Xác nhận Desired State và version thay đổi.
-5. Xác nhận Reported State chưa thay đổi trước phản hồi.
-6. Cho thiết bị thực thi và gửi ACK/Reported State.
-7. Xác nhận trạng thái command và Shadow được cập nhật.
-8. Gửi ACK sai session/version hoặc ACK lặp để kiểm tra từ chối/chống ghi đè.
+1. Tạo Control Node.
+2. Truy vấn Shadow ban đầu.
+3. Tạo command bật/tắt đèn hoặc quạt.
+4. Kiểm tra Desired State/version.
+5. Xác nhận Reported State chỉ thay đổi sau phản hồi hợp lệ.
+6. Kiểm tra ACK sai session/version, ACK lặp và timeout.
+7. Đối chiếu `in_sync` và `differences`.
 
-### 10.6. Giai đoạn 6 — Kiểm tra OTA
+### 10.6. Giai đoạn F — OTA
 
-Chỉ thực hiện phần thiết bị khi đã có firmware OTA tương ứng và đã thống nhất hợp đồng MQTT.
+1. Đăng ký firmware.
+2. Publish firmware.
+3. Tạo OTA Job.
+4. Quan sát command MQTT.
+5. Kiểm tra status từ thiết bị.
+6. Nếu có phần cứng OTA, xác nhận download, verify, install, reboot.
+7. Kiểm tra kết quả và `firmware_version`.
+8. Thử tình huống lỗi và rollback.
 
-1. Đăng ký firmware tương thích.
-2. Phát hành firmware.
-3. Tạo OTA Job cho thiết bị đủ điều kiện.
-4. Kiểm tra lệnh OTA được gửi.
-5. Thiết bị tải firmware và báo tiến độ.
-6. Thiết bị xác minh hash/chữ ký và cài đặt.
-7. Thiết bị reboot, xác nhận phiên bản mới.
-8. Backend nhận `SUCCESS` và cập nhật `firmware_version`.
-9. Thực hiện kịch bản lỗi để kiểm tra `FAILED`, `TIMEOUT` hoặc `ROLLED_BACK`.
+Không chạy kiểm thử phá hủy như mất nguồn/ghi flash trên thiết bị đang vận hành hoặc có dữ liệu cần giữ.
 
-### 10.7. Ghi nhận kết quả
+---
 
-Với mỗi bài kiểm thử, ghi tối thiểu:
+## 11. Đánh giá và ghi nhận kết quả
 
-| Trường | Nội dung cần ghi |
+### 11.1. Quy trình đánh giá cho mỗi test case
+
+Với mỗi test:
+1. Ghi trạng thái ban đầu.
+2. Ghi dữ liệu đầu vào và môi trường.
+3. Thực hiện đúng các bước.
+4. Thu phản hồi API, MQTT, log, database hoặc trạng thái thiết bị.
+5. So sánh kết quả thực tế với kết quả mong đợi.
+6. Gán trạng thái.
+7. Lưu bằng chứng.
+
+### 11.2. Quy ước trạng thái
+
+| Trạng thái | Cách sử dụng |
 |---|---|
-| Mã test | Ví dụ `ADV02-IT-01` |
-| Mục tiêu | Nghiệp vụ cần xác nhận |
-| Môi trường | Local, Docker, MQTT test broker, ESP32 thật... |
-| Dữ liệu đầu vào | Payload, thiết bị, trạng thái ban đầu |
-| Các bước | Trình tự thao tác thực tế |
-| Kết quả mong đợi | Điều kiện phải đạt |
-| Kết quả thực tế | Phản hồi API, log, database, MQTT hoặc thiết bị |
-| Trạng thái | PASS / FAIL / BLOCKED / NOT TESTED |
-| Bằng chứng | Ảnh terminal, log đã che secret, truy vấn kết quả hoặc video kiểm thử |
-| Ghi chú | Lỗi, giới hạn và việc cần xử lý |
+| `PASS` | Đã thực hiện test và kết quả thực tế đáp ứng đầy đủ điều kiện mong đợi. |
+| `FAIL` | Đã thực hiện test nhưng kết quả không đáp ứng điều kiện. |
+| `BLOCKED` | Không thể thực hiện do thiếu thiết bị, dịch vụ, credential hoặc điều kiện tiên quyết. |
+| `NOT TESTED` | Chưa chạy test. |
+| `N/A` | Test không thuộc phạm vi cấu hình/thiết bị đang nghiệm thu; cần nêu lý do. |
 
-Không ghi PASS nếu chỉ mới đọc source hoặc nhìn thấy test case. Nếu chưa có phần cứng hoặc dependency, ghi `BLOCKED` hoặc `NOT TESTED` và nêu rõ lý do.
+Không đánh dấu PASS chỉ vì test case đã được viết hoặc source code có chức năng tương ứng.
+
+### 11.3. Mẫu bảng ghi nhận kết quả
+
+| ID | Chức năng | Môi trường | Dữ liệu/điều kiện | Kết quả mong đợi | Kết quả thực tế | Trạng thái | Bằng chứng |
+|---|---|---|---|---|---|---|---|
+| ADV01-UT-01 | Device Shadow | Local Node.js | Tạo Shadow | Giá trị mặc định đúng | Điền sau khi chạy | — | Log test |
+| ADV01-IT-01 | Commands/MQTT | PostgreSQL + MQTT test | Tạo command | ACK hợp lệ cập nhật Shadow | Điền sau khi chạy | — | Log + DB |
+| ADV02-IT-01 | Offline sync | MQTT + PostgreSQL test | Gửi telemetry | Lưu một lần, ACK STORED | Điền sau khi chạy | — | Log + DB |
+| ADV02-HW-01 | LittleFS | ESP32 thật | Ngắt mạng | Dữ liệu vẫn được lưu | Điền sau khi chạy | — | Ảnh/serial log |
+| ADV03-UT-01 | Logging | Local Node.js | Log có secret key | Secret được che | Điền sau khi chạy | — | Log đã che |
+| ADV04-UT-01 | Anomaly | Local Node.js | Baseline chưa đủ mẫu | WARMING_UP | Điền sau khi chạy | — | Test output |
+| ADV04-IT-01 | Consumer | DB + Backend | telemetry.stored | Lưu kết quả/delivery đúng | Điền sau khi chạy | — | DB + log |
+| ADV05-IT-01 | OTA | PostgreSQL + MQTT test | Tạo OTA Job | Job/command đúng | Điền sau khi chạy | — | Log + DB |
+| ADV05-HW-01 | OTA device | ESP32 thật | Cập nhật firmware | Reboot và firmware mới chạy | Điền sau khi chạy | — | Serial log |
+
+### 11.4. Đánh giá tổng hợp
+
+Có thể báo cáo kết quả theo bốn nhóm:
+
+- **Mức code/module:** module đã có trong repository.
+- **Mức tự động:** unit test hoặc mock test đã chạy.
+- **Mức tích hợp:** các thành phần thực tế như PostgreSQL/MQTT được phối hợp trong test.
+- **Mức phần cứng:** ESP32 đã được nạp và kiểm tra trong tình huống thực tế.
+
+Ví dụ cách viết kết luận đúng:
+- “ADV-03 đạt 12/12 unit test; repository PostgreSQL hiện được kiểm thử bằng pool giả lập.”
+- “ADV-04 đạt 16/16 test local; consumer test sử dụng mock PostgreSQL, chưa xác nhận PostgreSQL integration.”
+- “ADV-05 đạt 15/15 OTA integration test trong lần chạy sau bootstrap MQTT test ACL; OTA trên ESP32 thật chưa nghiệm thu.”
+
+Không viết “toàn bộ hệ thống đã hoạt động hoàn chỉnh” nếu chưa có kiểm thử đầu cuối.
 
 ---
 
-## 11. Bảng tổng hợp lệnh chạy và kiểm thử
+## 12. Bảng lệnh kiểm thử tổng hợp
 
-Chạy các lệnh từ thư mục gốc repository, trừ khi ghi chú khác.
+Chạy tại thư mục gốc repository.
 
-| Chức năng | Lệnh | Mục đích |
+| Chức năng | Lệnh | Phạm vi |
 |---|---|---|
 | ADV-01 | `npm run test:device-shadow` | Unit test Device Shadow |
-| ADV-01 | `node --test tests/integration/commands.test.js` | Kiểm thử tích hợp luồng Commands/Shadow |
-| ADV-02 | `docker compose --env-file .env -f deployment/compose.yml --profile test up -d --wait db db-test mqtt mqtt-test` | Khởi chạy dịch vụ test |
-| ADV-02 | `npm run mqtt:bootstrap:test` | Bootstrap MQTT test |
+| ADV-01 | `node --test tests/integration/commands.test.js` | Integration test Commands/Shadow |
+| ADV-02 | `npm run test:telemetry-ingestion` | Test telemetry ingestion |
+| ADV-02 | `npm run test:firmware-phase3` | Integration test Sensor Node/Phase 3 |
 | ADV-02 | `node --test tests/integration/telemetry.test.js` | Integration test telemetry |
 | ADV-03 | `npm run test:monitoring-logging` | Test Monitoring và Logging |
-| ADV-03 | `npm test` | Chạy toàn bộ test repository |
-| ADV-04 | `npm run db:migrate` | Áp dụng migration |
-| ADV-04 | `npm run test:anomaly-detection` | Test phát hiện bất thường |
-| ADV-04 | `npm test` | Chạy toàn bộ test repository |
-| ADV-05 | `npm run test:ota` | Integration test Backend OTA |
+| ADV-04 | `npm run test:anomaly-detection` | Test anomaly detection và consumer |
+| ADV-05 | `npm run mqtt:bootstrap:test` | Khởi tạo MQTT test role/ACL |
+| ADV-05 | `npm run test:ota` | 15 OTA integration test |
+| Tất cả | `npm test` | Unit/service/HTTP tests trong `tests/*.test.js` |
+| Tất cả | `npm run test:integration` | Các file `tests/integration/*.test.js` |
 
-### 11.1. Kết quả được ghi nhận trong các tài liệu đầu vào
-
-| Chức năng | Kết quả được tài liệu nguồn ghi nhận | Phạm vi kết quả |
-|---|---:|---|
-| ADV-01 | 11/11 PASS | Unit test Device Shadow |
-| ADV-02 | 6/6 PASS | Integration test Backend qua MQTT test broker và PostgreSQL test |
-| ADV-03 | 12/12 PASS | Unit test; test repository PostgreSQL dùng pool giả lập |
-| ADV-04 | 16/16 PASS; toàn repository 52/52 PASS | Unit test và consumer mock test; chưa phải PostgreSQL integration thực |
-| ADV-05 | Có 12 test case | Chưa có kết quả PASS được xác nhận trong tài liệu nguồn |
-
-Các kết quả trên là kết quả được ghi trong tài liệu đầu vào, không phải kết quả vừa chạy lại trong quá trình tạo hướng dẫn này. Khi kiểm thử ở máy hoặc nhánh hiện tại, phải chạy lại và ghi nhận output thực tế.
+**Chú ý về `npm test`:** script này không thay thế `npm run test:integration`; hai lệnh chạy các tập file khác nhau. Nếu muốn kiểm tra toàn bộ theo phạm vi repository, chạy cả hai sau khi đã chuẩn bị đúng môi trường.
 
 ---
 
-## 12. Xử lý lỗi và lưu ý vận hành
+## 13. Xử lý lỗi thường gặp
 
-### 12.1. Lỗi database hoặc migration
+### 13.1. Database không kết nối
 
-- Kiểm tra PostgreSQL có đang chạy không.
-- Kiểm tra host, port, database và credential trong cấu hình local.
-- Xác nhận đang kết nối đúng database test hay database phát triển.
-- Kiểm tra migration đã được áp dụng chưa.
-- Không chạy test phá hủy dữ liệu trên database thật.
+- Kiểm tra Docker container và cổng PostgreSQL.
+- Kiểm tra `DATABASE_URL`, `TEST_DATABASE_URL` và `TEST_MIGRATION_DATABASE_URL`.
+- Đảm bảo database test có tên kết thúc `_test` theo README.
+- Không thay URL test bằng database ứng dụng để “chạy cho được”.
 
-### 12.2. Lỗi MQTT
+### 13.2. Migration lỗi hoặc thiếu bảng
 
-- Kiểm tra broker đang chạy và Backend đã kết nối.
-- Kiểm tra topic đúng cấu trúc và mã phòng/thiết bị.
-- Kiểm tra payload có định danh khớp topic.
-- Kiểm tra credential, role và session thiết bị.
-- Phân biệt MQTT QoS acknowledgement với ACK nghiệp vụ của ứng dụng.
+- Kiểm tra migration đã chạy chưa.
+- Xác nhận đang dùng đúng database.
+- Đọc thông báo lỗi và migration tương ứng.
+- Không sửa migration đã áp dụng; nếu cần thay đổi schema, tạo migration mới theo quy tắc dự án.
 
-### 12.3. Lỗi đồng bộ Device Shadow
+### 13.3. MQTT `Not authorized`
 
-- Không tự cập nhật Reported State khi chỉ mới publish command.
+- Kiểm tra đúng broker và credential.
+- Với broker test, chạy:
+
+```powershell
+npm run mqtt:bootstrap:test
+```
+
+- Kiểm tra role/ACL và topic của client.
+- Không kết luận lỗi nghiệp vụ OTA/telemetry khi nguyên nhân thực tế là broker từ chối Subscribe/Publish.
+
+### 13.4. Device Shadow không đồng bộ
+
+- Kiểm tra Desired State và Reported State riêng biệt.
 - Kiểm tra `command_id`, `session_id`, `shadow_version`.
-- Kiểm tra ACK có khớp trạng thái yêu cầu không.
-- Kiểm tra timestamp/version để tránh dữ liệu cũ ghi đè trạng thái mới.
+- Kiểm tra ACK đúng thiết bị và đúng phiên.
+- Không tự cập nhật Reported State ngay sau khi publish command.
 
-### 12.4. Lỗi hàng đợi offline
+### 13.5. Offline queue không xóa bản ghi
 
-- Không xóa bản ghi chỉ vì publish MQTT thành công.
-- Chỉ xóa khi ACK ứng dụng `STORED` đúng mã định danh.
-- Kiểm tra LittleFS đã mount thành công.
-- Kiểm tra hàng đợi đầy, file tạm/backup và khả năng phục hồi sau reboot.
-- Kiểm tra firmware và Backend đang dùng cùng định dạng ACK.
+- Kiểm tra ACK đúng định dạng legacy/hiện hành.
+- Kiểm tra ID khớp bản ghi đầu hàng đợi.
+- Kiểm tra `status = STORED`.
+- Kiểm tra thiết bị có subscribe đúng ACK topic không.
+- Không xóa bản ghi thủ công để làm test “đạt”.
 
-### 12.5. Lỗi Monitoring
+### 13.6. Monitoring không có event
 
-- Kiểm tra log level và message có hợp lệ.
-- Không đưa secret vào message tự do.
-- Phân biệt connection status với lifecycle status.
-- Kiểm tra heartbeat theo ngưỡng thời gian.
-- Không kết luận repository PostgreSQL hoạt động thực tế chỉ từ test dùng pool giả lập.
+- Kiểm tra nơi đăng ký `bindMonitoring()`.
+- Kiểm tra MQTT runtime có phát `device-message`.
+- Kiểm tra service và repository.
+- Phân biệt test service độc lập với tích hợp runtime thực tế.
 
-### 12.6. Lỗi phát hiện bất thường
+### 13.7. Anomaly không trả kết quả như mong đợi
 
-- Kiểm tra dữ liệu có phải bản ghi mới nhất không.
-- Kiểm tra `eligible`, `is_backfill`, `clock_skew`.
-- Kiểm tra thiết bị và phòng học có ACTIVE không.
-- Kiểm tra baseline đã đủ `minSamples` chưa.
-- Kiểm tra metric, đơn vị và kiểu dữ liệu.
-- Không đánh giá độ chính xác của thuật toán chỉ bằng unit test.
+- Kiểm tra baseline hiện có và số mẫu.
+- Kiểm tra metric và đơn vị.
+- Kiểm tra `eligible`, `is_latest`, `is_backfill`, `clock_skew`.
+- Kiểm tra trạng thái thiết bị/phòng.
+- Kiểm tra event/data ID đã được xử lý chưa.
+- Lưu ý MAD bằng 0 có quy tắc riêng.
 
-### 12.7. Lỗi OTA
+### 13.8. OTA không tạo job hoặc không publish
 
-- Kiểm tra firmware đúng `device_type` và `hardware_target`.
-- Kiểm tra file, kích thước và SHA-256.
-- Kiểm tra firmware đã `PUBLISHED`.
+- Kiểm tra firmware có `PUBLISHED`.
+- Kiểm tra device type/hardware target.
 - Kiểm tra thiết bị online, heartbeat, session và credential.
-- Phân biệt chữ ký Ed25519 của firmware hash với HMAC của URL tải.
-- Không coi MQTT publish thành công là cài đặt thành công.
-- Không coi Backend `TIMEOUT` là thiết bị đã rollback.
-- Không coi trạng thái `ROLLED_BACK` trong Backend là bằng chứng rollback vật lý nếu chưa kiểm tra thiết bị.
+- Kiểm tra thiết bị có OTA Job đang hoạt động không.
+- Kiểm tra outbox và MQTT ACL.
+- Phân biệt Backend publish lệnh với thiết bị thực sự cài firmware.
 
 ---
 
-## 13. Checklist nghiệm thu
+## 14. Checklist nghiệm thu
 
-### 13.1. ADV-01 — Digital Twin / Device Shadow
+### 14.1. ADV-01 — Device Shadow
 
-- [ ] Tạo được Shadow cho Control Node.
+- [ ] Shadow được tạo cho Control Node.
 - [ ] Desired State và Reported State được lưu riêng.
-- [ ] Tạo command làm tăng version Desired State.
+- [ ] Tạo command làm tăng version mong muốn.
 - [ ] MQTT command đúng topic/payload.
-- [ ] ACK/Reported State hợp lệ cập nhật trạng thái thực tế.
-- [ ] Phát hiện đúng `in_sync` và `differences`.
+- [ ] Reported State chỉ thay đổi sau phản hồi hợp lệ.
+- [ ] `in_sync` và `differences` đúng.
 - [ ] Kiểm tra ACK sai session/version, ACK lặp và timeout.
-- [ ] Kiểm thử với ESP32/Mosquitto thật nếu nghiệm thu đầu cuối.
+- [ ] Kiểm thử ESP32/Mosquitto thật nếu nghiệm thu đầu cuối.
 
-### 13.2. ADV-02 — Offline Data Buffering & Synchronization
+### 14.2. ADV-02 — Offline Synchronization
 
-- [ ] Telemetry được lưu vào LittleFS trước khi gửi.
-- [ ] Mất Wi-Fi/MQTT không làm mất bản ghi đang chờ.
+- [ ] Telemetry được ghi LittleFS trước khi gửi.
+- [ ] Mất Wi-Fi/MQTT không làm mất bản ghi chờ.
 - [ ] Hàng đợi phục hồi sau reboot.
-- [ ] Kết nối lại gửi được dữ liệu bù.
+- [ ] Kết nối lại gửi bù theo thứ tự.
 - [ ] Chỉ ACK `STORED` đúng ID mới xóa bản ghi.
-- [ ] Backend chống trùng theo thiết bị và mã bản tin.
-- [ ] Backfill không ghi đè dữ liệu mới nhất.
-- [ ] Đã thống nhất payload/ACK giữa firmware và Backend.
-- [ ] Đã kiểm thử trên ESP32 thật.
+- [ ] Backend chống trùng.
+- [ ] Backfill không ghi đè dữ liệu latest.
+- [ ] Kiểm thử ESP32 thật.
 
-### 13.3. ADV-03 — Monitoring và Logging
+### 14.3. ADV-03 — Monitoring và Logging
 
-- [ ] Log JSON có đủ trường chính.
-- [ ] Dữ liệu nhạy cảm được che.
-- [ ] Dữ liệu log sai bị từ chối.
-- [ ] Trạng thái component được cập nhật.
-- [ ] Heartbeat xác định online/offline đúng ngưỡng.
-- [ ] Counter tăng đúng sự kiện.
+- [ ] Log JSON đúng cấu trúc.
+- [ ] Key nhạy cảm được che.
+- [ ] Input không hợp lệ bị từ chối.
+- [ ] Component status cập nhật đúng.
+- [ ] Heartbeat online/offline đúng ngưỡng.
+- [ ] Counter tăng đúng.
 - [ ] Snapshot tổng hợp đúng.
-- [ ] Đã xác nhận liên kết MQTT runtime.
-- [ ] Đã kiểm tra PostgreSQL thật nếu nghiệm thu repository.
-- [ ] Đã xác nhận giao diện nếu yêu cầu dashboard.
+- [ ] Đã xác nhận bind MQTT runtime.
+- [ ] Đã kiểm tra PostgreSQL thật nếu thuộc phạm vi nghiệm thu.
+- [ ] Dashboard được xác nhận nếu yêu cầu giao diện.
 
-### 13.4. ADV-04 — Phát hiện dữ liệu môi trường bất thường
+### 14.4. ADV-04 — Anomaly Detection
 
-- [ ] Migration tạo được hai bảng ADV-04.
-- [ ] Baseline tách theo thiết bị và metric.
+- [ ] Migration `016_anomaly_detection.sql` áp dụng thành công.
+- [ ] Baseline tách theo thiết bị/metric.
 - [ ] Chưa đủ mẫu trả `WARMING_UP`.
 - [ ] Mẫu bình thường trả `NORMAL`.
 - [ ] Mẫu lệch trả `ANOMALY`.
-- [ ] Mẫu bất thường không được thêm vào baseline.
-- [ ] Event trùng không bị xử lý lặp.
-- [ ] Dữ liệu backfill/clock skew/không mới nhất bị bỏ qua.
-- [ ] Lỗi lưu kết quả không đánh dấu delivery.
-- [ ] Đã kiểm thử PostgreSQL và luồng MQTT đầu cuối nếu nghiệm thu tích hợp.
-- [ ] Có dữ liệu thực nghiệm nếu cần đánh giá tỷ lệ báo động giả.
+- [ ] Mẫu bất thường không thêm vào baseline.
+- [ ] Event trùng không xử lý lặp.
+- [ ] Backfill/clock skew/không latest được bỏ qua.
+- [ ] Lỗi lưu kết quả rollback và không đánh dấu delivery.
+- [ ] Đã kiểm thử PostgreSQL/MQTT thật nếu nghiệm thu tích hợp.
+- [ ] Có dữ liệu thực nghiệm nếu đánh giá chất lượng phát hiện.
 
-### 13.5. ADV-05 — OTA
+### 14.5. ADV-05 — OTA
 
-- [ ] Đăng ký firmware và lưu được metadata/hash.
-- [ ] Phát hành firmware sau khi kiểm tra lại file.
+- [ ] Đăng ký firmware và lưu metadata/hash.
+- [ ] Publish sau khi kiểm tra lại file.
 - [ ] Thu hồi firmware đúng điều kiện.
-- [ ] Tạo OTA Job chỉ cho thiết bị tương thích và đủ điều kiện.
-- [ ] Outbox gửi/retry lệnh MQTT đúng logic.
-- [ ] Backend kiểm tra status theo job/device/session/credential.
+- [ ] Tạo OTA Job cho thiết bị tương thích.
+- [ ] Outbox gửi/retry MQTT đúng.
+- [ ] Backend xác thực status theo job/device/session/credential.
 - [ ] URL tải kiểm tra chữ ký và thời hạn.
-- [ ] Firmware ESP32 tải file và kiểm tra SHA-256.
-- [ ] ESP32 xác minh chữ ký Ed25519.
+- [ ] ESP32 tải firmware và kiểm tra SHA-256.
+- [ ] ESP32 xác minh Ed25519.
 - [ ] ESP32 cài đặt, reboot và xác nhận phiên bản.
 - [ ] Đã thử lỗi tải/cài đặt/mất nguồn.
 - [ ] Đã kiểm thử rollback trên phần cứng thật.
 
-### 13.6. Quy tắc kết luận
+### 14.6. Quy tắc kết luận cuối cùng
 
-- Nếu chỉ có mã nguồn: ghi **Đã triển khai module**.
-- Nếu test tự động chạy thành công: ghi **Đã kiểm thử tự động**, kèm số test và loại test.
-- Nếu test dùng mock/in-memory: ghi rõ phạm vi mock/in-memory.
-- Nếu đã chạy với database/MQTT thật: ghi rõ môi trường và kết quả.
-- Nếu đã thử trên ESP32 thật: ghi rõ board, firmware, tình huống và bằng chứng.
-- Nếu chưa thực hiện: ghi **Chưa kiểm thử** hoặc **Chưa xác nhận**, không ghi PASS.
+- Chỉ có mã nguồn: **Đã triển khai module**.
+- Test tự động đã chạy: **Đã kiểm thử tự động**, ghi rõ số test và loại test.
+- Test dùng mock/in-memory: ghi rõ phạm vi mock/in-memory.
+- PostgreSQL/MQTT thật đã chạy: ghi rõ môi trường và bằng chứng.
+- ESP32 thật đã kiểm thử: ghi rõ board, firmware, tình huống và kết quả.
+- Chưa thực hiện: ghi **Chưa kiểm thử**, **BLOCKED** hoặc **Chưa xác nhận**; không ghi PASS.
 
 ---
 
-## 14. Kết luận
+## 15. Kết luận
 
-Năm chức năng nâng cao bổ sung các năng lực quan trọng cho hệ thống phòng học thông minh: quản lý trạng thái thiết bị, duy trì dữ liệu khi mất mạng, giám sát và ghi log, phát hiện dữ liệu môi trường bất thường và cập nhật firmware từ xa.
+Năm chức năng ADV bổ sung các năng lực quan trọng cho hệ thống phòng học thông minh: quản lý trạng thái thiết bị, lưu dữ liệu khi mất mạng và đồng bộ lại, giám sát/logging, phát hiện dữ liệu môi trường bất thường và cập nhật firmware từ xa.
 
-Trình tự thực hiện hợp lý là chuẩn bị môi trường và database trước, kiểm thử từng module độc lập, sau đó kiểm tra luồng MQTT/PostgreSQL và cuối cùng mới nghiệm thu trên phần cứng. Với các chức năng có firmware, kết quả test Backend không thay thế việc biên dịch, nạp và kiểm tra ESP32 thật.
+Quy trình triển khai và kiểm thử cần đi từ nền tảng database/MQTT, kiểm thử từng module, kiểm thử phối hợp, rồi mới nghiệm thu phần cứng. Các kết quả unit test, mock test, integration test, CI build và kiểm thử ESP32 là những mức bằng chứng khác nhau.
 
-Khi báo cáo kết quả, cần phân biệt rõ **đã triển khai**, **đã kiểm thử tự động**, **đã kiểm thử tích hợp** và **đã nghiệm thu phần cứng**. Đây là cơ sở để đánh giá đúng mức độ hoàn thiện của từng ADV và tránh kết luận vượt quá bằng chứng hiện có.
+Khi báo cáo, phải phân biệt rõ **đã triển khai**, **đã kiểm thử tự động**, **đã kiểm thử tích hợp** và **đã nghiệm thu phần cứng**. Chỉ kết luận trong phạm vi mà kết quả thực tế và bằng chứng kiểm thử hỗ trợ.
