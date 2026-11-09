@@ -64,7 +64,7 @@ bool parseOtaCommand(
   size_t length,
   OtaCommand& c
 ) {
-  JsonDocument doc;
+  DynamicJsonDocument doc(2048);
 
   if (deserializeJson(doc, payload, length)) {
     return false;
@@ -111,7 +111,7 @@ bool parseOtaAck(
   size_t length,
   OtaAck& ack
 ) {
-  JsonDocument doc;
+  DynamicJsonDocument doc(512);
 
   if (deserializeJson(doc, payload, length)) {
     return false;
@@ -133,7 +133,7 @@ bool parseOtaAck(
 }
 
 String serializeOtaStatus(const OtaStatus& s) {
-  JsonDocument doc;
+  StaticJsonDocument<512> doc;
 
   doc["job_id"] = s.jobId;
   doc["device_id"] = s.deviceId;

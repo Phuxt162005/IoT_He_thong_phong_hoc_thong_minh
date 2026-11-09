@@ -322,7 +322,7 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
   uint8_t digest[32];
 
   mbedtls_sha256_init(&sha);
-  mbedtls_sha256_starts_ret(&sha, 0);
+  mbedtls_sha256_starts(&sha, 0);
 
   while (received < c.fileSize) {
     if (!stream->connected() && !stream->available()) {
@@ -345,7 +345,7 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
       break;
     }
 
-    mbedtls_sha256_update_ret(&sha, buffer, readCount);
+   mbedtls_sha256_update(&sha, buffer, readCount);
 
     if (Update.write(buffer, readCount) != (size_t)readCount) {
       writeOk = false;
@@ -359,7 +359,7 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
     _mqtt.loop();
   }
 
-  mbedtls_sha256_finish_ret(&sha, digest);
+ mbedtls_sha256_finish(&sha, digest);
   mbedtls_sha256_free(&sha);
   http.end();
 
