@@ -34,11 +34,30 @@ jobs:
         uses: arduino/setup-arduino-cli@v2
 
       - name: Configure ESP32 board package
+        shell: bash
         run: |
+          set -e
+
           arduino-cli core update-index \
             --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp32:esp32@3.2.1 \
-            --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+          for attempt in 1 2 3; do
+            echo "ESP32 Core installation attempt $attempt/3"
+
+            if arduino-cli core install esp32:esp32@3.2.1 \
+              --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json; then
+              echo "ESP32 Core installed successfully."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "Installation failed. Retrying in 20 seconds..."
+              sleep 20
+            fi
+          done
+
+          echo "ESP32 Core installation failed after 3 attempts."
+          exit 1
 
       - name: Install firmware libraries
         run: |
