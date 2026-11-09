@@ -33,10 +33,21 @@ jobs:
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
+      # Restore Arduino CLI download cache
+      - name: Restore Arduino CLI cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.arduino15/staging
+          key: ${{ runner.os }}-arduino-${{ matrix.node }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-arduino-${{ matrix.node }}-
+
       - name: Configure ESP32 board package
         shell: bash
         run: |
           set -e
+
+          mkdir -p ~/.arduino15/staging
 
           arduino-cli core update-index \
             --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
@@ -81,6 +92,11 @@ jobs:
         run: |
           CONFIG="firmware/sensor_node/Config.h"
 
+          if ! grep -q '^#define OTA_ENABLED 0$' "$CONFIG"; then
+            echo "Expected OTA_ENABLED=0 in Config.h.example"
+            exit 1
+          fi
+
           sed -i 's/^#define OTA_ENABLED 0$/#define OTA_ENABLED 1/' "$CONFIG"
 
           cat >> "$CONFIG" <<'EOF'
@@ -98,9 +114,19 @@ jobs:
           #define OTA_ROOT_CA_CERT "CI_ONLY_DUMMY_CERTIFICATE"
           EOF
 
+          echo "Sensor Node OTA compile path enabled."
+
       - name: Compile ESP32 firmware
         run: |
           arduino-cli compile \
             --fqbn esp32:esp32:esp32 \
             --warnings all \
             "firmware/${{ matrix.node }}"
+
+      # Save downloaded packages even when installation or compilation fails
+      - name: Save Arduino CLI cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.arduino15/staging
+          key: ${{ runner.os }}-arduino-${{ matrix.node }}-${{ github.run_id }}-${{ github.run_attempt }}
