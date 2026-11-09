@@ -34,21 +34,46 @@ void OtaClient::setCurrentSessionId(const String& sessionId) {
 }
 
 bool OtaClient::savePendingOta(const OtaCommand& command) {
+  const esp_app_desc_t* currentApp = esp_app_get_description();
+
+  if (currentApp == nullptr || currentApp->version[0] == '\0') {
+    Serial.println("[OTA] Cannot determine previous firmware version.");
+    return false;
+  }
+
+  String previousVersion = String(currentApp->version);
+
+  if (previousVersion == command.version) {
+    Serial.println("[OTA] Target version is already running.");
+    return false;
+  }
+
   Preferences prefs;
 
   if (!prefs.begin("ota_state", false)) {
     return false;
   }
 
-  bool ok = prefs.putString("job_id", command.jobId) > 0 &&
-            prefs.putString("version", command.version) > 0 &&
-            prefs.putBool("pending", true) > 0;
+  bool ok =
+    prefs.putString("job_id", command.jobId) > 0 &&
+    prefs.putString("version", command.version) > 0 &&
+    prefs.putString("previous_version", previousVersion) > 0 &&
+    prefs.putBool("pending", true) > 0;
 
   if (!ok) {
     prefs.clear();
   }
 
   prefs.end();
+
+  if (ok) {
+    Serial.printf(
+      "[OTA] Pending state saved. Previous=%s, Target=%s\n",
+      previousVersion.c_str(),
+      command.version.c_str()
+    );
+  }
+
   return ok;
 }
 
@@ -72,7 +97,6 @@ bool OtaClient::publishPendingSuccess() {
     return false;
   }
 
-  // Retry tối đa một lần mỗi 10 giây.
   uint32_t now = millis();
 
   if (_lastSuccessPublishMs != 0 &&
@@ -89,14 +113,15 @@ bool OtaClient::publishPendingSuccess() {
   bool pending = prefs.getBool("pending", false);
   String jobId = prefs.getString("job_id", "");
   String expectedVersion = prefs.getString("version", "");
+  String previousVersion = prefs.getString("previous_version", "");
 
   prefs.end();
 
-  if (!pending || jobId.isEmpty() || expectedVersion.isEmpty()) {
+  if (!pending || jobId.isEmpty() ||
+      expectedVersion.isEmpty() || previousVersion.isEmpty()) {
     return false;
   }
 
-  // Đọc phiên bản thực tế của firmware đang chạy.
   const esp_app_desc_t* app = esp_app_get_description();
 
   if (app == nullptr) {
@@ -105,25 +130,35 @@ bool OtaClient::publishPendingSuccess() {
 
   String actualVersion = String(app->version);
 
-  // Không báo SUCCESS nếu firmware thực tế không đúng phiên bản.
-  if (actualVersion != expectedVersion) {
-    Serial.printf(
-      "[OTA] Version mismatch. Expected=%s, Actual=%s\n",
-      expectedVersion.c_str(),
-      actualVersion.c_str()
-    );
-
-    return false;
-  }
-
   OtaStatus status;
   status.jobId = jobId;
   status.deviceId = _deviceId;
   status.roomId = _roomId;
   status.sessionId = _currentSessionId;
   status.version = actualVersion;
-  status.status = "SUCCESS";
   status.progress = 100;
+
+  if (actualVersion == expectedVersion) {
+    status.status = "SUCCESS";
+    Serial.println("[OTA] Target firmware is running.");
+  } else if (actualVersion == previousVersion) {
+    status.status = "ROLLED_BACK";
+    status.errorCode = "BOOTLOADER_ROLLBACK";
+
+    Serial.printf(
+      "[OTA] Previous firmware restored. Version=%s\n",
+      actualVersion.c_str()
+    );
+  } else {
+    Serial.printf(
+      "[OTA] Unexpected firmware version. Expected=%s, Previous=%s, Actual=%s\n",
+      expectedVersion.c_str(),
+      previousVersion.c_str(),
+      actualVersion.c_str()
+    );
+
+    return false;
+  }
 
   String body = serializeOtaStatus(status);
 
@@ -131,11 +166,12 @@ bool OtaClient::publishPendingSuccess() {
     return false;
   }
 
-  // Không xóa NVS ở đây.
-  // Chỉ xóa sau khi nhận ACK hợp lệ.
   _lastSuccessPublishMs = now;
 
-  Serial.println("[OTA] SUCCESS published; waiting for backend ACK.");
+  Serial.printf(
+    "[OTA] %s published; waiting for backend ACK.\n",
+    status.status.c_str()
+  );
 
   return true;
 }
@@ -159,7 +195,9 @@ bool OtaClient::handleAck(
   if (ack.deviceId != _deviceId ||
       ack.roomId != _roomId ||
       ack.sessionId != _currentSessionId ||
-      ack.status != "SUCCESS") {
+      ack.result != "PROCESSED" ||
+      (ack.status != "SUCCESS" &&
+       ack.status != "ROLLED_BACK")) {
     return false;
   }
 
@@ -181,7 +219,10 @@ bool OtaClient::handleAck(
   clearPendingOta();
   _lastSuccessPublishMs = 0;
 
-  Serial.println("[OTA] Backend ACK received. Pending state cleared.");
+  Serial.printf(
+    "[OTA] Backend ACK received. Status=%s. Pending state cleared.\n",
+    ack.status.c_str()
+  );
 
   return true;
 }

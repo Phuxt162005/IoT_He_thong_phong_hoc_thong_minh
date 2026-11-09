@@ -143,6 +143,10 @@ String serializeOtaStatus(const OtaStatus& s) {
   doc["status"] = s.status;
   doc["progress"] = s.progress;
 
+  if (!s.errorCode.isEmpty()) {
+    doc["error_code"] = s.errorCode;
+  }
+
   doc["timestamp"] = (uint64_t)time(nullptr) * 1000ULL;
 
   String output;

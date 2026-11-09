@@ -37,7 +37,9 @@ jobs:
       - name: Restore Arduino CLI cache
         uses: actions/cache/restore@v4
         with:
-          path: ~/.arduino15/staging
+          path: |
+            ~/.arduino15/packages
+            ~/.arduino15/staging
           key: ${{ runner.os }}-arduino-${{ matrix.node }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             ${{ runner.os }}-arduino-${{ matrix.node }}-

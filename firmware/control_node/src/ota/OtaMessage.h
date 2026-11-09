@@ -26,6 +26,7 @@ struct OtaStatus {
   String status;
   uint8_t progress = 0;
   String message;
+  String errorCode;
 };
 
 struct OtaAck {
