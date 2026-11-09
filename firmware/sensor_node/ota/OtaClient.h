@@ -25,7 +25,8 @@ private:
   void publishStatus(const OtaCommand& command, const String& state,
                      uint8_t progress, const String& message = "");
   bool installFirmware(const OtaCommand& command);
-  bool verifyDigest(const uint8_t digest[32], const String& signatureHex);
+  bool verifyDigest(const uint8_t digest[32], const String& signatureBase64);
   bool hexToBytes(const String& hex, uint8_t* output, size_t outputLength);
+  bool base64ToBytes(const String& base64, uint8_t* output, size_t outputLength);
   bool validateCommand(const OtaCommand& command);
 };

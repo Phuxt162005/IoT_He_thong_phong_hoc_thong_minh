@@ -5,6 +5,7 @@
 #include <mbedtls/sha256.h>
 #include <esp_ota_ops.h>
 #include <monocypher.h>
+#include <mbedtls/base64.h>
 
 OtaClient::OtaClient(PubSubClient& mqtt, const String& deviceId,
                      const String& roomId, const String& deviceType,
@@ -52,13 +53,27 @@ bool OtaClient::hexToBytes(const String& hex, uint8_t* output,
   return true;
 }
 
-bool OtaClient::verifyDigest(const uint8_t digest[32],
-                             const String& signatureHex) {
-  if (!_hasPublicKey || !isValidHex(signatureHex, 128)) return false;
+bool OtaClient::base64ToBytes(const String& base64, uint8_t* output, size_t outputLength) {
+  size_t decodedLength = 0;
+
+  int result = mbedtls_base64_decode(
+    output,
+    outputLength,
+    &decodedLength,
+    reinterpret_cast<const unsigned char*>(base64.c_str()),
+    base64.length()
+  );
+
+  return result == 0 && decodedLength == outputLength;
+}
+
+bool OtaClient::verifyDigest(const uint8_t digest[32], const String& signatureBase64) {
+  if (!_hasPublicKey || signatureBase64.isEmpty()) return false;
 
   uint8_t signature[64];
-  if (!hexToBytes(signatureHex, signature, sizeof(signature))) return false;
-
+  if (!base64ToBytes(signatureBase64, signature, sizeof(signature))) {
+    return false;
+  }
   // Monocypher: 0 means the Ed25519 signature is valid.
   return crypto_ed25519_check(signature, _publicKey, digest, 32) == 0;
 }
