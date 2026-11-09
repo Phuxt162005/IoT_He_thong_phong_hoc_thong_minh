@@ -14,10 +14,13 @@ public:
   void setCaCertificate(const char* rootCA);
   bool handleCommand(const char* topic, const uint8_t* payload, size_t length);
   void confirmBoot();
+  void setCurrentSessionId(const String& sessionId);
+  bool publishPendingSuccess();
 
 private:
   PubSubClient& _mqtt;
   String _deviceId, _roomId, _deviceType, _hardwareTarget, _statusTopic;
+  String _currentSessionId;
   uint8_t _publicKey[32] = {};
   const char* _rootCA = nullptr;
   bool _hasPublicKey = false;
@@ -29,4 +32,6 @@ private:
   bool hexToBytes(const String& hex, uint8_t* output, size_t outputLength);
   bool base64ToBytes(const String& base64, uint8_t* output, size_t outputLength);
   bool validateCommand(const OtaCommand& command);
+  bool savePendingOta(const OtaCommand& command);
+  void clearPendingOta();
 };

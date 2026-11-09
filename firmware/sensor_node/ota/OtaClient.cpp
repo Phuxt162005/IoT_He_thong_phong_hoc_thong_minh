@@ -6,6 +6,8 @@
 #include <esp_ota_ops.h>
 #include <monocypher.h>
 #include <mbedtls/base64.h>
+#include <Preferences.h>
+#include <time.h>
 
 OtaClient::OtaClient(PubSubClient& mqtt, const String& deviceId,
                      const String& roomId, const String& deviceType,
@@ -21,6 +23,85 @@ void OtaClient::setPublicKey(const uint8_t publicKey[32]) {
 
 void OtaClient::setCaCertificate(const char* rootCA) {
   _rootCA = rootCA;
+}
+
+void OtaClient::setCurrentSessionId(const String& sessionId) {
+  _currentSessionId = sessionId;
+}
+
+bool OtaClient::savePendingOta(const OtaCommand& command) {
+  Preferences prefs;
+
+  if (!prefs.begin("ota_state", false)) {
+    return false;
+  }
+
+  bool ok = prefs.putString("job_id", command.jobId) > 0 &&
+            prefs.putString("version", command.version) > 0 &&
+            prefs.putBool("pending", true) > 0;
+
+  if (!ok) {
+    prefs.clear();
+  }
+
+  prefs.end();
+  return ok;
+}
+
+void OtaClient::clearPendingOta() {
+  Preferences prefs;
+
+  if (!prefs.begin("ota_state", false)) {
+    return;
+  }
+
+  prefs.clear();
+  prefs.end();
+}
+
+bool OtaClient::publishPendingSuccess() {
+  if (!_mqtt.connected() || _currentSessionId.isEmpty()) {
+    return false;
+  }
+
+  // Chỉ gửi khi thời gian đã được đồng bộ NTP.
+  if (time(nullptr) < 1700000000) {
+    return false;
+  }
+
+  Preferences prefs;
+
+  if (!prefs.begin("ota_state", true)) {
+    return false;
+  }
+
+  bool pending = prefs.getBool("pending", false);
+  String jobId = prefs.getString("job_id", "");
+  String version = prefs.getString("version", "");
+
+  prefs.end();
+
+  if (!pending || jobId.isEmpty() || version.isEmpty()) {
+    return false;
+  }
+
+  OtaStatus status;
+  status.jobId = jobId;
+  status.deviceId = _deviceId;
+  status.roomId = _roomId;
+  status.sessionId = _currentSessionId;
+  status.version = version;
+  status.status = "SUCCESS";
+  status.progress = 100;
+
+  String body = serializeOtaStatus(status);
+
+  if (!_mqtt.publish(_statusTopic.c_str(), body.c_str(), false)) {
+    return false;
+  }
+
+  clearPendingOta();
+  return true;
 }
 
 void OtaClient::publishStatus(const OtaCommand& c, const String& state,
@@ -201,7 +282,13 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
 
   publishStatus(c, "INSTALLING", 100, "Firmware verified; finalizing update");
 
+  if (!savePendingOta(c)) {
+    Update.abort();
+    return false;
+  }
+
   if (!Update.end(true) || !Update.isFinished()) {
+    clearPendingOta();
     Update.abort();
     return false;
   }
