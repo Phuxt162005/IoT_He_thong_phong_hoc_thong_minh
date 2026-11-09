@@ -8,7 +8,7 @@
 #include "MqttSyncManager.h"
 #include "SensorDrivers.h"
 #include "OledDisplay.h"
-#include "ota/OtaClient.h"
+#include "src/ota/OtaClient.h"
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);

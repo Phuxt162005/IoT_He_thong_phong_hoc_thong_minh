@@ -4,7 +4,7 @@
 #include <Update.h>
 #include <mbedtls/sha256.h>
 #include <esp_ota_ops.h>
-#include <monocypher.h>
+#include "monocypher-ed25519.h"
 #include <mbedtls/base64.h>
 #include <Preferences.h>
 #include <time.h>
@@ -256,6 +256,15 @@ bool OtaClient::validateCommand(const OtaCommand& c) {
 
   if (!_hasPublicKey || _rootCA == nullptr) return false;
   if (WiFi.status() != WL_CONNECTED) return false;
+
+  if (time(nullptr) < 1700000000) return false;
+
+  uint64_t currentTimeMs = (uint64_t)time(nullptr) * 1000ULL;
+
+  if (c.expiresAt == 0 || c.expiresAt <= currentTimeMs) {
+    Serial.println("[OTA] Command expired or invalid.");
+    return false;
+  }
 
   return true;
 }

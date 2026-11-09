@@ -82,7 +82,7 @@ bool parseOtaCommand(
   c.fileSize = doc["file_size"] | 0;
   c.sha256 = doc["sha256"] | "";
   c.signature = doc["signature"] | "";
-  c.expiresAt = doc["expires_at"] | "";
+  c.expiresAt = doc["expires_at"] | 0ULL;
 
   if (c.jobId.isEmpty() ||
       c.deviceId.isEmpty() ||

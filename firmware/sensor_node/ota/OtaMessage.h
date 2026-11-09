@@ -13,7 +13,7 @@ struct OtaCommand {
   String downloadUrl;
   String sha256;
   String signature;
-  String expiresAt;
+  uint64_t expiresAt = 0;
   size_t fileSize = 0;
 };
 
