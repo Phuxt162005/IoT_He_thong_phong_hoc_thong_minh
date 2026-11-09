@@ -401,14 +401,41 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
   return true;
 }
 
-void OtaClient::confirmBoot() {
-  // Call only after the application has completed its startup health checks.
+bool OtaClient::confirmBoot() {
   const esp_partition_t* running = esp_ota_get_running_partition();
-  if (running == nullptr) return;
+
+  if (running == nullptr) {
+    Serial.println("[OTA] Cannot get running partition.");
+    return false;
+  }
 
   esp_ota_img_states_t state;
-  if (esp_ota_get_state_partition(running, &state) == ESP_OK &&
-      state == ESP_OTA_IMG_PENDING_VERIFY) {
-    esp_ota_mark_app_valid_cancel_rollback();
+
+  esp_err_t stateResult = esp_ota_get_state_partition(running, &state);
+
+  if (stateResult != ESP_OK) {
+    Serial.printf("[OTA] Cannot get partition state: %s\n",
+                  esp_err_to_name(stateResult));
+    return false;
   }
+
+  if (state == ESP_OTA_IMG_VALID) {
+    return true;
+  }
+
+  if (state != ESP_OTA_IMG_PENDING_VERIFY) {
+    Serial.printf("[OTA] Unexpected image state: %d\n", state);
+    return false;
+  }
+
+  esp_err_t result = esp_ota_mark_app_valid_cancel_rollback();
+
+  if (result != ESP_OK) {
+    Serial.printf("[OTA] Boot confirmation failed: %s\n",
+                  esp_err_to_name(result));
+    return false;
+  }
+
+  Serial.println("[OTA] New firmware confirmed. Rollback cancelled.");
+  return true;
 }

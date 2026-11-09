@@ -33,7 +33,7 @@ public:
   );
 
   bool publishPendingSuccess();
-  void confirmBoot();
+  bool confirmBoot();
 
 private:
   PubSubClient& _mqtt;

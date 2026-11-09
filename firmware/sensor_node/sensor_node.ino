@@ -42,6 +42,12 @@ RemoteConfigManager configManager(
 #define OTA_STATUS_TOPIC \
   "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/status"
 
+#if OTA_ENABLED
+bool otaStartupChecksPassed = false;
+bool otaBootConfirmed = false;
+uint32_t otaStartupTime = 0;
+#endif
+
 OtaClient otaClient(
   mqttClient,
   DEVICE_ID,
@@ -179,13 +185,27 @@ void setup() {
   }
 
   // Doc thu mau cam bien ban dau
-  sensorDrivers.readSample(currentSample);
+  #if OTA_ENABLED
+    otaStartupChecksPassed = sensorDrivers.readSample(currentSample);
+    otaStartupTime = millis();
+    Serial.printf(
+      "[OTA] Startup sensor check: %s\n",
+      otaStartupChecksPassed ? "PASSED" : "FAILED"
+    );
+  #else
+    sensorDrivers.readSample(currentSample);
+  #endif
 }
 
 void loop() {
   // 1. Dieu phoi duy tri ket noi Wi-Fi, MQTT, dong bo NTP va gui heartbeat
   sessionManager.loop();
   #if OTA_ENABLED
+    if (!otaBootConfirmed &&
+        otaStartupChecksPassed &&
+        millis() - otaStartupTime >= 30000) {
+      otaBootConfirmed = otaClient.confirmBoot();
+    }
     otaClient.publishPendingSuccess();
   #endif
   // 2. Dieu phoi dong bo du lieu cam bien (gui telemetry va xu ly bu du lieu ngoai tuyen)
