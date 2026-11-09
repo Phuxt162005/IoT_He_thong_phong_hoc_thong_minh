@@ -28,6 +28,28 @@ struct OtaStatus {
   String message;
 };
 
-bool parseOtaCommand(const uint8_t* payload, size_t length, OtaCommand& command);
+struct OtaAck {
+  String jobId;
+  String deviceId;
+  String roomId;
+  String sessionId;
+  String result;
+  String status;
+};
+
+bool parseOtaCommand(
+  const uint8_t* payload,
+  size_t length,
+  OtaCommand& command
+);
+
+bool parseOtaAck(
+  const uint8_t* payload,
+  size_t length,
+  OtaAck& ack
+);
+
 String serializeOtaStatus(const OtaStatus& status);
+
 bool isValidHex(const String& value, size_t expectedLength);
+bool isValidBase64(const String& value, size_t expectedDecodedLength);
