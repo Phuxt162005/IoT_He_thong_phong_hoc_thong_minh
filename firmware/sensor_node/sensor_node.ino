@@ -8,6 +8,7 @@
 #include "MqttSyncManager.h"
 #include "SensorDrivers.h"
 #include "OledDisplay.h"
+#include "ota/OtaClient.h"
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -32,6 +33,24 @@ RemoteConfigManager configManager(
   HEARTBEAT_INTERVAL_S   // default heartbeat interval
 );
 
+#define OTA_COMMAND_TOPIC \
+  "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/command"
+
+#define OTA_ACK_TOPIC \
+  "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/ack"
+
+#define OTA_STATUS_TOPIC \
+  "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/status"
+
+OtaClient otaClient(
+  mqttClient,
+  DEVICE_ID,
+  ROOM_ID,
+  "SENSOR_NODE",
+  "ESP32",
+  OTA_STATUS_TOPIC
+);
+
 OfflineQueue offlineQueue(LittleFS, 100);
 MqttSyncManager syncManager(mqttClient, offlineQueue, DEVICE_ID, ROOM_ID);
 
@@ -42,21 +61,47 @@ uint32_t lastSampleTime = 0;
 TelemetrySample currentSample;
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // 1. Kiem tra va xu ly ban tin cau hinh tu xa /config
+#if OTA_ENABLED
+  String topicName(topic);
+
+  if (topicName == OTA_COMMAND_TOPIC) {
+    otaClient.handleCommand(topic, payload, length);
+    return;
+  }
+
+  if (topicName == OTA_ACK_TOPIC) {
+    otaClient.handleAck(topic, payload, length);
+    return;
+  }
+#endif
+
   if (configManager.handleMessage(topic, payload, length)) {
     return;
   }
 
-  // 2. Kiem tra va xu ly ban tin xac nhan telemetry /telemetry/ack
   syncManager.handleMessage(topic, payload, length);
 }
 
 void onMqttConnected(const String& sessionId) {
   Serial.println("[MQTT] Connected successfully! Session ID: " + sessionId);
-  // Dang ky nhan cau hinh tu xa khi vua ket noi MQTT
+
   configManager.subscribe();
-  // Dang ky topic nhan ACK cho du lieu cam bien
   syncManager.onMqttConnected();
+
+#if OTA_ENABLED
+  otaClient.setCurrentSessionId(sessionId);
+
+  bool commandSubscribed = mqttClient.subscribe(OTA_COMMAND_TOPIC, 1);
+  bool ackSubscribed = mqttClient.subscribe(OTA_ACK_TOPIC, 1);
+
+  Serial.printf(
+    "[OTA] Subscribe command: %s | ACK: %s\n",
+    commandSubscribed ? "OK" : "FAILED",
+    ackSubscribed ? "OK" : "FAILED"
+  );
+
+  otaClient.publishPendingSuccess();
+#endif
 }
 
 void onConfigChanged(uint32_t sampleInterval, uint32_t heartbeatInterval) {
@@ -70,6 +115,10 @@ void setup() {
   Serial.println(" SMART CLASSROOM SENSOR NODE - PHASE 3: SENSORS & OLED");
   Serial.println("========================================================");
 
+  #if OTA_ENABLED
+    otaClient.setPublicKey(OTA_ED25519_PUBLIC_KEY);
+    otaClient.setCaCertificate(OTA_ROOT_CA_CERT);
+  #endif
   // 1. Khoi tao man hinh OLED & Cam bien phan cung
   oledDisplay.begin();
   sensorDrivers.begin();
@@ -123,7 +172,6 @@ void setup() {
 
   // 6. Cau hinh Session Manager
   sessionManager.setOnConnectedCallback(onMqttConnected);
-
   if (!sessionManager.begin()) {
     Serial.println("[ERROR] SessionManager initialization failed: " + sessionManager.lastError());
   } else {
@@ -137,7 +185,9 @@ void setup() {
 void loop() {
   // 1. Dieu phoi duy tri ket noi Wi-Fi, MQTT, dong bo NTP va gui heartbeat
   sessionManager.loop();
-
+  #if OTA_ENABLED
+    otaClient.publishPendingSuccess();
+  #endif
   // 2. Dieu phoi dong bo du lieu cam bien (gui telemetry va xu ly bu du lieu ngoai tuyen)
   syncManager.loop();
 

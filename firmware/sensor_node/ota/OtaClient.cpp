@@ -243,9 +243,20 @@ bool OtaClient::verifyDigest(const uint8_t digest[32], const String& signatureBa
 
 bool OtaClient::validateCommand(const OtaCommand& c) {
   if (c.deviceId != _deviceId || c.roomId != _roomId) return false;
-  if (c.deviceType != _deviceType || c.hardwareTarget != _hardwareTarget) return false;
+
+  if (c.deviceType != _deviceType ||
+      c.hardwareTarget != _hardwareTarget) {
+    return false;
+  }
+
+  if (c.sessionId != _currentSessionId ||
+      _currentSessionId.isEmpty()) {
+    return false;
+  }
+
   if (!_hasPublicKey || _rootCA == nullptr) return false;
   if (WiFi.status() != WL_CONNECTED) return false;
+
   return true;
 }
 

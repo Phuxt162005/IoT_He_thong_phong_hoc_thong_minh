@@ -34,3 +34,5 @@
 #define PIN_I2C_SDA             21                // GPIO 21: SDA (BH1750 + OLED SSD1306)
 #define PIN_I2C_SCL             22                // GPIO 22: SCL (BH1750 + OLED SSD1306)
 #define PIN_PIR                 27                // GPIO 27: Cảm biến phát hiện người PIR
+
+#define OTA_ENABLED 0
