@@ -86,11 +86,10 @@ jobs:
           cp "firmware/${{ matrix.node }}/Config.h.example" \
              "firmware/${{ matrix.node }}/Config.h"
 
-      - name: Enable Sensor Node OTA compile path
-        if: matrix.node == 'sensor_node'
+      - name: Enable OTA compile path
         shell: bash
         run: |
-          CONFIG="firmware/sensor_node/Config.h"
+          CONFIG="firmware/${{ matrix.node }}/Config.h"
 
           if ! grep -q '^#define OTA_ENABLED 0$' "$CONFIG"; then
             echo "Expected OTA_ENABLED=0 in Config.h.example"
@@ -101,7 +100,7 @@ jobs:
 
           cat >> "$CONFIG" <<'EOF'
 
-          // CI-only test configuration. Never use these values in production.
+          // CI-only test configuration. Never use in production.
           #include <stdint.h>
 
           static const uint8_t OTA_ED25519_PUBLIC_KEY[32] = {
@@ -114,7 +113,7 @@ jobs:
           #define OTA_ROOT_CA_CERT "CI_ONLY_DUMMY_CERTIFICATE"
           EOF
 
-          echo "Sensor Node OTA compile path enabled."
+          echo "${{ matrix.node }} OTA compile path enabled."
 
       - name: Compile ESP32 firmware
         run: |

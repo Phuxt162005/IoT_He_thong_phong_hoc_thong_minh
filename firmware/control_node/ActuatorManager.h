@@ -19,13 +19,13 @@ public:
 
   void begin();
   bool subscribe();
-
   bool handleMessage(
     const char* topic,
     const uint8_t* payload,
     size_t length
   );
-
+  bool isReady() const;
+  
   void loop();
 
   String getFanState() const;

@@ -541,3 +541,7 @@ bool ActuatorManager::handleMessage(
 
   return true;
 }
+
+bool ActuatorManager::isReady() const {
+  return _prefsReady && !_storageFault;
+}

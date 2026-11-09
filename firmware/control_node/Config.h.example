@@ -32,3 +32,8 @@
 #define PIN_RELAY_FAN           25                // GPIO 25: Relay K1 - Quạt (FAN)
 #define PIN_RELAY_LIGHT         26                // GPIO 26: Relay K2 - Đèn (LIGHT)
 #define RELAY_ACTIVE_LOW        true              // true nếu relay kích mức LOW (phổ biến)
+
+// ==============================================================================
+// 6. OTA Firmware Update
+// ==============================================================================
+#define OTA_ENABLED 0

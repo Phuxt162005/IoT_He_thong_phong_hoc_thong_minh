@@ -4,6 +4,7 @@
 #include "NodeSessionManager.h"
 #include "RemoteConfigManager.h"
 #include "ActuatorManager.h"
+#include "src/ota/OtaClient.h"
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -38,18 +39,54 @@ ActuatorManager actuatorManager(
   RELAY_ACTIVE_LOW
 );
 
+#define OTA_COMMAND_TOPIC \
+  "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/command"
+
+#define OTA_ACK_TOPIC \
+  "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/ack"
+
+#define OTA_STATUS_TOPIC \
+  "smartclassroom/room/" ROOM_ID "/device/" DEVICE_ID "/ota/status"
+
+#if OTA_ENABLED
+bool otaStartupChecksPassed = false;
+bool otaBootConfirmed = false;
+uint32_t otaStartupTime = 0;
+#endif
+
+OtaClient otaClient(
+  mqttClient,
+  DEVICE_ID,
+  ROOM_ID,
+  "CONTROL_NODE",
+  "ESP32",
+  OTA_STATUS_TOPIC
+);
+
 // Hook đồng bộ trạng thái thực tế của relay vào bản tin /status ONLINE
 String getExtraStatus(const String& sessionId) {
   return actuatorManager.getReportedStatusJson();
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // 1. Kiểm tra và xử lý lệnh điều khiển Relay /command
+#if OTA_ENABLED
+  String topicName(topic);
+
+  if (topicName == OTA_COMMAND_TOPIC) {
+    otaClient.handleCommand(topic, payload, length);
+    return;
+  }
+
+  if (topicName == OTA_ACK_TOPIC) {
+    otaClient.handleAck(topic, payload, length);
+    return;
+  }
+#endif
+
   if (actuatorManager.handleMessage(topic, payload, length)) {
     return;
   }
 
-  // 2. Kiểm tra và xử lý cấu hình từ xa /config
   if (configManager.handleMessage(topic, payload, length)) {
     return;
   }
@@ -57,10 +94,24 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 void onMqttConnected(const String& sessionId) {
   Serial.println("[MQTT] Connected successfully! Session ID: " + sessionId);
-  // Đăng ký topic nhận lệnh điều khiển quạt & đèn
+
   actuatorManager.subscribe();
-  // Đăng ký topic nhận cấu hình từ xa
   configManager.subscribe();
+
+#if OTA_ENABLED
+  otaClient.setCurrentSessionId(sessionId);
+
+  bool commandSubscribed = mqttClient.subscribe(OTA_COMMAND_TOPIC, 1);
+  bool ackSubscribed = mqttClient.subscribe(OTA_ACK_TOPIC, 1);
+
+  Serial.printf(
+    "[OTA] Subscribe command: %s | ACK: %s\n",
+    commandSubscribed ? "OK" : "FAILED",
+    ackSubscribed ? "OK" : "FAILED"
+  );
+
+  otaClient.publishPendingSuccess();
+#endif
 }
 
 void onConfigChanged(uint32_t sampleInterval, uint32_t heartbeatInterval) {
@@ -70,13 +121,15 @@ void onConfigChanged(uint32_t sampleInterval, uint32_t heartbeatInterval) {
 void setup() {
   // 1. Khởi tạo và chốt ngắt Relay NGAY LẬP TỨC ở đầu setup() để chống nháy/bật ngoài ý muốn
   actuatorManager.begin();
-
   Serial.begin(115200);
   delay(200);
   Serial.println("\n========================================================");
   Serial.println(" SMART CLASSROOM CONTROL NODE - ACTUATOR & COMMAND ACK");
   Serial.println("========================================================");
-
+  #if OTA_ENABLED
+    otaClient.setPublicKey(OTA_ED25519_PUBLIC_KEY);
+    otaClient.setCaCertificate(OTA_ROOT_CA_CERT);
+  #endif
   // Khởi tạo Preferences NVS cho cấu hình
   configManager.begin();
   configManager.setOnConfigChangedCallback(onConfigChanged);
@@ -101,18 +154,45 @@ void setup() {
   } else {
     Serial.println("[NTP] SNTP time synchronization started (UTC).");
   }
+
+  #if OTA_ENABLED
+    otaStartupChecksPassed =
+      actuatorManager.isReady() &&
+      actuatorManager.getFanState() == "OFF" &&
+      actuatorManager.getLightState() == "OFF";
+
+    otaStartupTime = millis();
+
+    Serial.printf(
+      "[OTA] Startup actuator check: %s\n",
+      otaStartupChecksPassed ? "PASSED" : "FAILED"
+    );
+  #endif
 }
 
 void loop() {
-  // Điều phối luồng duy trì kết nối, đồng bộ NTP và gửi heartbeat tự động
   sessionManager.loop();
+
+#if OTA_ENABLED
+  if (!otaBootConfirmed &&
+      otaStartupChecksPassed &&
+      millis() - otaStartupTime >= 30000) {
+
+    otaBootConfirmed = otaClient.confirmBoot();
+  }
+
+  otaClient.publishPendingSuccess();
+#endif
+
   actuatorManager.loop();
 
-  // In thông tin chẩn đoán ra Serial Monitor mỗi 5 giây
   static uint32_t lastPrint = 0;
+
   if (millis() - lastPrint >= 5000) {
     lastPrint = millis();
-    Serial.printf("[Chẩn đoán] Wi-Fi: %s | NTP: %s | MQTT: %s | Session: %s | HB: %us | CfgVer: %u | ShadowVer: %u | Fan: %s | Light: %s\n",
+
+    Serial.printf(
+      "[Chẩn đoán] Wi-Fi: %s | NTP: %s | MQTT: %s | Session: %s | HB: %us | CfgVer: %u | ShadowVer: %u | Fan: %s | Light: %s\n",
       sessionManager.isWifiConnected() ? "ONLINE" : "OFFLINE",
       sessionManager.isTimeSynced() ? "SYNCED" : "SYNCING",
       sessionManager.isMqttConnected() ? "CONNECTED" : "DISCONNECTED",
