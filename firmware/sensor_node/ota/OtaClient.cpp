@@ -8,6 +8,7 @@
 #include <mbedtls/base64.h>
 #include <Preferences.h>
 #include <time.h>
+#include <esp_app_desc.h>
 
 OtaClient::OtaClient(PubSubClient& mqtt, const String& deviceId,
                      const String& roomId, const String& deviceType,
@@ -26,7 +27,10 @@ void OtaClient::setCaCertificate(const char* rootCA) {
 }
 
 void OtaClient::setCurrentSessionId(const String& sessionId) {
-  _currentSessionId = sessionId;
+  if (_currentSessionId != sessionId) {
+    _currentSessionId = sessionId;
+    _lastSuccessPublishMs = 0;
+  }
 }
 
 bool OtaClient::savePendingOta(const OtaCommand& command) {
@@ -64,8 +68,15 @@ bool OtaClient::publishPendingSuccess() {
     return false;
   }
 
-  // Chỉ gửi khi thời gian đã được đồng bộ NTP.
   if (time(nullptr) < 1700000000) {
+    return false;
+  }
+
+  // Retry tối đa một lần mỗi 10 giây.
+  uint32_t now = millis();
+
+  if (_lastSuccessPublishMs != 0 &&
+      now - _lastSuccessPublishMs < 10000) {
     return false;
   }
 
@@ -77,11 +88,31 @@ bool OtaClient::publishPendingSuccess() {
 
   bool pending = prefs.getBool("pending", false);
   String jobId = prefs.getString("job_id", "");
-  String version = prefs.getString("version", "");
+  String expectedVersion = prefs.getString("version", "");
 
   prefs.end();
 
-  if (!pending || jobId.isEmpty() || version.isEmpty()) {
+  if (!pending || jobId.isEmpty() || expectedVersion.isEmpty()) {
+    return false;
+  }
+
+  // Đọc phiên bản thực tế của firmware đang chạy.
+  const esp_app_desc_t* app = esp_app_get_description();
+
+  if (app == nullptr) {
+    return false;
+  }
+
+  String actualVersion = String(app->version);
+
+  // Không báo SUCCESS nếu firmware thực tế không đúng phiên bản.
+  if (actualVersion != expectedVersion) {
+    Serial.printf(
+      "[OTA] Version mismatch. Expected=%s, Actual=%s\n",
+      expectedVersion.c_str(),
+      actualVersion.c_str()
+    );
+
     return false;
   }
 
@@ -90,7 +121,7 @@ bool OtaClient::publishPendingSuccess() {
   status.deviceId = _deviceId;
   status.roomId = _roomId;
   status.sessionId = _currentSessionId;
-  status.version = version;
+  status.version = actualVersion;
   status.status = "SUCCESS";
   status.progress = 100;
 
@@ -100,7 +131,58 @@ bool OtaClient::publishPendingSuccess() {
     return false;
   }
 
+  // Không xóa NVS ở đây.
+  // Chỉ xóa sau khi nhận ACK hợp lệ.
+  _lastSuccessPublishMs = now;
+
+  Serial.println("[OTA] SUCCESS published; waiting for backend ACK.");
+
+  return true;
+}
+
+bool OtaClient::handleAck(
+  const char* topic,
+  const uint8_t* payload,
+  size_t length
+) {
+  if (topic == nullptr ||
+      String(topic).indexOf("/ota/ack") < 0) {
+    return false;
+  }
+
+  OtaAck ack;
+
+  if (!parseOtaAck(payload, length, ack)) {
+    return false;
+  }
+
+  if (ack.deviceId != _deviceId ||
+      ack.roomId != _roomId ||
+      ack.sessionId != _currentSessionId ||
+      ack.status != "SUCCESS") {
+    return false;
+  }
+
+  Preferences prefs;
+
+  if (!prefs.begin("ota_state", true)) {
+    return false;
+  }
+
+  bool pending = prefs.getBool("pending", false);
+  String jobId = prefs.getString("job_id", "");
+
+  prefs.end();
+
+  if (!pending || jobId.isEmpty() || ack.jobId != jobId) {
+    return false;
+  }
+
   clearPendingOta();
+  _lastSuccessPublishMs = 0;
+
+  Serial.println("[OTA] Backend ACK received. Pending state cleared.");
+
   return true;
 }
 
