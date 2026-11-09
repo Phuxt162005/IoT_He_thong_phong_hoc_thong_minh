@@ -128,10 +128,6 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
     ).status,
     200,
   );
-  node.client.on("message", (topic, raw) => {
-    if (topic === node.topic + "/ota/command")
-      command = JSON.parse(raw.toString());
-  });
   await node.client.subscribeAsync(
     [node.topic + "/ota/command", node.topic + "/ota/ack"],
     { qos: 1 },
