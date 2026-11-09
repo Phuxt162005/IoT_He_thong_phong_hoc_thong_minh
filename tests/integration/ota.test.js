@@ -107,6 +107,15 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
   );
   const uploaded = await uploadFirmware(f);
   const firmwareId = uploaded.body.data.firmware_id;
+  let otaAck;
+  node.client.on("message", (topic, raw) => {
+    if (topic === node.topic + "/ota/command") {
+      command = JSON.parse(raw.toString());
+    }
+    if (topic === node.topic + "/ota/ack") {
+      otaAck = JSON.parse(raw.toString());
+    }
+  });
   assert.equal(
     (
       await f.request(`/ota/firmware/${firmwareId}/publish`, {
@@ -121,7 +130,10 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
     if (topic === node.topic + "/ota/command")
       command = JSON.parse(raw.toString());
   });
-  await node.client.subscribeAsync(node.topic + "/ota/command", { qos: 1 });
+  await node.client.subscribeAsync(
+    [node.topic + "/ota/command", node.topic + "/ota/ack"],
+    { qos: 1 },
+  );
   const created = await f.request(`/devices/${node.device.device_id}/ota`, {
     method: "POST",
     token: f.token,
@@ -170,6 +182,16 @@ test("OTA: API creates a job, publishes MQTT and persists status through SUCCESS
           ])
         ).rows[0]?.status === status,
     );
+
+    await waitFor(() => Boolean(otaAck));
+
+    assert.equal(otaAck.job_id, jobId);
+    assert.equal(otaAck.device_id, node.device.device_code);
+    assert.equal(otaAck.room_id, f.room.room_code);
+    assert.equal(otaAck.session_id, "boot-1");
+    assert.equal(otaAck.result, "PROCESSED");
+
+    otaAck = undefined;
   }
   const listed = await f.request(
     `/ota/jobs?device_id=${node.device.device_id}`,

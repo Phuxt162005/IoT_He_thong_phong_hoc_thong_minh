@@ -28,11 +28,11 @@ export async function bootstrapBroker(
   const roles = {
     sensor_role: nodeAcls(
       ["telemetry", "heartbeat", "status", "config/ack", "ota/status"],
-      ["telemetry/ack", "config", "ota/command"],
+      ["telemetry/ack", "config", "ota/command", "ota/ack"],
     ),
     control_role: nodeAcls(
       ["ack", "reported", "heartbeat", "status", "config/ack", "ota/status"],
-      ["command", "config", "ota/command"],
+      ["command", "config", "ota/command", "ota/ack"],
     ),
     backend_role: [
       acl("publishClientSend", "smartclassroom/#"),

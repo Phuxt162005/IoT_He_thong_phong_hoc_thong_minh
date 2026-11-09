@@ -455,7 +455,7 @@ export class OtaService {
       );
     }
 
-    return withTransaction(this.pool, async (client) => {
+    const result = await withTransaction(this.pool, async (client) => {
       const device = requireFound(
         (
           await client.query(
@@ -620,6 +620,20 @@ export class OtaService {
 
       return { duplicate: false, job: jobView(updated) };
     });
+
+    // Chỉ gửi ACK sau khi transaction đã hoàn tất.
+    await this.mqtt.publish(
+      `smartclassroom/room/${envelope.roomCode}/device/${envelope.deviceCode}/ota/ack`,
+      {
+        job_id: data.job_id,
+        device_id: data.device_id,
+        room_id: data.room_id,
+        session_id: data.session_id,
+        result: "PROCESSED",
+      },
+    );
+
+    return result;
   }
 
   async listFirmware(actor, filters) {
