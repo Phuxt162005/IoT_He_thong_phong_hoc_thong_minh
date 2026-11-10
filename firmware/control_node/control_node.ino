@@ -109,8 +109,6 @@ void onMqttConnected(const String& sessionId) {
       commandSubscribed ? "OK" : "FAILED",
       ackSubscribed ? "OK" : "FAILED"
     );
-
-    otaClient.publishPendingSuccess();
   #endif
 }
 

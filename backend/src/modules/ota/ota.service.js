@@ -493,8 +493,7 @@ export class OtaService {
 
       if (
         device.broker_sync_status !== "SYNCED" ||
-        !isCurrentDeviceSession ||
-        (!isOriginalSession && !isPostReboot)
+        (!isPostReboot && (!isCurrentDeviceSession || !isOriginalSession))
       ) {
         throw new AppError(
           "OTA_SESSION_INVALID",
@@ -503,7 +502,7 @@ export class OtaService {
         );
       }
 
-      const session = await this.repository.getCurrentSession(
+      let session = await this.repository.getCurrentSession(
         client,
         device.device_id,
         data.session_id,
@@ -513,6 +512,23 @@ export class OtaService {
         client,
         device.device_id,
       );
+
+      // Nếu là sau khi reboot, thiết bị có thể gửi OTA status SUCCESS trước khi bản tin status/heartbeat kịp ghi nhận session mới
+      if (!session && isPostReboot && credential) {
+        await client.query(
+          "UPDATE device_sessions SET closed_at=now() WHERE device_id=$1 AND closed_at IS NULL",
+          [device.device_id],
+        );
+        await client.query(
+          "INSERT INTO device_sessions(device_id, session_id, last_timestamp_ms) VALUES($1, $2, $3) ON CONFLICT DO NOTHING",
+          [device.device_id, data.session_id, Date.now()],
+        );
+        await client.query(
+          "UPDATE devices SET connection_status='ONLINE', session_id=$1, updated_at=now() WHERE device_id=$2",
+          [data.session_id, device.device_id],
+        );
+        session = { session_id: data.session_id };
+      }
 
       if (!session || !credential) {
         throw new AppError(
@@ -576,8 +592,8 @@ export class OtaService {
 
       if (data.status === "SUCCESS") {
         await client.query(
-          "UPDATE devices SET firmware_version=$1 WHERE device_id=$2",
-          [data.version, device.device_id],
+          "UPDATE devices SET firmware_version=$1, session_id=$2, connection_status='ONLINE', updated_at=now() WHERE device_id=$3",
+          [data.version, data.session_id, device.device_id],
         );
       }
 
