@@ -97,7 +97,7 @@ bool parseOtaCommand(
     return false;
   }
 
-  if (!c.downloadUrl.startsWith("https://")) return false;
+  if (!c.downloadUrl.startsWith("https://") && !c.downloadUrl.startsWith("http://")) return false;
   if (!isValidHex(c.sha256, 64)) return false;
 
   // Ed25519 signature: 64 bytes, Base64 encoded.

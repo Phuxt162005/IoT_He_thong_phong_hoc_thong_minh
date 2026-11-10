@@ -103,8 +103,8 @@ export function loadConfig(
 
   if (data.OTA_DOWNLOAD_BASE_URL) {
     const url = new URL(data.OTA_DOWNLOAD_BASE_URL);
-    if (url.protocol !== "https:") {
-      throw new Error("OTA_DOWNLOAD_BASE_URL bắt buộc sử dụng HTTPS");
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error("OTA_DOWNLOAD_BASE_URL bắt buộc sử dụng HTTP hoặc HTTPS");
     }
   }
   if (data.MQTT_USERNAME === data.MQTT_ADMIN_USERNAME)

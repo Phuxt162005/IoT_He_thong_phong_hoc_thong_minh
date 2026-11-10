@@ -105,8 +105,6 @@ void onMqttConnected(const String& sessionId) {
       commandSubscribed ? "OK" : "FAILED",
       ackSubscribed ? "OK" : "FAILED"
     );
-
-    otaClient.publishPendingSuccess();
   #endif
 }
 
@@ -129,8 +127,8 @@ void setup() {
   oledDisplay.begin();
   sensorDrivers.begin();
 
-  // 2. Khoi tao bo nho dem LittleFS cho hang doi ngoai tuyen
-  if (!LittleFS.begin(false)) {
+  // 2. Khoi tao bo nho dem LittleFS cho hang doi ngoai tuyen (formatOnFail = true khi doi partition scheme)
+  if (!LittleFS.begin(true)) {
     Serial.println(
       "[LittleFS] Mount that bai. Dung he thong de bao toan du lieu."
     );

@@ -201,6 +201,11 @@ test("PHASE 1: NodeSessionManager simulation for Sensor Node and Control Node", 
     { qos: 0 },
   );
 
+  await waitFor(async () => {
+    const row = (await f.pool.query("SELECT last_heartbeat_at FROM devices WHERE device_id=$1", [controlDevice.device_id])).rows[0];
+    return Boolean(row?.last_heartbeat_at);
+  });
+
   // Kích hoạt Control Node
   const ctrlActivate = await f.action(controlDevice.device_id, "activate");
   assert.equal(ctrlActivate.status, 200, "Control node phải kích hoạt thành công");

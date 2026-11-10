@@ -12,8 +12,8 @@ export class OtaDownloadSigner {
     }
 
     const url = new URL(baseUrl);
-    if (url.protocol !== "https:") {
-      throw new TypeError("OTA download URL bắt buộc sử dụng HTTPS");
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new TypeError("OTA download URL bắt buộc sử dụng HTTP hoặc HTTPS");
     }
 
     this.baseUrl = `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
