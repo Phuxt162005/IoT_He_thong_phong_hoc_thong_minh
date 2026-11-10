@@ -450,6 +450,8 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
 
   Serial.println("[OTA] Tai firmware thanh cong 100%! Dang kiem tra SHA-256 va Ed25519...");
   publishStatus(c, "VERIFYING", 100, "Checking SHA-256 and Ed25519");
+  _mqtt.loop();
+  delay(100);
 
   // In ra mã SHA-256 tính toán và mong đợi
   Serial.print("[OTA] SHA-256 thuc te : ");
@@ -479,6 +481,8 @@ bool OtaClient::installFirmware(const OtaCommand& c) {
   Serial.println("[OTA] Chu ky Ed25519 HOP LE 100%! Dang hoan tat ghi vao Flash...");
 
   publishStatus(c, "INSTALLING", 100, "Firmware verified; finalizing update");
+  _mqtt.loop();
+  delay(100);
 
   if (!savePendingOta(c)) {
     Serial.println("[OTA] Loi luu trang thai OTA pending vao NVS!");

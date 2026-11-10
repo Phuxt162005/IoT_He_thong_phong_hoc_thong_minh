@@ -487,7 +487,10 @@ export class OtaService {
       );
       const isPostReboot =
         postRebootStatus &&
-        (job.status === "REBOOTING" || job.status === data.status);
+        (job.status === "REBOOTING" ||
+          job.status === "INSTALLING" ||
+          job.status === "VERIFYING" ||
+          job.status === data.status);
       const isOriginalSession = job.session_id === data.session_id;
       const isCurrentDeviceSession = device.session_id === data.session_id;
 
