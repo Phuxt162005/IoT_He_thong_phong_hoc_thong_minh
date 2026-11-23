@@ -44,6 +44,22 @@ Xem [cấu hình Sensor Node](../firmware/sensor_node/Config.h.example).
 
 Hình 6.8 trích từ báo cáo thiết kế. Bảng chân phía trên bổ sung OLED và xác định kênh theo tải đèn/quạt trong cấu hình firmware.
 
-## Ảnh prototype
+### Sơ đồ lắp mạch minh họa (Cirkit Designer)
 
-Hồ sơ hiện có sơ đồ thiết kế. Mục này đang chờ ảnh chụp hai ESP32 đã lắp mạch, gồm Sensor Node với cảm biến/OLED, Control Node với relay/tải và một ảnh toàn cảnh prototype.
+![Sơ đồ lắp mạch tổng quan Sensor Node và Control Node trên breadboard](images/prototype-overview.jpg)
+
+Hình trên là sơ đồ lắp mạch minh họa dựng trên **Cirkit Designer**, bổ sung đầy đủ **màn hình OLED SSD1306** cùng **DHT22**, **BH1750**, **PIR HC-SR501** trên **Sensor Node** (trái) và mạch điều khiển **quạt DC / đèn LED** qua relay kèm nguồn `5 V` ngoài trên **Control Node** (phải; thư viện minh họa sử dụng module relay 4 kênh và đấu nối 2 kênh cho `FAN` và `LIGHT`, khi thi công thực tế dùng module relay 2 kênh như danh sách linh kiện ở trên).
+
+## Ảnh prototype thực tế
+
+### Cận cảnh hai node và màn hình OLED đang hoạt động
+
+![Ảnh cận cảnh prototype thực tế gồm 2 ESP32, OLED, cảm biến, relay, LED và quạt DC](images/prototype-real-closeup.jpg)
+
+Sensor Node (`ESP32` phía dưới trái) hiển thị số đo môi trường và trạng thái kết nối `Net: W:OK M:OK` trên OLED SSD1306, kết nối DHT22, PIR HC-SR501 và BH1750; Control Node (`ESP32` phía trên phải) điều khiển đèn LED vàng và quạt DC qua module relay 2 kênh.
+
+### Toàn cảnh mô hình thử nghiệm
+
+![Ảnh toàn cảnh prototype 2 node ESP32 trên bàn thử nghiệm](images/prototype-real-overview.jpg)
+
+Ảnh toàn cảnh mô hình 2 ESP32 đang cấp nguồn vận hành thực tế cùng module relay 2 kênh xanh và tải quạt DC, phù hợp với [kịch bản kiểm thử phần cứng](../tests/hardware-test-scenarios.md).
