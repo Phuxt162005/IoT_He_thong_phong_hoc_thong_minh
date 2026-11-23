@@ -19,6 +19,21 @@ Compose đợi PostgreSQL/Mosquitto healthy và init hoàn thành trước khi m
 
 Khi cập nhật mã: build lại và chạy cùng lệnh `up -d --build --wait backend`; migration mới phải thêm file SQL, không sửa file đã áp dụng. Nếu chạy `npm start` ngoài Docker, dừng service backend để tránh trùng cổng và MQTT client ID. BACKEND_PORT/POSTGRES_PORT/MQTT_PORT có thể đổi cổng host; URL nội bộ container giữ nguyên. MQTT_CLIENT_ID phải riêng cho mỗi backend đang kết nối.
 
+## Chạy backend bằng Node.js trên máy chủ
+
+Từ thư mục gốc, dùng `.env` đã chuẩn bị ở trên. Khởi động PostgreSQL và Mosquitto bằng Compose, sau đó chạy các bước khởi tạo qua npm.
+
+```powershell
+docker compose --env-file .env -f deployment/compose.yml --profile app stop backend
+docker compose --env-file .env -f deployment/compose.yml up -d --wait db mqtt
+npm run db:migrate
+npm run db:seed
+npm run mqtt:bootstrap
+npm start
+```
+
+Có thể dùng `npm run dev` để tự khởi động lại backend khi sửa mã. Các URL kết nối trong `.env` sử dụng cổng công bố trên máy chủ.
+
 ## Kiểm thử và demo mô phỏng
 
 ```powershell
@@ -55,7 +70,7 @@ SIGTERM/SIGINT đóng WebSocket, dừng HTTP nhận mới, chờ job đang chạ
 
 ## Mạng và firmware
 
-Mặc định mọi cổng host chỉ bind loopback; phù hợp dev/demo tại máy. Để ESP32 truy cập LAN/production, cấu hình DNS/IP, chứng chỉ TLS và firewall trước khi mở cổng. Có [mẫu Mosquitto TLS](../deployment/mosquitto/mosquitto.tls.conf.example): mount thành mosquitto.conf, mount ca/server cert/key ở /mosquitto/certs, publish 8883 và cho firmware xác minh CA/hostname. Backend có thể tiếp tục dùng 1883 trong mạng Docker riêng. Không mở listener nội bộ 1883 ra Internet. Mẫu TLS cần chứng chỉ của môi trường đích; chưa chạy nghiệm thu TLS tại đây.
+Compose công bố backend ở cổng 3000 và Mosquitto ở cổng 1884 trên IPv4 của máy chủ. PostgreSQL và broker kiểm thử chỉ bind loopback. Với prototype trên LAN, đặt `MQTT_HOST` thành IP LAN của máy chạy Docker. Truy cập production qua mạng ngoài cần cấu hình firewall và TLS. Để dùng [mẫu Mosquitto TLS](../deployment/mosquitto/mosquitto.tls.conf.example), mount cấu hình thành `mosquitto.conf`, mount chứng chỉ/khóa ở `/mosquitto/certs`, công bố cổng 8883 và cấu hình firmware xác minh CA/hostname. Hai sketch chính hiện dùng `WiFiClient`. Tích hợp TLS trên thiết bị còn cần triển khai và nghiệm thu tại môi trường đích.
 
 HTTP/WebSocket production đặt sau reverse proxy HTTPS/WSS: forward HTTP tới loopback 3000, `/ws` cần Upgrade/Connection và HTTP/1.1, timeout đủ cho ping/pong. Đặt CORS_ORIGINS thành origin frontend thực tế. Mặc định không tin X-Forwarded-For; nếu muốn lấy IP người dùng qua proxy thì cấu hình Express trust proxy đúng phạm vi proxy, không tin mọi nguồn.
 
@@ -63,6 +78,6 @@ Firmware cần MQTT username/password/client ID riêng từ provision; tạo ses
 
 ## Tài liệu API và giới hạn nghiệm thu
 
-[openapi.json](openapi.json) theo [OpenAPI 3.1.1](https://spec.openapis.org/oas/v3.1.1.html) mô tả 53 HTTP operations, Bearer auth, input/query/response envelope và mã lỗi. Tái sinh bằng `npm run docs:openapi`; unit test đối chiếu với toàn bộ route Express và kiểm các schema reference. MQTT/WebSocket và chính sách nghiệp vụ chi tiết nằm trong README/hợp đồng; frontend lấy snapshot khi reconnect.
+[openapi.json](openapi.json) mô tả HTTP API, Bearer auth, tham số, phản hồi và mã lỗi. Tái sinh bằng `npm run docs:openapi`. Unit test đối chiếu với toàn bộ route Express và kiểm các schema reference. Xem [hợp đồng MQTT](backend-contracts.md) và [mô tả WebSocket](backend-notes.md#dashboard-dữ-liệu-và-realtime-be-14). Frontend lấy snapshot khi kết nối lại.
 
-Backend chạy và được kiểm chứng với PostgreSQL/Mosquitto thật cùng MQTT client Node mô phỏng. Chưa có ESP32/cảm biến/relay thật, frontend tích hợp, chứng chỉ production hoặc bài đo tải/đường truyền Wi-Fi. Giới hạn hiện tại: một Sensor và một Control Node chưa thu hồi mỗi phòng; job quét tối đa 1000 thiết bị/phòng có rule mỗi lượt, consumer cảnh báo tối đa 100 event/lượt. Cần đo tải, phân trang worker hoặc tăng năng lực trước khi dùng quy mô lớn hơn. Chưa tạo tag `v1.0.0` vì tiêu chí nghiệm thu toàn hệ thống trong kế hoạch còn phần phần cứng/frontend.
+Backend có kiểm thử với PostgreSQL/Mosquitto và MQTT client Node mô phỏng. Dashboard có bộ [kiểm thử trình duyệt](../frontend/README.md#kiểm-thử-giao-diện-tích-hợp). Phần cứng, chứng chỉ production và độ trễ qua Wi-Fi cần được nghiệm thu tại môi trường đích. Mỗi phòng hỗ trợ một Sensor Node và một Control Node chưa thu hồi. Job quét tối đa 1.000 thiết bị hoặc phòng có quy tắc mỗi lượt, consumer cảnh báo xử lý tối đa 100 sự kiện mỗi lượt.

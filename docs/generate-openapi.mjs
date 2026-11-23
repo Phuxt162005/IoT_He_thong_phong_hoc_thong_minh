@@ -692,7 +692,7 @@ const document = {
     title: "Smart Classroom Backend",
     version: "1.0.0-backend",
     description:
-      "Backend HTTP contract. Authenticated requests are limited to 100/minute/user. Roles and room membership are checked server-side. For MQTT and WebSocket first-frame authentication see backend-contracts.md and README.md. Hardware acceptance is pending.",
+      "Backend HTTP contract. Authenticated requests are limited to 100/minute/user. Roles and room membership are checked server-side. See backend-contracts.md for MQTT and backend-notes.md for WebSocket first-frame authentication. Hardware acceptance is pending.",
   },
   servers: [
     {
