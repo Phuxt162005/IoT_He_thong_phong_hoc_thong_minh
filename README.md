@@ -30,7 +30,7 @@ flowchart LR
 | [deployment/](deployment/) | Docker Compose, Dockerfile, cấu hình Mosquitto và script triển khai. |
 | [hardware/](hardware/) | Danh sách linh kiện, sơ đồ nối dây và hình minh họa phần cứng trong báo cáo. |
 | [tests/](tests/) | Kiểm thử đơn vị, tích hợp, trình duyệt và kịch bản kiểm thử phần cứng. |
-| [docs/](docs/) | Đề bài, đặc tả giao tiếp, hướng dẫn vận hành và tài liệu tính năng nâng cao. |
+| [docs/](docs/) | Đặc tả giao tiếp, hướng dẫn vận hành và tài liệu tính năng nâng cao. |
 | [.env.example](.env.example) | Biến môi trường backend và Docker Compose với giá trị mẫu. |
 
 ## Cài đặt và chạy cục bộ
@@ -95,7 +95,6 @@ Kiểm thử tích hợp dùng PostgreSQL và Mosquitto riêng, theo cấu hình
 
 ## Tài liệu
 
-- [Đề bài mục 8.1](docs/assignment.pdf#page=10).
 - [Đặc tả HTTP OpenAPI](docs/openapi.json), [hợp đồng MQTT](docs/backend-contracts.md) và [ghi chú triển khai backend](docs/backend-notes.md#dashboard-dữ-liệu-và-realtime-be-14) có chi tiết WebSocket.
 - [Tài liệu nâng cao](docs/advanced/) gồm Device Shadow, đồng bộ offline, Monitoring và Logging, phát hiện bất thường và OTA.
 
